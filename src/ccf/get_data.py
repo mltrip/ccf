@@ -66,7 +66,7 @@ class OnMessage:
     if 'depth' in ws.url:
       d['time'] = datetime.utcnow()
       data = json.loads(message)
-      d['lastUpdateId'] = data['lastUpdateId']
+      d['d_i'] = data['lastUpdateId']
       for i, a in enumerate(data['asks']):
         if a[1] != '0':
           d[f'a_p_{i}'] = float(a[0])
