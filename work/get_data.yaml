@@ -1,0 +1,13 @@
+markets:
+- btcusdt
+- ethusdt
+streams:
+- depth5@1000ms
+- trade
+verbose: true
+executor_kwargs:
+  max_workers: 4
+# run_kwargs:
+#   http_proxy_host: 127.0.0.1
+#   http_proxy_port: 3128
+#   proxy_type: http

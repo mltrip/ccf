@@ -1,0 +1,4 @@
+engine_kwargs:
+  url: sqlite:///btcusdt@trade.db
+read_kwargs:
+  sql: "SELECT * FROM 'data'"

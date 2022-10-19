@@ -1,0 +1,4 @@
+pandas
+PyYAML
+SQLAlchemy
+websocket-client
