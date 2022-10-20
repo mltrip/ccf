@@ -6,22 +6,32 @@ See Also:
 import sys
 import json
 from datetime import datetime, timezone
+import time
 
 import yaml
 import websocket
 from concurrent.futures import ThreadPoolExecutor, wait
 from sqlalchemy import create_engine
 import pandas as pd
+import numpy as np
+import feedparser
 
 
-def get_data(markets, streams, verbose=False,
+def get_data(markets=None, streams=None, feeds=None, 
+             engine_kwargs=None, 
+             market_kwargs=None, feeds_kwargs=None,
              executor_kwargs=None, app_kwargs=None, 
-             run_kwargs=None, engine_kwargs=None):
+             run_kwargs=None):
+  markets = [] if markets is None else markets
+  streams = [] if streams is None else streams
+  feeds = [] if feeds is None else feeds
   engine_kwargs = {'url': 'sqlite:///data.db'} if engine_kwargs is None else engine_kwargs
   executor_kwargs = {} if executor_kwargs is None else executor_kwargs
+  feeds_kwargs = {} if feeds_kwargs is None else feeds_kwargs
+  market_kwargs = {} if market_kwargs is None else market_kwargs
   app_kwargs = {} if app_kwargs is None else app_kwargs
   run_kwargs = {} if run_kwargs is None else run_kwargs
-  if verbose:
+  if market_kwargs.pop('verbose', False):
     websocket.enableTrace(True)
   executor = ThreadPoolExecutor(**executor_kwargs)
   futures = []
@@ -37,6 +47,13 @@ def get_data(markets, streams, verbose=False,
                                            app_kwargs=app_kwargs)
       app = websocket.WebSocketApp(**app_kwargs)
       futures.append(executor.submit(app.run_forever, **run_kwargs))
+  feeds = [k for k, v in feeds.items() if v]
+  feeds = np.array_split(feeds, feeds_kwargs.pop('split', 1))
+  feeds_kwargs['engine_kwargs'] = engine_kwargs
+  for f in feeds:
+    feeds_kwargs['feeds'] = f
+    on_feed = OnFeed(**feeds_kwargs)
+    futures.append(executor.submit(on_feed))
   wait(futures)
 
 
@@ -58,9 +75,8 @@ class OnMessage:
   def __call__(self, ws, message):
     d = {}
     if 'depth' in ws.url:
-      d['time'] = datetime.utcnow()
+      d['time'] = datetime.now(timezone.utc)
       data = json.loads(message)
-      d['d_i'] = data['lastUpdateId']
       for i, a in enumerate(data['asks']):
         if a[1] != '0':
           d[f'a_p_{i}'] = float(a[0])
@@ -80,8 +96,7 @@ class OnMessage:
       d['time'] = datetime.fromtimestamp(float(data['T']) / 1000.0, tz=timezone.utc)
       d['t_p'] = float(data['p'])
       d['t_q'] = float(data['q'])
-      d['t_i'] = data['t']
-      d['t_t'] = 'sell' if data['m'] else 'buy'
+      d['t_t'] = data['m']  # True - Sell, False - Buy
     else:
       raise NotImplementedError(s)
     df = pd.DataFrame.from_records([d], index='time')
@@ -90,6 +105,72 @@ class OnMessage:
     else:
       name = 'data'
     df.to_sql(name, self.con, if_exists='append')
+
+    
+class OnFeed:
+  def __init__(self, engine_kwargs, feeds, delay=3, verbose=False):
+    self.feeds = feeds
+    self.delay = delay
+    self.verbose = verbose
+    url = engine_kwargs['url']
+    if not 'sqlite' in url:
+      self.con = create_engine(**engine_kwargs)
+      self.is_sqlite = False
+    else:
+      tokens = url.split('/')
+      tokens[-1] = f'news.db'
+      engine_kwargs['url'] = '/'.join(tokens)
+      self.con = create_engine(**engine_kwargs)
+      self.is_sqlite = True
+    self.cache = set()
+    
+  def __call__(self):
+    while True:
+      t0 = time.time()
+      for f in self.feeds:
+        try:
+          r = feedparser.parse(f)
+        except Exception:
+          d, s = [], None
+        else:
+          d, s = r.get('entries', []), r.get('status', None)
+        dd = []
+        for e in d:
+          i = e.get('id', None)
+          if i not in self.cache:
+            t = e.get('published_parsed', None)
+            if t is not None:
+              t = datetime.fromtimestamp(time.mktime(t), tz=timezone.utc)
+            authors = e.get('authors', None)
+            if authors is not None:
+              authors = '|'.join(x.get('name', '') for x in authors)
+            tags = e.get('tags', None)
+            if tags is not None:
+              tags = '|'.join(x.get('term', '') for x in tags)
+            links = e.get('links', None)
+            if links is not None:
+              links = '|'.join(x.get('href', '') for x in links)
+            ee = {'id': i,
+                  'links': links,
+                  'title': e.get('title', None),
+                  'time': t,
+                  'authors': authors,
+                  'tags': tags,
+                  'summary': e.get('summary', None)}
+            dd.append(ee)
+            self.cache.add(i)
+        if self.verbose:
+          print(f'feed: {f}, status: {s}, news: {len(dd)}')
+        if len(dd) > 0:
+          df = pd.DataFrame.from_records(dd, index='id')
+          if not self.is_sqlite:
+            name = 'news'
+          else:
+            name = 'data'
+          df.to_sql(name, self.con, if_exists='append')
+      print(self.delay - ((time.time() - t0) % self.delay))
+      time.sleep(self.delay - ((time.time() - t0) % self.delay))
+
   
   
 if __name__ == "__main__":
