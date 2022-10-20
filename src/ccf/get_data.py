@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 
 import yaml
 import websocket
-from concurrent.futures import ThreadPoolExecutor, wait, as_completed
+from concurrent.futures import ThreadPoolExecutor, wait
 from sqlalchemy import create_engine
 import pandas as pd
 
@@ -37,13 +37,7 @@ def get_data(markets, streams, verbose=False,
                                            app_kwargs=app_kwargs)
       app = websocket.WebSocketApp(**app_kwargs)
       futures.append(executor.submit(app.run_forever, **run_kwargs))
-  for future in as_completed(futures):
-    try:
-        data = future.result()
-    except Exception as exc:
-        print('%r generated an exception: %s' % (url, exc))
-    else:
-        print('%r page is %d bytes' % (url, len(data)))
+  wait(futures)
 
 
 class OnMessage:
