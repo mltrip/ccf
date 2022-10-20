@@ -5,7 +5,7 @@ See Also:
 """
 import sys
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import time
 
 import yaml
@@ -108,9 +108,10 @@ class OnMessage:
 
     
 class OnFeed:
-  def __init__(self, engine_kwargs, feeds, delay=3, verbose=False):
+  def __init__(self, engine_kwargs, feeds, delay=3, before=None, verbose=False):
     self.feeds = feeds
     self.delay = delay
+    self.before = before
     self.verbose = verbose
     url = engine_kwargs['url']
     if not 'sqlite' in url:
@@ -138,9 +139,14 @@ class OnFeed:
         for e in d:
           i = e.get('id', None)
           if i not in self.cache:
+            self.cache.add(i)
             t = e.get('published_parsed', None)
             if t is not None:
               t = datetime.fromtimestamp(time.mktime(t), tz=timezone.utc)
+              if self.before is not None:
+                min_t = datetime.now(timezone.utc) - timedelta(seconds=self.before)
+                if t < min_t:
+                  continue
             authors = e.get('authors', None)
             if authors is not None:
               authors = '|'.join(x.get('name', '') for x in authors)
@@ -158,7 +164,6 @@ class OnFeed:
                   'tags': tags,
                   'summary': e.get('summary', None)}
             dd.append(ee)
-            self.cache.add(i)
         if self.verbose:
           print(f'feed: {f}, status: {s}, news: {len(dd)}')
         if len(dd) > 0:
