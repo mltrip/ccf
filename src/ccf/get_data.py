@@ -173,7 +173,8 @@ class OnFeed:
           else:
             name = 'data'
           df.to_sql(name, self.con, if_exists='append')
-      print(self.delay - ((time.time() - t0) % self.delay))
+      if self.verbose:
+        print(self.delay - ((time.time() - t0) % self.delay))
       time.sleep(self.delay - ((time.time() - t0) % self.delay))
 
   
