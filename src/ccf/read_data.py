@@ -19,4 +19,4 @@ if __name__ == "__main__":
   with open(cfg) as f:
     kwargs = yaml.safe_load(f)
   df = read_data(**kwargs)
-  print(df) 
+  print(df)
