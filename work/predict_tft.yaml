@@ -1,6 +1,11 @@
-model_path: model.ckpt
-engine_kwargs:
-  url: sqlite:///btcusdt@depth5@1000ms.db
-  # url: sqlite:///btcusdt@trade.db
-  # url: sqlite:///news.db
+model_path: tft.ckpt
+train_kwargs: train_tft.yaml
 verbose: true
+past: 3600
+predict_kwargs:
+  mode: prediction  # prediction or quantiles
+engine_kwargs:
+  url: sqlite:///tft@prediction.db
+write_kwargs:
+  name: data
+  if_exists: append

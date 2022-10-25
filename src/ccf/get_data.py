@@ -96,7 +96,7 @@ class OnMessage:
       d['time'] = datetime.fromtimestamp(float(data['T']) / 1000.0, tz=timezone.utc)
       d['t_p'] = float(data['p'])
       d['t_q'] = float(data['q'])
-      d['t_t'] = data['m']  # True - Sell, False - Buy
+      d['t_t'] = not data['m']  # True - Buy, False - Sell
     else:
       raise NotImplementedError(s)
     df = pd.DataFrame.from_records([d], index='time')
@@ -147,6 +147,8 @@ class OnFeed:
                 min_t = datetime.now(timezone.utc) - timedelta(seconds=self.before)
                 if t < min_t:
                   continue
+            else:
+              continue
             authors = e.get('authors', None)
             if authors is not None:
               authors = '|'.join(x.get('name', '') for x in authors)
