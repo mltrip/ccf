@@ -5,15 +5,15 @@ CryptoCurrency Forecasting App for [ML System Design Course on ODS.ai](https://o
 * Install python 3.9
 * Install requirements for Data part:
 ```
-pip install src/ccf/requirements_data.txt
+pip install -r src/ccf/requirements_data.txt
 ``` 
 * Install requirements for ML part:
 ```
-pip install src/ccf/requirements_ml.txt
+pip install -r src/ccf/requirements_ml.txt
 ```
 * Install requirements dor App part:
 ```
-pip install src/ccf/requirements_app.txt
+pip install -r src/ccf/requirements_app.txt
 ```
 
 # Run
