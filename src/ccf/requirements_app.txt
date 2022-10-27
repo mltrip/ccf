@@ -1,0 +1,7 @@
+altair
+numpy
+pandas
+PyYAML
+plotly
+SQLAlchemy
+streamlit

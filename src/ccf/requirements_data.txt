@@ -1,0 +1,5 @@
+feedparser
+pandas
+PyYAML
+SQLAlchemy
+websocket-client

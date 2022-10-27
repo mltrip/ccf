@@ -2,10 +2,18 @@
 CryptoCurrency Forecasting App for [ML System Design Course on ODS.ai](https://ods.ai/tracks/ml-system-design-22)
 
 # Install
+* Install python 3.9
+* Install requirements for Data part:
 ```
-pip install src/ccf/reqirements.txt
-pip install src/ccf/reqirements_ml.txt
-pip install src/ccf/reqirements_app.txt
+pip install src/ccf/requirements_data.txt
+``` 
+* Install requirements for ML part:
+```
+pip install src/ccf/requirements_ml.txt
+```
+* Install requirements dor App part:
+```
+pip install src/ccf/requirements_app.txt
 ```
 
 # Run
@@ -14,8 +22,13 @@ Go to working directory
 cd work
 ```
 Get data
+* Linux (by default)
 ```sh
-python ../src/ccf/get_data.py
+PYTHONPATH=../src/ python ../src/ccf/get_data.py
+```
+* Windows
+```sh
+cmd /C  "set PYTHONPATH=../src && python ../src/ccf/get_data.py"
 ```
 Train [TFT](https://pytorch-forecasting.readthedocs.io/en/stable/tutorials/stallion.html) model
 ```sh
@@ -27,7 +40,7 @@ PYTHONPATH=../src/ python ../src/ccf/predict.py predict_tft.yaml
 ```
 Run Streamlit app
 ```sh
-python ../src/ccf/app.py
+streamlit run ../src/ccf/app.py app_tft.yaml
 ```
 
 # Configs
@@ -172,4 +185,30 @@ write_kwargs:
   name: data
   if_exists: append
 ```
-TODO App `work/app.yaml`
+App `work/app_tft.yaml`
+```yaml 
+past: 30
+freq: 1
+engine_kwargs:
+  orderbook:
+    url: sqlite:///btcusdt@depth5@1000ms.db
+  trades:
+    url: sqlite:///btcusdt@trade.db  
+  news:
+    url: sqlite:///news.db
+  prediction:
+    url: sqlite:///tft@prediction.db
+read_kwargs:
+  orderbook:
+    name: data
+    columns: [time, a_p_0, b_p_0]
+  trades:
+    name: data
+  news:
+    name: data
+  prediction:
+    name: data
+    columns: [time, pred]
+resample_kwargs:
+  rule: 1S
+```
