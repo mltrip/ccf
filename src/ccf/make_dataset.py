@@ -1,9 +1,11 @@
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import gc
 
 import numpy as np
 import pandas as pd
+import torch
 from pytorch_forecasting import TimeSeriesDataSet
 from sqlalchemy import create_engine
 import yaml
@@ -13,7 +15,8 @@ from ccf.make_features import make_features
 
 def make_dataset(engine_kwargs, read_kwargs, 
                  features_kwargs, dataset_kwargs,
-                 start=None, end=None, split=None, target_prefix='tgt'):
+                 start=None, end=None, split=None, 
+                 target_prefix='tgt', df_only=False):
   now = datetime.utcnow()
   if isinstance(start, (int, float)):
     start = now + timedelta(seconds=start)
@@ -89,13 +92,16 @@ def make_dataset(engine_kwargs, read_kwargs,
     df, df2 = df[:split_idx], df[split_idx:]
   else:
     df, df2 = df, None
-  dataset_kwargs['data'] = df
-  ds = TimeSeriesDataSet(**dataset_kwargs)
-  if df2 is not None:
-    ds2 = TimeSeriesDataSet.from_dataset(ds, df2, stop_randomization=True)
+  if not df_only:
+    dataset_kwargs['data'] = df
+    ds = TimeSeriesDataSet(**dataset_kwargs)  # FIXME Memory leak!
+    if df2 is not None:
+      ds2 = TimeSeriesDataSet.from_dataset(ds, df2, stop_randomization=True)
+    else:
+      ds2 = None
+    return ds, ds2, df, df2
   else:
-    ds2 = None
-  return ds, ds2, df, df2
+    return None, None, df, df2
     
   
 if __name__ == "__main__":

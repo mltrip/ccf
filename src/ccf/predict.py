@@ -30,24 +30,26 @@ def predict(model_path, train_kwargs, engine_kwargs, write_kwargs,
   dks['split'] = None
   dks['start'] = -past
   dks['end'] = max_prediction_length*resample_seconds
+  dks['df_only'] = True  # Due to memory leak of TimeSeriesDataset
   # dks['dataset_kwargs']['predict_mode'] = True
   while True:
     t0 = time.time()
-    ds, _, df, _ = make_dataset(**deepcopy(dks))
+    _, _, df, _ = make_dataset(**deepcopy(dks))
     if verbose:
       dt_data = time.time() - t0
-    if ds is None:
+    if df is None:
       status = None
     else:
       status = True if len(df) >= min_length else False
     # dl = ds.to_dataloader(**dataloader_kwargs)
     if status is not None and status:
-      # df = df.tail(min_length)
+      df = df.tail(min_length)
+      predict_kwargs['data'] = df
       # df_past = df.head(max_encoder_length)
       df_future = df.tail(max_prediction_length)
-      pred_time_idx = df_future.iloc[0].time_idx
-      predict_kwargs['data'] = ds.filter(
-        lambda x: x.time_idx_first_prediction == pred_time_idx)
+      # pred_time_idx = df_future.iloc[0].time_idx
+      # predict_kwargs['data'] = ds.filter(
+      #   lambda x: x.time_idx_first_prediction == pred_time_idx)
       pred = model.predict(**predict_kwargs)
       if predict_kwargs['mode'] == 'quantiles':
         p = pred[0]
