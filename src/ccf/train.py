@@ -13,7 +13,9 @@ from ccf.make_dataset import make_dataset
 
 
 def train(dataset_kwargs, dataloader_kwargs,
-          model_kwargs, trainer_kwargs, model_path=None):
+          model_kwargs, trainer_kwargs, 
+          model_path=None, tune=False):
+  model_path = Path(model_path) if model_path is not None else None
   # Dataset
   ds_t, ds_v, df_t, df_v = make_dataset(**dataset_kwargs)
   if ds_t is None:
@@ -22,12 +24,19 @@ def train(dataset_kwargs, dataloader_kwargs,
   dl_t = ds_t.to_dataloader(**dataloader_kwargs['train'])
   dl_v= ds_v.to_dataloader(**dataloader_kwargs['val'])
   # Model
-  loss_kwargs = model_kwargs.pop('loss')
-  l = getattr(pf.metrics, loss_kwargs.pop('class'))
-  model_kwargs['loss'] = l(**loss_kwargs)
-  model_kwargs['dataset'] = ds_t
-  c = getattr(pf.models, model_kwargs.pop('class'))
-  model = c.from_dataset(**model_kwargs)
+  if not tune:
+    loss_kwargs = model_kwargs.pop('loss')
+    l = getattr(pf.metrics, loss_kwargs.pop('class'))
+    model_kwargs['loss'] = l(**loss_kwargs)
+    model_kwargs['dataset'] = ds_t
+    c = getattr(pf.models, model_kwargs.pop('class'))
+    model = c.from_dataset(**model_kwargs)
+  else:
+    if model_path is not None:
+      c = getattr(pf.models, model_kwargs.pop('class'))
+      model = c.load_from_checkpoint(model_path)
+      if isinstance(tune, str):
+        model_path = Path(tune)
   # Trainer
   cs = trainer_kwargs.get('callbacks', [])
   for i, c in enumerate(cs):
@@ -51,8 +60,8 @@ def train(dataset_kwargs, dataloader_kwargs,
   trainer.fit(model, train_dataloaders=dl_t, val_dataloaders=dl_v)
   if model_path is not None:
     best = Path(trainer.checkpoint_callback.best_model_path)
-    p = Path(model_path)
-    shutil.copyfile(best, p)
+    model_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(best, model_path)
   return trainer
   
   

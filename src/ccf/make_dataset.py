@@ -2,11 +2,12 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import gc
+from copy import deepcopy
 
 import numpy as np
 import pandas as pd
 import torch
-from pytorch_forecasting import TimeSeriesDataSet
+import pytorch_forecasting as pf
 from sqlalchemy import create_engine
 import yaml
 
@@ -32,27 +33,29 @@ def make_dataset(engine_kwargs, read_kwargs,
     end = None
   # Data
   dfs = {}
-  for n, ek in engine_kwargs.items():
-    rk = read_kwargs[n]
-    rk['con'] = create_engine(**ek)
-    rk['index_col'] = 'time'
-    rk['parse_dates'] = ['time']
-    t = rk.pop('name')
-    if start is not None and end is not None:
-      rk['sql'] = f"SELECT * FROM '{t}' WHERE time > '{start}' AND time < '{end}'"
-    elif start is not None:
-      rk['sql'] = f"SELECT * FROM '{t}' WHERE time > '{start}'"
-    elif end is not None:
-      rk['sql'] = f"SELECT * FROM '{t}' WHERE time < '{end}'"
-    else:  # start is None and end is None
-      rk['sql'] = f"SELECT * FROM '{t}'"
-    df = pd.read_sql(**rk)
-    if end is not None and len(df) > 0 and df.index[-1] < end:
-      row = pd.DataFrame(data=[[None for _ in df.columns]], 
-                         columns=df.columns,
-                         index=[end]).rename_axis(df.index.name)
-      df = pd.concat([df, row])
-    dfs[n] = df
+  for g, eks in engine_kwargs.items():
+    dfs[g] = {}
+    for n, ek in eks.items():
+      rk = read_kwargs[g][n]
+      rk['con'] = create_engine(**ek)
+      rk['index_col'] = 'time'
+      rk['parse_dates'] = ['time']
+      t = rk.pop('name')
+      if start is not None and end is not None:
+        rk['sql'] = f"SELECT * FROM '{t}' WHERE time > '{start}' AND time < '{end}'"
+      elif start is not None:
+        rk['sql'] = f"SELECT * FROM '{t}' WHERE time > '{start}'"
+      elif end is not None:
+        rk['sql'] = f"SELECT * FROM '{t}' WHERE time < '{end}'"
+      else:  # start is None and end is None
+        rk['sql'] = f"SELECT * FROM '{t}'"
+      df = pd.read_sql(**rk)
+      if end is not None and len(df) > 0 and df.index[-1] < end:
+        row = pd.DataFrame(data=[[None for _ in df.columns]], 
+                           columns=df.columns,
+                           index=[end]).rename_axis(df.index.name)
+        df = pd.concat([df, row])
+      dfs[g][n] = df  
   # Features
   features_kwargs['dfs'] = dfs
   df = make_features(**features_kwargs)
@@ -83,20 +86,47 @@ def make_dataset(engine_kwargs, read_kwargs,
       tt = f'{target_prefix}-{t}'
       df[tt] = df[t]
       target[i] = tt
+  dataset_kwargs['target'] = target if len(target) != 1 else target[0]
   columns.update(target)
+  # Scalers
+  all_scalers = {}
+  scalers = dataset_kwargs.get('scalers', {})
+  if isinstance(scalers, dict):
+    if 'class' in scalers:
+      black_list = target + ['group', 'time_idx']
+      scalers = {x: deepcopy(scalers) for x in columns 
+                 if x not in black_list}
+    for column, scaler_kwargs in scalers.items():
+      if isinstance(scaler_kwargs, dict):
+        c = scaler_kwargs.pop('class')
+        s = getattr(pf.data.encoders, c)(**scaler_kwargs)
+      else:
+        s = scaler_kwargs
+      scalers[column] = s
+    dataset_kwargs['scalers'] = scalers
+  target_scaler = dataset_kwargs.get('target_normalizer', 'auto')
+  if isinstance(target_scaler, dict):
+    c = target_scaler.pop('class')
+    target_scaler = getattr(pf.data.encoders, c)(**target_scaler)
+  dataset_kwargs['target_normalizer'] = target_scaler
+  # Filter
   df = df[list(columns)]
   # df = df.replace([np.inf, -np.inf, np.nan], 0)
   df = df.dropna()  # Requires allow_missing_timesteps = True
   if split is not None:
-    split_idx = int(split*len(df))
-    df, df2 = df[:split_idx], df[split_idx:]
+    df1s, df2s = [], []
+    for g, gdf in df.groupby('group'):
+      split_idx = int(split*len(gdf))
+      df1s.append(gdf[:split_idx])
+      df2s.append(gdf[split_idx:])
+    df, df2 = pd.concat(df1s), pd.concat(df2s)
   else:
     df, df2 = df, None
   if not df_only:
-    dataset_kwargs['data'] = df
-    ds = TimeSeriesDataSet(**dataset_kwargs)  # FIXME Memory leak!
+    dataset_kwargs['data'] = df.reset_index()
+    ds = pf.TimeSeriesDataSet(**dataset_kwargs)  # FIXME Memory leak!
     if df2 is not None:
-      ds2 = TimeSeriesDataSet.from_dataset(ds, df2, stop_randomization=True)
+      ds2 = pf.TimeSeriesDataSet.from_dataset(ds, df2.reset_index(), stop_randomization=True)
     else:
       ds2 = None
     return ds, ds2, df, df2

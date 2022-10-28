@@ -35,8 +35,13 @@ Train [TFT](https://pytorch-forecasting.readthedocs.io/en/stable/tutorials/stall
 PYTHONPATH=../src/ python ../src/ccf/train.py train_tft.yaml
 ```
 Predict with [TFT](https://pytorch-forecasting.readthedocs.io/en/stable/tutorials/stallion.html) model
+* With memory leak:(
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/predict.py predict_tft.yaml
+```
+* Workaround of memory leak;) 
+```sh
+while true; do PYTHONPATH=../src/ timeout 1800 python ../src/ccf/predict.py predict_tft.yaml; done
 ```
 Run Streamlit app
 ```sh
@@ -47,49 +52,52 @@ streamlit run ../src/ccf/app.py app_tft.yaml
 Data `work/get_data.yaml`
 ```yaml
 executor_kwargs:
-  max_workers: 6
-run_kwargs:
-  http_proxy_host: 127.0.0.1
-  http_proxy_port: 3128
-  proxy_type: http
+  max_workers: 3
+# run_kwargs:
+#   http_proxy_host: 127.0.0.1
+#   http_proxy_port: 3128
+#   proxy_type: http
 market_kwargs:
   verbose: false
 feeds_kwargs:
-  split: 4
+  split: 1
   delay: 3
-  before: 86400
-  verbose: true
+  before: 3600
+  verbose: false
 markets:
 - btcusdt
-# - ethusdt
 streams:
 - depth5@1000ms
 - trade
 feeds:
   https://cointelegraph.com/rss: Yes
   https://www.newsbtc.com/feed: Yes
+  https://www.cryptoninjas.net/feed/: Yes
 ```
 Train `work/train_tft.yaml`
 ```yaml
 model_path: tft.ckpt
+tune: false
 dataset_kwargs:
-  start: -864000
+  start: -86400
   end: ~
   split: 0.8
   engine_kwargs:
-    orderbook:
-      url: sqlite:///btcusdt@depth5@1000ms.db
-    trades:
-      url: sqlite:///btcusdt@trade.db  
-    news:
-      url: sqlite:///news.db
+    btcusdt:
+      orderbook:
+        url: sqlite:///btcusdt@depth5@1000ms.db
+      trades:
+        url: sqlite:///btcusdt@trade.db  
+      news:
+        url: sqlite:///news.db
   read_kwargs:
-    orderbook:
-      name: data
-    trades:
-      name: data
-    news:
-      name: data
+    btcusdt:
+      orderbook:
+        name: data
+      trades:
+        name: data
+      news:
+        name: data
   features_kwargs:
     post_features:
     - time_idx
@@ -124,6 +132,10 @@ dataset_kwargs:
     - m_p
     - a_p_0
     - b_p_0
+    target_normalizer:
+      class: EncoderNormalizer
+    scalers:
+      class: EncoderNormalizer
 dataloader_kwargs:
   train:
     train: true
@@ -151,7 +163,7 @@ trainer_kwargs:
   # devices: [ 0 ]
   gradient_clip_val: 0.1
   log_every_n_steps: 50
-  limit_train_batches: 2
+  # limit_train_batches: 2
   logger:
   - class: TensorBoardLogger
     save_dir: tensorboard
@@ -178,6 +190,7 @@ train_kwargs: train_tft.yaml
 verbose: true
 past: 3600
 predict_kwargs:
+  return_index: true
   mode: prediction  # prediction or quantiles
 engine_kwargs:
   url: sqlite:///tft@prediction.db
@@ -190,25 +203,27 @@ App `work/app_tft.yaml`
 past: 30
 freq: 1
 engine_kwargs:
-  orderbook:
-    url: sqlite:///btcusdt@depth5@1000ms.db
-  trades:
-    url: sqlite:///btcusdt@trade.db  
-  news:
-    url: sqlite:///news.db
-  prediction:
-    url: sqlite:///tft@prediction.db
+  btcusdt:
+    orderbook:
+      url: sqlite:///btcusdt@depth5@1000ms.db
+    trades:
+      url: sqlite:///btcusdt@trade.db  
+    news:
+      url: sqlite:///news.db
+    prediction:
+      url: sqlite:///tft@prediction.db
 read_kwargs:
-  orderbook:
-    name: data
-    columns: [time, a_p_0, b_p_0]
-  trades:
-    name: data
-  news:
-    name: data
-  prediction:
-    name: data
-    columns: [time, pred]
+  btcusdt:
+    orderbook:
+      name: data
+      columns: [time, a_p_0, b_p_0]
+    trades:
+      name: data
+    news:
+      name: data
+    prediction:
+      name: data
+      columns: [time, pred]
 resample_kwargs:
   rule: 1S
 ```
