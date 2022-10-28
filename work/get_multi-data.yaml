@@ -1,5 +1,5 @@
 executor_kwargs:
-  max_workers: 5
+  max_workers: 7
 # run_kwargs:
 #   http_proxy_host: 127.0.0.1
 #   http_proxy_port: 3128
@@ -14,6 +14,7 @@ feeds_kwargs:
 markets:
 - btcusdt
 - ethusdt
+- ethbtc
 streams:
 - depth5@1000ms
 - trade

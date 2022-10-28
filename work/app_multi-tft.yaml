@@ -19,6 +19,15 @@ engine_kwargs:
       url: sqlite:///news.db
     prediction:
       url: sqlite:///multi-tft@prediction.db
+  ethbtc:
+    orderbook:
+      url: sqlite:///ethbtc@depth5@1000ms.db
+    trades:
+      url: sqlite:///ethbtc@trade.db  
+    news:
+      url: sqlite:///news.db
+    prediction:
+      url: sqlite:///multi-tft@prediction.db
 read_kwargs:
   btcusdt:
     orderbook:
@@ -32,6 +41,17 @@ read_kwargs:
       name: data
       columns: [time, pred]
   ethusdt:
+    orderbook:
+      name: data
+      columns: [time, a_p_0, b_p_0]
+    trades:
+      name: data
+    news:
+      name: data
+    prediction:
+      name: data
+      columns: [time, pred]
+  ethbtc:
     orderbook:
       name: data
       columns: [time, a_p_0, b_p_0]

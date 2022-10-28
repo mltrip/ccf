@@ -19,6 +19,13 @@ dataset_kwargs:
         url: sqlite:///ethusdt@trade.db  
       news:
         url: sqlite:///news.db
+    ethbtc:
+      orderbook:
+        url: sqlite:///ethbtc@depth5@1000ms.db
+      trades:
+        url: sqlite:///ethbtc@trade.db  
+      news:
+        url: sqlite:///news.db
   read_kwargs:
     btcusdt:
       orderbook:
@@ -28,6 +35,13 @@ dataset_kwargs:
       news:
         name: data
     ethusdt:
+      orderbook:
+        name: data
+      trades:
+        name: data
+      news:
+        name: data
+    ethbtc:
       orderbook:
         name: data
       trades:
@@ -101,7 +115,7 @@ trainer_kwargs:
   # devices: [ 0 ]
   gradient_clip_val: 0.1
   log_every_n_steps: 50
-  # limit_train_batches: 2
+  # limit_train_batches: 10
   logger:
   - class: TensorBoardLogger
     save_dir: tensorboard
