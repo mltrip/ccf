@@ -1,4 +1,4 @@
-model_path: tft.ckpt
+model_path: multi-tft.ckpt
 tune: false
 dataset_kwargs:
   start: -86400
@@ -12,8 +12,22 @@ dataset_kwargs:
         url: sqlite:///btcusdt@trade.db  
       news:
         url: sqlite:///news.db
+    ethusdt:
+      orderbook:
+        url: sqlite:///ethusdt@depth5@1000ms.db
+      trades:
+        url: sqlite:///ethusdt@trade.db  
+      news:
+        url: sqlite:///news.db
   read_kwargs:
     btcusdt:
+      orderbook:
+        name: data
+      trades:
+        name: data
+      news:
+        name: data
+    ethusdt:
       orderbook:
         name: data
       trades:
@@ -55,9 +69,11 @@ dataset_kwargs:
     - a_p_0
     - b_p_0
     target_normalizer:
-      class: EncoderNormalizer
+      class: GroupNormalizer
+      groups: [ group ]
     scalers:
-      class: EncoderNormalizer
+      class: GroupNormalizer
+      groups: [ group ]
 dataloader_kwargs:
   train:
     train: true

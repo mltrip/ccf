@@ -16,7 +16,6 @@ from ccf.make_dataset import make_dataset
 def predict(model_path, train_kwargs, engine_kwargs, write_kwargs, 
             predict_kwargs, past, verbose=False, prediction_suffix='pred',
             dataloader_kwargs=None):
-  write_kwargs['con'] = create_engine(**engine_kwargs)
   with open(train_kwargs) as f:
     train_kwargs = yaml.safe_load(f)
   c = getattr(pf.models, train_kwargs['model_kwargs']['class'])
@@ -30,42 +29,55 @@ def predict(model_path, train_kwargs, engine_kwargs, write_kwargs,
   dks['split'] = None
   dks['start'] = -past
   dks['end'] = max_prediction_length*resample_seconds
-  dks['df_only'] = True  # Due to memory leak of TimeSeriesDataset
-  # dks['dataset_kwargs']['predict_mode'] = True
+  dks['dataset_kwargs']['predict_mode'] = True
   while True:
     t0 = time.time()
-    _, _, df, _ = make_dataset(**deepcopy(dks))
+    ds, _, df, _ = make_dataset(**deepcopy(dks))
     if verbose:
       dt_data = time.time() - t0
-    if df is None:
+    if ds is None:
       status = None
     else:
-      status = True if len(df) >= min_length else False
+      status = True
+    # else:
+    #   status = True if len(df) >= min_length else False
     # dl = ds.to_dataloader(**dataloader_kwargs)
     if status is not None and status:
-      df = df.tail(min_length)
-      predict_kwargs['data'] = df
+      # df = df.tail(min_length)
       # df_past = df.head(max_encoder_length)
-      df_future = df.tail(max_prediction_length)
+      # df_future = df.tail(max_prediction_length)
       # pred_time_idx = df_future.iloc[0].time_idx
       # predict_kwargs['data'] = ds.filter(
       #   lambda x: x.time_idx_first_prediction == pred_time_idx)
-      pred = model.predict(**predict_kwargs)
-      if predict_kwargs['mode'] == 'quantiles':
-        p = pred[0]
-        qs = model.loss.quantiles
-        pred_df = pd.DataFrame(
-          data=p, 
-          columns=[f'{prediction_suffix}-{x}' for x in qs],
-          index=df_future.index)
-      elif predict_kwargs['mode'] == 'prediction':
-        p = pred[0]
-        pred_df = pd.DataFrame(
-          data=p, 
-          columns=[prediction_suffix],
-          index=df_future.index)
-      else:
-        raise NotImplementedError(predict_kwargs['mode'])
+      predict_kwargs['data'] = ds
+      pred, idxs = model.predict(**predict_kwargs)
+      pred_dfs = []
+      for g, gdf in df.groupby('group'):
+        g_idx = idxs[idxs['group'] == g]
+        p_idx, t_idx = g_idx.iloc[0].name, g_idx.iloc[0].time_idx
+        df_future = gdf[gdf['time_idx'] >= t_idx]
+        if predict_kwargs['mode'] == 'quantiles':
+          ps = pred[p_idx].tolist()
+          data = [x + [g] for x in ps]
+          qs = model.loss.quantiles
+          columns = [f'{prediction_suffix}-{x}' for x in qs]
+          columns += ['group']
+          pred_df = pd.DataFrame(
+            data=data, 
+            columns=columns,
+            index=df_future.index)
+        elif predict_kwargs['mode'] == 'prediction':
+          ps = pred[p_idx].tolist()
+          data = [[x, g] for x in ps]
+          pred_df = pd.DataFrame(
+            data=data, 
+            columns=[prediction_suffix, 'group'],
+            index=df_future.index)
+        else:
+          raise NotImplementedError(predict_kwargs['mode'])
+        pred_dfs.append(pred_df)
+      pred_df = pd.concat(pred_dfs)
+      write_kwargs['con'] = create_engine(**engine_kwargs)
       pred_df.to_sql(**write_kwargs)
     dt_total = time.time() - t0
     if verbose:

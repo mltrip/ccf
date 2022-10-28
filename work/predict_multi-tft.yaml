@@ -1,12 +1,12 @@
-model_path: tft.ckpt
-train_kwargs: train_tft.yaml
+model_path: multi-tft.ckpt
+train_kwargs: train_multi-tft.yaml
 verbose: true
 past: 3600
 predict_kwargs:
   return_index: true
   mode: prediction  # prediction or quantiles
 engine_kwargs:
-  url: sqlite:///tft@prediction.db
+  url: sqlite:///multi-tft@prediction.db
 write_kwargs:
   name: data
   if_exists: append
