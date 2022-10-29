@@ -1,7 +1,7 @@
-model_path: tft.ckpt
+model_path: multi_tgt_tft.ckpt
 tune: true
 dataset_kwargs:
-  start: -86400
+  start: -3600
   end: ~
   split: 0.8
   engine_kwargs:
@@ -12,8 +12,36 @@ dataset_kwargs:
         url: sqlite:///btcusdt@trade.db  
       news:
         url: sqlite:///news.db
+    ethusdt:
+      orderbook:
+        url: sqlite:///ethusdt@depth5@1000ms.db
+      trades:
+        url: sqlite:///ethusdt@trade.db  
+      news:
+        url: sqlite:///news.db
+    ethbtc:
+      orderbook:
+        url: sqlite:///ethbtc@depth5@1000ms.db
+      trades:
+        url: sqlite:///ethbtc@trade.db  
+      news:
+        url: sqlite:///news.db
   read_kwargs:
     btcusdt:
+      orderbook:
+        name: data
+      trades:
+        name: data
+      news:
+        name: data
+    ethusdt:
+      orderbook:
+        name: data
+      trades:
+        name: data
+      news:
+        name: data
+    ethbtc:
       orderbook:
         name: data
       trades:
@@ -45,19 +73,22 @@ dataset_kwargs:
     time_idx: time_idx
     allow_missing_timesteps: true
     add_relative_time_idx: true
-    target: m_p
+    target: [a_p_0, b_p_0]
     group_ids:
+    - group
+    static_categoricals:
     - group
     max_encoder_length: 10
     max_prediction_length: 5
     time_varying_unknown_reals:
-    - m_p
     - a_p_0
     - b_p_0
     target_normalizer:
-      class: EncoderNormalizer
+      class: GroupNormalizer
+      groups: [ group ]
     scalers:
-      class: EncoderNormalizer
+      class: GroupNormalizer
+      groups: [ group ]
 dataloader_kwargs:
   train:
     train: true
@@ -85,7 +116,7 @@ trainer_kwargs:
   # devices: [ 0 ]
   gradient_clip_val: 0.1
   log_every_n_steps: 50
-  # limit_train_batches: 2
+  # limit_train_batches: 10
   logger:
   - class: TensorBoardLogger
     save_dir: tensorboard

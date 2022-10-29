@@ -106,8 +106,14 @@ def make_dataset(engine_kwargs, read_kwargs,
     dataset_kwargs['scalers'] = scalers
   target_scaler = dataset_kwargs.get('target_normalizer', 'auto')
   if isinstance(target_scaler, dict):
-    c = target_scaler.pop('class')
-    target_scaler = getattr(pf.data.encoders, c)(**target_scaler)
+    if len(target) > 1:
+      c = target_scaler.pop('class')
+      target_scaler = getattr(pf.data.encoders, c)(**target_scaler)
+      target_scalers = [target_scaler for _ in target]
+      target_scaler = pf.MultiNormalizer(target_scalers)
+    else:
+      c = target_scaler.pop('class')
+      target_scaler = getattr(pf.data.encoders, c)(**target_scaler)
   dataset_kwargs['target_normalizer'] = target_scaler
   # Filter
   df = df[list(columns)]
