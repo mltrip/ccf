@@ -17,11 +17,11 @@ pip install -r src/ccf/requirements_app.txt
 ```
 
 # Run
-Go to working directory
+## Go to working directory
 ```sh
 cd work
 ```
-Get data
+## Get data
 * Linux (by default)
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/get_data.py
@@ -30,11 +30,23 @@ PYTHONPATH=../src/ python ../src/ccf/get_data.py
 ```sh
 cmd /C  "set PYTHONPATH=../src && python ../src/ccf/get_data.py"
 ```
-Train [TFT](https://pytorch-forecasting.readthedocs.io/en/stable/tutorials/stallion.html) model
+## Train [TFT](https://pytorch-forecasting.readthedocs.io/en/stable/tutorials/stallion.html) model
+* Once
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/train.py train_tft.yaml
 ```
-Predict with [TFT](https://pytorch-forecasting.readthedocs.io/en/stable/tutorials/stallion.html) model
+* Every ~hour
+
+Change in the `train_tft.yaml`:
+```yaml
+tune: true
+start: -3600  # Train only on the last hour data (set ~ for all available data)
+```
+Run
+```sh
+while true; do PYTHONPATH=../src/ python ../src/ccf/train.py train_tft.yaml; sleep 3600; done
+```
+## Predict with [TFT](https://pytorch-forecasting.readthedocs.io/en/stable/tutorials/stallion.html) model
 * With memory leak:(
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/predict.py predict_tft.yaml
@@ -43,7 +55,7 @@ PYTHONPATH=../src/ python ../src/ccf/predict.py predict_tft.yaml
 ```sh
 while true; do PYTHONPATH=../src/ timeout 1800 python ../src/ccf/predict.py predict_tft.yaml; done
 ```
-Run Streamlit app
+## Run Streamlit app
 ```sh
 streamlit run ../src/ccf/app.py app_tft.yaml
 ```
