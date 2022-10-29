@@ -14,7 +14,7 @@ from ccf.make_dataset import make_dataset
 
 
 def predict(model_path, train_kwargs, engine_kwargs, write_kwargs, 
-            predict_kwargs, past, verbose=False, prediction_suffix='pred',
+            predict_kwargs, past, verbose=False, prediction_prefix='pred',
             dataloader_kwargs=None):
   with open(train_kwargs) as f:
     train_kwargs = yaml.safe_load(f)
@@ -51,31 +51,41 @@ def predict(model_path, train_kwargs, engine_kwargs, write_kwargs,
       #   lambda x: x.time_idx_first_prediction == pred_time_idx)
       predict_kwargs['data'] = ds
       pred, idxs = model.predict(**predict_kwargs)
+      pred = [pred] if len(ds.target_names) == 1 else pred
       pred_dfs = []
       for g, gdf in df.groupby('group'):
         g_idx = idxs[idxs['group'] == g]
         p_idx, t_idx = g_idx.iloc[0].name, g_idx.iloc[0].time_idx
         df_future = gdf[gdf['time_idx'] >= t_idx]
-        if predict_kwargs['mode'] == 'quantiles':
-          ps = pred[p_idx].tolist()
-          data = [x + [g] for x in ps]
-          qs = model.loss.quantiles
-          columns = [f'{prediction_suffix}-{x}' for x in qs]
-          columns += ['group']
-          pred_df = pd.DataFrame(
-            data=data, 
-            columns=columns,
-            index=df_future.index)
-        elif predict_kwargs['mode'] == 'prediction':
-          ps = pred[p_idx].tolist()
-          data = [[x, g] for x in ps]
-          pred_df = pd.DataFrame(
-            data=data, 
-            columns=[prediction_suffix, 'group'],
-            index=df_future.index)
-        else:
-          raise NotImplementedError(predict_kwargs['mode'])
-        pred_dfs.append(pred_df)
+        tgt_dfs = []
+        for tgt_idx, tgt in enumerate(ds.target_names):
+          tgt_ts = tgt.split('-')  # tokens
+          tgt_ts[0] = prediction_prefix  # change target prefix to prediction prefix
+          pred_name = '-'.join(tgt_ts)
+          if predict_kwargs['mode'] == 'quantiles':
+            ps = pred[tgt_idx][p_idx].tolist()
+            data = [x + [g] for x in ps]
+            qs = model.loss.quantiles
+            columns = [f'{pred_name}-{x}' for x in qs]
+            columns += ['group']
+            pred_df = pd.DataFrame(
+              data=data, 
+              columns=columns,
+              index=df_future.index)
+            tgt_dfs.append(pred_df)
+          elif predict_kwargs['mode'] == 'prediction':
+            ps = pred[tgt_idx][p_idx].tolist()
+            data = [[x, g] for x in ps]
+            pred_df = pd.DataFrame(
+              data=data, 
+              columns=[pred_name, 'group'],
+              index=df_future.index)
+            tgt_dfs.append(pred_df)
+          else:
+            raise NotImplementedError(predict_kwargs['mode'])
+        tgt_df = pd.concat(tgt_dfs, axis=1)
+        tgt_df = tgt_df.loc[:, ~tgt_df.columns.duplicated()]
+        pred_dfs.append(tgt_df)
       pred_df = pd.concat(pred_dfs)
       write_kwargs['con'] = create_engine(**engine_kwargs)
       pred_df.to_sql(**write_kwargs)

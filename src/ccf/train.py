@@ -24,17 +24,24 @@ def train(dataset_kwargs, dataloader_kwargs,
   dl_t = ds_t.to_dataloader(**dataloader_kwargs['train'])
   dl_v= ds_v.to_dataloader(**dataloader_kwargs['val'])
   # Model
+  loss_kwargs = model_kwargs.pop('loss')
+  l = getattr(pf.metrics, loss_kwargs.pop('class'))
+  loss = l(**loss_kwargs)
+  if ds_t.multi_target:
+    model_kwargs['loss'] = pf.metrics.MultiLoss(
+      metrics=[loss for _ in ds_t.target_names])
+  else:
+    model_kwargs['loss'] = loss
+  model_kwargs['dataset'] = ds_t
+  c = getattr(pf.models, model_kwargs.pop('class'))
   if not tune:
-    loss_kwargs = model_kwargs.pop('loss')
-    l = getattr(pf.metrics, loss_kwargs.pop('class'))
-    model_kwargs['loss'] = l(**loss_kwargs)
-    model_kwargs['dataset'] = ds_t
-    c = getattr(pf.models, model_kwargs.pop('class'))
     model = c.from_dataset(**model_kwargs)
   else:
     if model_path is not None:
-      c = getattr(pf.models, model_kwargs.pop('class'))
-      model = c.load_from_checkpoint(model_path)
+      if model_path.is_file():
+        model = c.load_from_checkpoint(model_path)
+      else:
+        model = c.from_dataset(**model_kwargs)
       if isinstance(tune, str):
         model_path = Path(tune)
   # Trainer
