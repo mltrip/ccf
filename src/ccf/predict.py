@@ -11,6 +11,7 @@ from sqlalchemy import create_engine
 import yaml
 
 from ccf.make_dataset import make_dataset
+import ccf
 
 
 def predict(model_path, train_kwargs, engine_kwargs, write_kwargs, 
@@ -18,7 +19,12 @@ def predict(model_path, train_kwargs, engine_kwargs, write_kwargs,
             dataloader_kwargs=None):
   with open(train_kwargs) as f:
     train_kwargs = yaml.safe_load(f)
-  c = getattr(pf.models, train_kwargs['model_kwargs']['class'])
+  model_name = train_kwargs['model_kwargs']['class']
+  c = getattr(pf.models, model_name, None)
+  if c is None:
+    c = getattr(ccf.models, model_name, None)
+  if c is None:
+    raise NotImplementedError(model_name) 
   model = c.load_from_checkpoint(model_path)
   dks = train_kwargs['dataset_kwargs']
   max_prediction_length = dks['dataset_kwargs']['max_prediction_length']

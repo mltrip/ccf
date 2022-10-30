@@ -1,0 +1,100 @@
+model_path: mlp.ckpt
+tune: true
+dataset_kwargs:
+  start: -3600
+  end: ~
+  split: 0.8
+  engine_kwargs:
+    btcusdt:
+      orderbook:
+        url: sqlite:///btcusdt@depth5@1000ms.db
+      trades:
+        url: sqlite:///btcusdt@trade.db  
+      news:
+        url: sqlite:///news.db
+  read_kwargs:
+    btcusdt:
+      orderbook:
+        name: data
+      trades:
+        name: data
+      news:
+        name: data
+  features_kwargs:
+    post_features:
+    - time_idx
+    - group
+    pre_features:
+    - m_p
+    resample_kwargs:
+      rule: 1S
+    aggregate_kwargs:
+      orderbook:
+        func: last
+      trades:
+        func: last
+      news:
+        func: last
+    interpolate_kwargs:
+      orderbook:
+        method: pad
+      trades:
+        method: pad
+      news: ~
+  dataset_kwargs:
+    time_idx: time_idx
+    allow_missing_timesteps: true
+    target: m_p
+    group_ids:
+    - group
+    max_encoder_length: 10
+    max_prediction_length: 5
+    time_varying_unknown_reals:
+    - m_p
+    target_normalizer:
+      class: EncoderNormalizer
+    scalers:
+      class: EncoderNormalizer
+dataloader_kwargs:
+  train:
+    train: true
+    num_workers: 2
+    batch_size: 32
+  val:
+    train: false
+    num_workers: 2
+    batch_size: 32
+model_kwargs:
+  class: MLP
+  learning_rate: 0.03
+  hidden_size: 32
+  n_hidden_layers: 2
+  loss:
+    class: MAE
+  log_interval: 0
+  reduce_on_plateau_patience: 2
+trainer_kwargs:
+  max_epochs: 1
+  accelerator: cpu  # gpu
+  # devices: [ 0 ]
+  gradient_clip_val: 0.1
+  log_every_n_steps: 50
+  # limit_train_batches: 2
+  logger:
+  - class: TensorBoardLogger
+    save_dir: tensorboard
+    name: tft
+  callbacks:
+  - class: LearningRateMonitor
+    logging_interval: step
+  - class: ModelCheckpoint
+    monitor: val_loss
+    filename: '{epoch}-{step}-{val_loss:.3f}'
+    save_last: true
+    save_top_k: 1
+  - class: EarlyStopping
+    monitor: val_loss
+    min_delta: 0
+    patience: 4
+    verbose: false
+    mode: min
