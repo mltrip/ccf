@@ -1,0 +1,66 @@
+past: 30
+freq: 1
+engine_kwargs:
+  btcusdt:
+    orderbook:
+      url: sqlite:///btcusdt@depth5@1000ms.db
+    trades:
+      url: sqlite:///btcusdt@trade.db  
+    news:
+      url: sqlite:///news.db
+    prediction:
+      url: sqlite:///multi_tgt_tft_naive@prediction.db
+  ethusdt:
+    orderbook:
+      url: sqlite:///ethusdt@depth5@1000ms.db
+    trades:
+      url: sqlite:///ethusdt@trade.db  
+    news:
+      url: sqlite:///news.db
+    prediction:
+      url: sqlite:///multi_tgt_tft_naive@prediction.db
+  ethbtc:
+    orderbook:
+      url: sqlite:///ethbtc@depth5@1000ms.db
+    trades:
+      url: sqlite:///ethbtc@trade.db  
+    news:
+      url: sqlite:///news.db
+    prediction:
+      url: sqlite:///multi_tgt_tft_naive@prediction.db
+read_kwargs:
+  btcusdt:
+    orderbook:
+      name: data
+      columns: [time, a_p_0, b_p_0]
+    trades:
+      name: data
+    news:
+      name: data
+    prediction:
+      name: data
+      columns: [time, pred-a_p_0, pred-b_p_0]
+  ethusdt:
+    orderbook:
+      name: data
+      columns: [time, a_p_0, b_p_0]
+    trades:
+      name: data
+    news:
+      name: data
+    prediction:
+      name: data
+      columns: [time, pred-a_p_0, pred-b_p_0]
+  ethbtc:
+    orderbook:
+      name: data
+      columns: [time, a_p_0, b_p_0]
+    trades:
+      name: data
+    news:
+      name: data
+    prediction:
+      name: data
+      columns: [time, pred-a_p_0, pred-b_p_0]
+resample_kwargs:
+  rule: 1S

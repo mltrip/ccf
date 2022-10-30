@@ -82,10 +82,9 @@ def make_dataset(engine_kwargs, read_kwargs,
   target = dataset_kwargs.get('target', [])
   target = [target] if isinstance(target, str) else target
   for i, t in enumerate(target):
-    if t in columns:
-      tt = f'{target_prefix}-{t}'
-      df[tt] = df[t]
-      target[i] = tt
+    tt = f'{target_prefix}-{t}'
+    df[tt] = df[t]
+    target[i] = tt
   dataset_kwargs['target'] = target if len(target) != 1 else target[0]
   columns.update(target)
   # Scalers

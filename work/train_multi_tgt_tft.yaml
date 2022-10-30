@@ -120,7 +120,7 @@ trainer_kwargs:
   logger:
   - class: TensorBoardLogger
     save_dir: tensorboard
-    name: tft
+    name: multi_tgt_tft
   callbacks:
   - class: LearningRateMonitor
     logging_interval: step
