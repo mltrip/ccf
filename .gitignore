@@ -1,4 +1,5 @@
 tensorboard/
+*.db-journal
 *.db
 *.ckpt
 # Byte-compiled / optimized / DLL files
