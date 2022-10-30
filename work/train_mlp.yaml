@@ -1,4 +1,4 @@
-model_path: multi_tft.ckpt
+model_path: mlp.ckpt
 tune: true
 dataset_kwargs:
   start: -3600
@@ -12,36 +12,8 @@ dataset_kwargs:
         url: sqlite:///btcusdt@trade.db  
       news:
         url: sqlite:///news.db
-    ethusdt:
-      orderbook:
-        url: sqlite:///ethusdt@depth5@1000ms.db
-      trades:
-        url: sqlite:///ethusdt@trade.db  
-      news:
-        url: sqlite:///news.db
-    ethbtc:
-      orderbook:
-        url: sqlite:///ethbtc@depth5@1000ms.db
-      trades:
-        url: sqlite:///ethbtc@trade.db  
-      news:
-        url: sqlite:///news.db
   read_kwargs:
     btcusdt:
-      orderbook:
-        name: data
-      trades:
-        name: data
-      news:
-        name: data
-    ethusdt:
-      orderbook:
-        name: data
-      trades:
-        name: data
-      news:
-        name: data
-    ethbtc:
       orderbook:
         name: data
       trades:
@@ -72,24 +44,17 @@ dataset_kwargs:
   dataset_kwargs:
     time_idx: time_idx
     allow_missing_timesteps: true
-    add_relative_time_idx: true
     target: m_p
     group_ids:
-    - group
-    static_categoricals:
     - group
     max_encoder_length: 10
     max_prediction_length: 5
     time_varying_unknown_reals:
     - m_p
-    - a_p_0
-    - b_p_0
     target_normalizer:
-      class: GroupNormalizer
-      groups: [ group ]
+      class: EncoderNormalizer
     scalers:
-      class: GroupNormalizer
-      groups: [ group ]
+      class: EncoderNormalizer
 dataloader_kwargs:
   train:
     train: true
@@ -100,15 +65,12 @@ dataloader_kwargs:
     num_workers: 2
     batch_size: 32
 model_kwargs:
-  class: TemporalFusionTransformer
+  class: MLP
   learning_rate: 0.03
   hidden_size: 32
-  attention_head_size: 1
-  dropout: 0.1
-  hidden_continuous_size: 16
-  # output_size: 7  # Inferred from loss
+  n_hidden_layers: 2
   loss:
-    class: QuantileLoss
+    class: MAE
   log_interval: 0
   reduce_on_plateau_patience: 2
 trainer_kwargs:
@@ -117,11 +79,11 @@ trainer_kwargs:
   # devices: [ 0 ]
   gradient_clip_val: 0.1
   log_every_n_steps: 50
-  # limit_train_batches: 10
+  # limit_train_batches: 2
   logger:
   - class: TensorBoardLogger
     save_dir: tensorboard
-    name: multi_tft
+    name: mlp
   callbacks:
   - class: LearningRateMonitor
     logging_interval: step

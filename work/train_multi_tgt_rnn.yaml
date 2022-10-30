@@ -1,4 +1,4 @@
-model_path: multi_tft.ckpt
+model_path: multi_tgt_rnn.ckpt
 tune: true
 dataset_kwargs:
   start: -3600
@@ -72,8 +72,8 @@ dataset_kwargs:
   dataset_kwargs:
     time_idx: time_idx
     allow_missing_timesteps: true
-    add_relative_time_idx: true
-    target: m_p
+    # add_relative_time_idx: true
+    target: [a_p_0, b_p_0]
     group_ids:
     - group
     static_categoricals:
@@ -81,9 +81,8 @@ dataset_kwargs:
     max_encoder_length: 10
     max_prediction_length: 5
     time_varying_unknown_reals:
-    - m_p
-    - a_p_0
-    - b_p_0
+    - tgt-a_p_0
+    - tgt-b_p_0
     target_normalizer:
       class: GroupNormalizer
       groups: [ group ]
@@ -100,15 +99,14 @@ dataloader_kwargs:
     num_workers: 2
     batch_size: 32
 model_kwargs:
-  class: TemporalFusionTransformer
+  class: RecurrentNetwork
+  cell_type: LSTM
   learning_rate: 0.03
   hidden_size: 32
-  attention_head_size: 1
+  rnn_layers: 2
   dropout: 0.1
-  hidden_continuous_size: 16
-  # output_size: 7  # Inferred from loss
   loss:
-    class: QuantileLoss
+    class: MAE
   log_interval: 0
   reduce_on_plateau_patience: 2
 trainer_kwargs:
@@ -121,7 +119,7 @@ trainer_kwargs:
   logger:
   - class: TensorBoardLogger
     save_dir: tensorboard
-    name: multi_tft
+    name: multi_tgt_rnn
   callbacks:
   - class: LearningRateMonitor
     logging_interval: step

@@ -9,6 +9,7 @@ import pytorch_lightning as pl
 from sqlalchemy import create_engine
 import yaml
 
+import ccf
 from ccf.make_dataset import make_dataset
 
 
@@ -33,7 +34,12 @@ def train(dataset_kwargs, dataloader_kwargs,
   else:
     model_kwargs['loss'] = loss
   model_kwargs['dataset'] = ds_t
-  c = getattr(pf.models, model_kwargs.pop('class'))
+  model_name = model_kwargs.pop('class')
+  c = getattr(pf.models, model_name, None)
+  if c is None:
+    c = getattr(ccf.models, model_name, None)
+  if c is None:
+    raise NotImplementedError(model_name)
   if not tune:
     model = c.from_dataset(**model_kwargs)
   else:
