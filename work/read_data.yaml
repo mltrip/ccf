@@ -1,8 +1,14 @@
-engine_kwargs:
-  # url: sqlite:///btcusdt@depth5@1000ms.db
-  # url: sqlite:///btcusdt@trade.db
-  # url: sqlite:///news.db
-  # url: sqlite:///tft@prediction.db
-  url: sqlite:///multi-tft@prediction.db
-read_kwargs:
-  sql: "SELECT * FROM 'data' LIMIT 10"
+start: -60
+end: ~
+query:
+  example:
+    db:
+      engine_kwargs:
+        # url: sqlite:///btcusdt@depth5@1000ms.db
+        # url: sqlite:///btcusdt@trade.db
+        # url: sqlite:///news.db
+        # url: sqlite:///tft@prediction.db
+        # url: sqlite:///multi-tft@prediction.db
+        url: sqlite:///multi_tgt_rnn@prediction.db
+      read_kwargs:
+        name: data

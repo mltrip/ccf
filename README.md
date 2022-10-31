@@ -57,7 +57,20 @@ while true; do PYTHONPATH=../src/ timeout 1800 python ../src/ccf/predict.py pred
 ```
 ## Run Streamlit app
 ```sh
-streamlit run ../src/ccf/app.py app_tft.yaml
+streamlit run ../src/ccf/apps/app.py app_tft.yaml
+```
+## Run Evidently
+* Raw data
+```sh
+PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py monitor_raw.yaml
+```
+* Target
+```sh
+PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py monitor_multi_tgt_tft_a.yaml
+PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py monitor_multi_tgt_tft_b.yaml
+PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py monitor_multi_tgt_tft_naive_a.yaml
+PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py monitor_multi_tgt_tft_naive_b.yaml
+
 ```
 
 # Configs

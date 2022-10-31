@@ -94,9 +94,9 @@ class OnMessage:
     elif 'trade' in ws.url:
       data = json.loads(message)
       d['time'] = datetime.fromtimestamp(float(data['T']) / 1000.0, tz=timezone.utc)
-      d['t_p'] = float(data['p'])
-      d['t_q'] = float(data['q'])
-      d['t_t'] = not data['m']  # True - Buy, False - Sell
+      d['p'] = float(data['p'])
+      d['q'] = float(data['q'])
+      d['t'] = not data['m']  # True - Buy, False - Sell
     else:
       raise NotImplementedError(s)
     df = pd.DataFrame.from_records([d], index='time')

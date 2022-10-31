@@ -25,6 +25,17 @@ read_data_kwargs:
             rule: 1S
           aggregate_kwargs:
             func: last
+      rnn:
+        engine_kwargs:
+          url: sqlite:///multi_tgt_rnn@prediction.db
+        read_kwargs:
+          name: data
+          group: btcusdt
+          columns: [ time, pred-a_p_0, pred-b_p_0 ]
+          resample_kwargs:
+            rule: 1S
+          aggregate_kwargs:
+            func: last
       naive:
         engine_kwargs:
           url: sqlite:///multi_tgt_tft_naive@prediction.db
@@ -58,6 +69,17 @@ read_data_kwargs:
             rule: 1S
           aggregate_kwargs:
             func: last
+      rnn:
+        engine_kwargs:
+          url: sqlite:///multi_tgt_rnn@prediction.db
+        read_kwargs:
+          name: data
+          group: ethusdt
+          columns: [ time, pred-a_p_0, pred-b_p_0 ]
+          resample_kwargs:
+            rule: 1S
+          aggregate_kwargs:
+            func: last
       naive:
         engine_kwargs:
           url: sqlite:///multi_tgt_tft_naive@prediction.db
@@ -83,6 +105,17 @@ read_data_kwargs:
       tft:
         engine_kwargs:
           url: sqlite:///multi_tgt_tft@prediction.db
+        read_kwargs:
+          name: data
+          group: ethbtc
+          columns: [ time, pred-a_p_0, pred-b_p_0 ]
+          resample_kwargs:
+            rule: 1S
+          aggregate_kwargs:
+            func: last
+      rnn:
+        engine_kwargs:
+          url: sqlite:///multi_tgt_rnn@prediction.db
         read_kwargs:
           name: data
           group: ethbtc
