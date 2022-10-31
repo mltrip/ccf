@@ -1,0 +1,39 @@
+delay: 600
+log_dir: monitor/multi_tgt_tft_a
+report_kwargs:
+  metrics: 
+  - class: RegressionPreset
+  - class: RegressionPerformance
+  - class: TargetDriftPreset
+  - class: DataDriftPreset
+  - class: DataQualityPreset
+column_mapping_kwargs:
+  datetime: time
+  target: o_a_p_0
+  prediction: tft_pred-a_p_0
+read_data_kwargs:
+  start: -600
+  end: ~
+  query:
+    btcusdt:
+      o:
+        engine_kwargs:
+          url: sqlite:///btcusdt@depth5@1000ms.db
+        read_kwargs:
+          name: data
+          columns: [ time, a_p_0, b_p_0 ]
+          resample_kwargs:
+            rule: 1S
+          aggregate_kwargs:
+            func: last
+      tft:
+        engine_kwargs:
+          url: sqlite:///multi_tgt_tft@prediction.db
+        read_kwargs:
+          name: data
+          group: btcusdt
+          columns: [ time, pred-a_p_0 ]
+          resample_kwargs:
+            rule: 1S
+          aggregate_kwargs:
+            func: last
