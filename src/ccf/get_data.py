@@ -8,7 +8,7 @@ import json
 from datetime import datetime, timedelta, timezone
 import time
 
-from concurrent.futures import ThreadPoolExecutor, wait
+from concurrent.futures import ThreadPoolExecutor, wait, as_completed
 import websocket
 import numpy as np
 from sqlalchemy import create_engine
@@ -32,10 +32,10 @@ def get_data(markets=None, streams=None, feeds=None,
   market_kwargs = {} if market_kwargs is None else market_kwargs
   app_kwargs = {} if app_kwargs is None else app_kwargs
   run_kwargs = {} if run_kwargs is None else run_kwargs
-  if market_kwargs.pop('verbose', False):
-    websocket.enableTrace(True)
+  websocket.enableTrace(market_kwargs.pop('verbose', False))
   executor = ThreadPoolExecutor(**executor_kwargs)
-  futures = []
+  # futures = []
+  f2c = {}  # future: [callable, kwargs]
   for m in markets:
     for s in streams:
       if 'depth' in s:
@@ -47,7 +47,9 @@ def get_data(markets=None, streams=None, feeds=None,
       app_kwargs['on_message'] = OnMessage(engine_kwargs=engine_kwargs, 
                                            app_kwargs=app_kwargs)
       app = websocket.WebSocketApp(**app_kwargs)
-      futures.append(executor.submit(app.run_forever, **run_kwargs))
+      future = executor.submit(app.run_forever, **run_kwargs)
+      f2c[future] = [app.run_forever, run_kwargs]
+      # futures.append(executor.submit(app.run_forever, **run_kwargs))
   if feeds is not None and len(feeds) != 0:
     feeds = [k for k, v in feeds.items() if v]
     feeds = np.array_split(feeds, feeds_kwargs.pop('split', 1))
@@ -55,8 +57,35 @@ def get_data(markets=None, streams=None, feeds=None,
     for f in feeds:
       feeds_kwargs['feeds'] = f
       on_feed = OnFeed(**feeds_kwargs)
-      futures.append(executor.submit(on_feed))
-  wait(futures)
+      future = executor.submit(on_feed)
+      f2c[future] = [on_feed, {}]
+      # futures.append(executor.submit(on_feed))
+  # wait(futures)
+  def loop(future2callable):
+    for future in as_completed(future2callable):
+      try:
+        result = future.result()
+      except Exception as e:
+        print(f'Exception: {future} - {e}')
+      else:
+        print(f'Done: {future} - {result}')
+      finally:  # Resubmit
+        c, kwargs = future2callable[future]
+        new_future = executor.submit(c, **kwargs)
+        new_future2callable = {new_future: [c, kwargs]}
+        loop(new_future2callable)
+  loop(f2c)
+  # for future in as_completed(future2callable):
+  #   try:
+  #     result = future.result()
+  #   except Exception as e:
+  #     print(f'Exception: {future} - {e}')
+  #   else:
+  #     print(f'Done: {future} - {result}')
+  #   finally:  # Resubmit
+  #     c, kwargs = future2callable[future]
+  #     new_future = executor.submit(c, **kwargs)
+  #     future2callable[new_future] = future2callable[future]
 
 
 class OnMessage:

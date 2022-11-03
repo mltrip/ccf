@@ -6,10 +6,10 @@ read_data_kwargs:
     btcusdt:
       target:
         engine_kwargs:
-          url: sqlite:///btcusdt@depth5@1000ms.db
+          url: sqlite:///btcusdt@feature.db
         read_kwargs:
           name: data
-          columns: [ time, a_p_0, b_p_0 ]
+          columns: [ time, o_a_p_0, o_b_p_0 ]
           resample_kwargs:
             rule: 1S
           aggregate_kwargs:
@@ -20,7 +20,7 @@ read_data_kwargs:
         read_kwargs:
           name: data
           group: btcusdt
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
+          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
           resample_kwargs:
             rule: 1S
           aggregate_kwargs:
@@ -31,7 +31,7 @@ read_data_kwargs:
         read_kwargs:
           name: data
           group: btcusdt
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
+          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
           resample_kwargs:
             rule: 1S
           aggregate_kwargs:
@@ -42,7 +42,7 @@ read_data_kwargs:
         read_kwargs:
           name: data
           group: btcusdt
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
+          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
           resample_kwargs:
             rule: 1S
           aggregate_kwargs:
@@ -50,10 +50,10 @@ read_data_kwargs:
     ethusdt:
       target:
         engine_kwargs:
-          url: sqlite:///ethusdt@depth5@1000ms.db
+          url: sqlite:///ethusdt@feature.db
         read_kwargs:
           name: data
-          columns: [ time, a_p_0, b_p_0 ]
+          columns: [ time, o_a_p_0, o_b_p_0 ]
           resample_kwargs:
             rule: 1S
           aggregate_kwargs:
@@ -64,7 +64,7 @@ read_data_kwargs:
         read_kwargs:
           name: data
           group: ethusdt
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
+          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
           resample_kwargs:
             rule: 1S
           aggregate_kwargs:
@@ -75,7 +75,7 @@ read_data_kwargs:
         read_kwargs:
           name: data
           group: ethusdt
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
+          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
           resample_kwargs:
             rule: 1S
           aggregate_kwargs:
@@ -86,7 +86,7 @@ read_data_kwargs:
         read_kwargs:
           name: data
           group: ethusdt
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
+          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
           resample_kwargs:
             rule: 1S
           aggregate_kwargs:
@@ -94,10 +94,10 @@ read_data_kwargs:
     ethbtc:
       target:
         engine_kwargs:
-          url: sqlite:///ethbtc@depth5@1000ms.db
+          url: sqlite:///ethbtc@feature.db
         read_kwargs:
           name: data
-          columns: [ time, a_p_0, b_p_0 ]
+          columns: [ time, o_a_p_0, o_b_p_0 ]
           resample_kwargs:
             rule: 1S
           aggregate_kwargs:
@@ -108,7 +108,7 @@ read_data_kwargs:
         read_kwargs:
           name: data
           group: ethbtc
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
+          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
           resample_kwargs:
             rule: 1S
           aggregate_kwargs:
@@ -119,7 +119,7 @@ read_data_kwargs:
         read_kwargs:
           name: data
           group: ethbtc
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
+          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
           resample_kwargs:
             rule: 1S
           aggregate_kwargs:
@@ -130,7 +130,7 @@ read_data_kwargs:
         read_kwargs:
           name: data
           group: ethbtc
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
+          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
           resample_kwargs:
             rule: 1S
           aggregate_kwargs:

@@ -1,79 +1,45 @@
 model_path: multi_tgt_tft.ckpt
-tune: true
-dataset_kwargs:
-  start: -3600
-  end: ~
+tune: false
+create_dataset_kwargs:
   split: 0.8
-  engine_kwargs:
-    btcusdt:
-      orderbook:
-        url: sqlite:///btcusdt@depth5@1000ms.db
-      trades:
-        url: sqlite:///btcusdt@trade.db  
-      news:
-        url: sqlite:///news.db
-    ethusdt:
-      orderbook:
-        url: sqlite:///ethusdt@depth5@1000ms.db
-      trades:
-        url: sqlite:///ethusdt@trade.db  
-      news:
-        url: sqlite:///news.db
-    ethbtc:
-      orderbook:
-        url: sqlite:///ethbtc@depth5@1000ms.db
-      trades:
-        url: sqlite:///ethbtc@trade.db  
-      news:
-        url: sqlite:///news.db
-  read_kwargs:
-    btcusdt:
-      orderbook:
-        name: data
-      trades:
-        name: data
-      news:
-        name: data
-    ethusdt:
-      orderbook:
-        name: data
-      trades:
-        name: data
-      news:
-        name: data
-    ethbtc:
-      orderbook:
-        name: data
-      trades:
-        name: data
-      news:
-        name: data
-  features_kwargs:
-    post_features:
-    - time_idx
-    - group
-    pre_features:
-    - m_p
-    resample_kwargs:
-      rule: 1S
-    aggregate_kwargs:
-      orderbook:
-        func: last
-      trades:
-        func: last
-      news:
-        func: last
-    interpolate_kwargs:
-      orderbook:
-        method: pad
-      trades:
-        method: pad
-      news: ~
+  feature_data_kwargs:
+    start: -360
+    end: ~
+    concat: false
+    query:
+      feature:
+        btcusdt:
+          engine_kwargs:
+            url: sqlite:///btcusdt@feature.db
+          read_kwargs:
+            name: data
+            columns: ~
+          write_kwargs:
+            name: data
+            if_exists: append
+        ethusdt:
+          engine_kwargs:
+            url: sqlite:///ethusdt@feature.db
+          read_kwargs:
+            name: data
+            columns: ~
+          write_kwargs:
+            name: data
+            if_exists: append
+        ethbtc:
+          engine_kwargs:
+            url: sqlite:///ethbtc@feature.db
+          read_kwargs:
+            name: data
+            columns: ~
+          write_kwargs:
+            name: data
+            if_exists: append
   dataset_kwargs:
     time_idx: time_idx
     allow_missing_timesteps: true
     add_relative_time_idx: true
-    target: [a_p_0, b_p_0]
+    target: [o_a_p_0, o_b_p_0]
     group_ids:
     - group
     static_categoricals:
@@ -81,8 +47,8 @@ dataset_kwargs:
     max_encoder_length: 10
     max_prediction_length: 5
     time_varying_unknown_reals:
-    - a_p_0
-    - b_p_0
+    - o_a_p_0
+    - o_b_p_0
     target_normalizer:
       class: GroupNormalizer
       groups: [ group ]

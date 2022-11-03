@@ -9,7 +9,7 @@ import pandas as pd
 
 
 
-def read_data(query, start=None, end=None):
+def read_data(query, start=None, end=None, concat=True):
   now = datetime.utcnow()
   if isinstance(start, (int, float)):
     start = now + timedelta(seconds=start)
@@ -29,7 +29,7 @@ def read_data(query, start=None, end=None):
     end = None
   result = {}
   for n, d in query.items():
-    dfs = []
+    dfs = {}
     for nn, dd in d.items():
       ek = deepcopy(dd['engine_kwargs'])
       rk = deepcopy(dd['read_kwargs'])
@@ -38,6 +38,7 @@ def read_data(query, start=None, end=None):
       name = rk.pop('name')
       resample_kwargs = rk.pop('resample_kwargs', None)
       aggregate_kwargs = rk.pop('aggregate_kwargs', None)
+      interpolate_kwargs = rk.pop('interpolate_kwargs', None)
       group = rk.pop('group', None)
       columns = rk.pop('columns', None)
       sql_columns = ','.join([f'`{x}`' for x in columns]) if columns is not None else '*'
@@ -51,11 +52,27 @@ def read_data(query, start=None, end=None):
       else:  # start is None and end is None
         rk['sql'] = f"SELECT {sql_columns} FROM '{name}'{sql_group}"
       rk['con'] = create_engine(**ek)
-      df = pd.read_sql(**rk)
+      try:
+        df = pd.read_sql(**rk)
+      except Exception as e:
+        print(e)
+        df = pd.DataFrame(columns=columns if columns is not None else [])
       if resample_kwargs is not None and aggregate_kwargs is not None:
         df = df.resample(**resample_kwargs).aggregate(**aggregate_kwargs)
-      dfs.append(df.add_prefix(f'{nn}_'))
-    result[n] = pd.concat(dfs, axis=1)
+        if interpolate_kwargs is not None:
+          df = df.interpolate(**interpolate_kwargs)
+      for c in df:
+        try:
+          df[c] = df[c].astype(float)
+        except Exception:
+          pass
+      dfs[nn] = df
+    if concat:
+      for nn, df in dfs.items():
+        dfs[nn] = df.add_prefix(f'{nn}_')
+      result[n] = pd.concat(dfs.values(), axis=1)
+    else:
+      result[n] = dfs
   return result
     
 

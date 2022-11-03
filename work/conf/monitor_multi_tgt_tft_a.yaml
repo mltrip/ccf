@@ -1,4 +1,4 @@
-delay: 600
+delay: 3600
 log_dir: monitor/multi_tgt_tft_a
 report_kwargs:
   metrics: 
