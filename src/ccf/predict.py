@@ -11,13 +11,13 @@ import pytorch_forecasting as pf
 import pytorch_lightning as pl
 from sqlalchemy import create_engine
 
-from ccf.make_dataset import make_dataset
+from ccf.create_dataset import create_dataset
 import ccf
 
 
 def predict(model_path, train_kwargs, engine_kwargs, write_kwargs, 
             predict_kwargs, past, verbose=False, prediction_prefix='pred',
-            dataloader_kwargs=None):
+            rule='1S', dataloader_kwargs=None):
   if model_path is None:
     model = pf.models.Baseline()
   else:
@@ -28,19 +28,18 @@ def predict(model_path, train_kwargs, engine_kwargs, write_kwargs,
     if c is None:
       raise NotImplementedError(model_name) 
     model = c.load_from_checkpoint(model_path)
-  dks = train_kwargs['dataset_kwargs']
+  dks = train_kwargs['create_dataset_kwargs']
   max_prediction_length = dks['dataset_kwargs']['max_prediction_length']
   max_encoder_length = dks['dataset_kwargs']['max_encoder_length']
   min_length = max_encoder_length + max_prediction_length
-  resample_rule = dks['features_kwargs']['resample_kwargs']['rule']
-  resample_seconds = pd.to_timedelta(resample_rule).total_seconds()
+  resample_seconds = pd.to_timedelta(rule).total_seconds()
   dks['split'] = None
-  dks['start'] = -past
-  dks['end'] = max_prediction_length*resample_seconds
+  dks['feature_data_kwargs']['start'] = -past
+  dks['feature_data_kwargs']['end'] = max_prediction_length*resample_seconds
   dks['dataset_kwargs']['predict_mode'] = True
   while True:
     t0 = time.time()
-    ds, _, df, _ = make_dataset(**deepcopy(dks))
+    ds, _, df, _ = create_dataset(**deepcopy(dks))
     if verbose:
       dt_data = time.time() - t0
     if ds is None:

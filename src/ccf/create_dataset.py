@@ -4,6 +4,8 @@ from pathlib import Path
 import gc
 from copy import deepcopy
 
+import hydra
+from omegaconf import DictConfig, OmegaConf
 import numpy as np
 import pandas as pd
 import torch
@@ -11,74 +13,35 @@ import pytorch_forecasting as pf
 from sqlalchemy import create_engine
 import yaml
 
-from ccf.make_features import make_features
+from ccf.read_data import read_data
+from ccf.utils import expand_columns
 
 
-def make_dataset(engine_kwargs, read_kwargs, 
-                 features_kwargs, dataset_kwargs,
-                 start=None, end=None, split=None, 
-                 target_prefix='tgt', df_only=False):
-  now = datetime.utcnow()
-  if isinstance(start, (int, float)):
-    start = now + timedelta(seconds=start)
-  elif isinstance(start, str):
-    start = datetime.fromisoformat(start)
-  else:
-    start = None
-  if isinstance(end, (int, float)):
-    end = now + timedelta(seconds=end)
-  elif isinstance(end, str):
-    end = datetime.fromisoformat(end)
-  else:
-    end = None
-  # Data
-  dfs = {}
-  for g, eks in engine_kwargs.items():
-    dfs[g] = {}
-    for n, ek in eks.items():
-      rk = read_kwargs[g][n]
-      rk['con'] = create_engine(**ek)
-      rk['index_col'] = 'time'
-      rk['parse_dates'] = ['time']
-      t = rk.pop('name')
-      if start is not None and end is not None:
-        rk['sql'] = f"SELECT * FROM '{t}' WHERE time > '{start}' AND time < '{end}'"
-      elif start is not None:
-        rk['sql'] = f"SELECT * FROM '{t}' WHERE time > '{start}'"
-      elif end is not None:
-        rk['sql'] = f"SELECT * FROM '{t}' WHERE time < '{end}'"
-      else:  # start is None and end is None
-        rk['sql'] = f"SELECT * FROM '{t}'"
-      df = pd.read_sql(**rk)
-      if end is not None and len(df) > 0 and df.index[-1] < end:
-        row = pd.DataFrame(data=[[None for _ in df.columns]], 
-                           columns=df.columns,
-                           index=[end]).rename_axis(df.index.name)
-        df = pd.concat([df, row])
-      dfs[g][n] = df  
-  # Features
-  features_kwargs['dfs'] = dfs
-  df = make_features(**features_kwargs)
+def create_dataset(feature_data_kwargs, dataset_kwargs,
+                   split=None, target_prefix='tgt', df_only=False):
+  features = read_data(**feature_data_kwargs)['feature']
+  for n, df in features.items():
+    df['group'] = n
+    df['time_idx'] = np.arange(len(df))
+  df = pd.concat(features.values(), axis=0)
   if len(df) == 0:
     return None, None, None, None
   # Dataset
   columns = set()
   time_idx = dataset_kwargs['time_idx']
   columns.add(time_idx)
-  gs = dataset_kwargs.get('group_ids', [])
-  columns.update(gs)
-  urs = dataset_kwargs.get('time_varying_unknown_reals', [])
-  columns.update(urs)
-  krs = dataset_kwargs.get('time_varying_known_reals', [])
-  columns.update(krs)
-  srs = dataset_kwargs.get('static_reals', [])
-  columns.update(srs)
-  ucs = dataset_kwargs.get('time_varying_unknown_categoricals', [])
-  columns.update(ucs)
-  kcs = dataset_kwargs.get('time_varying_known_categoricals', [])
-  columns.update(kcs)
-  scs = dataset_kwargs.get('static_categoricals ', []) 
-  columns.update(scs)
+  for key in ['group_ids', 
+              'time_varying_unknown_reals',
+              'time_varying_known_reals',
+              'static_reals',
+              'time_varying_unknown_categoricals',
+              'time_varying_known_categoricals',
+              'static_categoricals',
+              'target']:
+    cs = dataset_kwargs.get(key, [])
+    cs = expand_columns(df, cs)
+    dataset_kwargs[key] = cs
+    columns.update(cs)
   target = dataset_kwargs.get('target', [])
   target = [target] if isinstance(target, str) else target
   for i, t in enumerate(target):
@@ -138,15 +101,13 @@ def make_dataset(engine_kwargs, read_kwargs,
   else:
     return None, None, df, df2
     
+    
+@hydra.main(version_base=None)
+def app(cfg: DictConfig) -> None:
+  print(OmegaConf.to_yaml(cfg))
+  create_dataset(**OmegaConf.to_object(cfg))
+
   
 if __name__ == "__main__":
-  cfg = sys.argv[1] if len(sys.argv) > 1 else 'make_dataset.yaml'
-  with open(cfg) as f:
-    kwargs = yaml.safe_load(f)
-  ds = make_dataset(**kwargs)
-  # p = Path(cfg)
-  # if ds[1] is None:
-  #   ds.save(p.with_suffix('.pt'))
-  # else:
-  #   for i, dss in enumerate(ds):
-  #     dss.save(p.with_name(f'{p.name}_{i + 1}.pt'))
+  app()
+

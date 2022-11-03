@@ -3,7 +3,8 @@ defaults:
 
 model_path: multi_tgt_tft.ckpt
 verbose: true
-past: 3600
+past: 360
+rule: 1S
 predict_kwargs:
   return_index: true
   mode: prediction  # prediction or quantiles

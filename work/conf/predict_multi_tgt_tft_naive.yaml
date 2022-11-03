@@ -4,6 +4,7 @@ defaults:
 model_path: ~
 verbose: true
 past: 60
+rule: 1S
 predict_kwargs:
   return_index: true
   mode: prediction  # prediction or quantiles
