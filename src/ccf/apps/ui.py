@@ -40,7 +40,7 @@ def make_time_charts(data):
   return charts
 
 
-def app(read_data_kwargs, delay=0):
+def ui(read_data_kwargs, delay=0):
   st.set_page_config(
       page_title="CryptoCurrency Forecasting",
       page_icon="₿",
@@ -57,7 +57,7 @@ def app(read_data_kwargs, delay=0):
   
   
 if __name__ == "__main__":
-  cfg = sys.argv[1] if len(sys.argv) > 1 else 'app.yaml'
+  cfg = sys.argv[1] if len(sys.argv) > 1 else 'ui.yaml'
   with open(cfg) as f:
     kwargs = yaml.safe_load(f)
-  app(**kwargs)
+  ui(**kwargs)

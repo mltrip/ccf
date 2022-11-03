@@ -1,5 +1,5 @@
+hydra-core
 pandas
-PyYAML
 SQLAlchemy
 torch
 pytorch-forecasting

@@ -100,7 +100,7 @@ dataloader_kwargs:
     batch_size: 32
 model_kwargs:
   class: TemporalFusionTransformer
-  learning_rate: 0.03
+  learning_rate: 0.003
   hidden_size: 32
   attention_head_size: 1
   dropout: 0.1
@@ -111,7 +111,7 @@ model_kwargs:
   log_interval: 0
   reduce_on_plateau_patience: 2
 trainer_kwargs:
-  max_epochs: 1
+  max_epochs: 32
   accelerator: cpu  # gpu
   # devices: [ 0 ]
   gradient_clip_val: 0.1

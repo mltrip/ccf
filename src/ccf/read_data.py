@@ -2,9 +2,11 @@ import sys
 from datetime import datetime, timedelta, timezone
 from copy import deepcopy
 
-import yaml
+import hydra
+from omegaconf import DictConfig, OmegaConf
 from sqlalchemy import create_engine
 import pandas as pd
+
 
 
 def read_data(query, start=None, end=None):
@@ -56,10 +58,13 @@ def read_data(query, start=None, end=None):
     result[n] = pd.concat(dfs, axis=1)
   return result
     
-  
-if __name__ == "__main__":
-  cfg = sys.argv[1] if len(sys.argv) > 1 else 'read_data.yaml'
-  with open(cfg) as f:
-    kwargs = yaml.safe_load(f)
-  df = read_data(**kwargs)
+
+@hydra.main(version_base=None)
+def app(cfg: DictConfig) -> None:
+  print(OmegaConf.to_yaml(cfg))
+  df = read_data(**OmegaConf.to_object(cfg))
   print(df)
+
+
+if __name__ == "__main__":
+  app()

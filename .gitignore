@@ -1,4 +1,6 @@
-tensorboard/
+work/monitor/
+work/outputs/
+work/tensorboard/
 *.db-journal
 *.db
 *.ckpt

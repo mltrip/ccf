@@ -8,13 +8,15 @@ import json
 from datetime import datetime, timedelta, timezone
 import time
 
-import yaml
-import websocket
 from concurrent.futures import ThreadPoolExecutor, wait
-from sqlalchemy import create_engine
-import pandas as pd
+import websocket
 import numpy as np
+from sqlalchemy import create_engine
+import hydra
+from omegaconf import DictConfig, OmegaConf
+import pandas as pd
 import feedparser
+
 
 
 def get_data(markets=None, streams=None, feeds=None, 
@@ -24,7 +26,6 @@ def get_data(markets=None, streams=None, feeds=None,
              run_kwargs=None):
   markets = [] if markets is None else markets
   streams = [] if streams is None else streams
-  feeds = [] if feeds is None else feeds
   engine_kwargs = {'url': 'sqlite:///data.db'} if engine_kwargs is None else engine_kwargs
   executor_kwargs = {} if executor_kwargs is None else executor_kwargs
   feeds_kwargs = {} if feeds_kwargs is None else feeds_kwargs
@@ -47,13 +48,14 @@ def get_data(markets=None, streams=None, feeds=None,
                                            app_kwargs=app_kwargs)
       app = websocket.WebSocketApp(**app_kwargs)
       futures.append(executor.submit(app.run_forever, **run_kwargs))
-  feeds = [k for k, v in feeds.items() if v]
-  feeds = np.array_split(feeds, feeds_kwargs.pop('split', 1))
-  feeds_kwargs['engine_kwargs'] = engine_kwargs
-  for f in feeds:
-    feeds_kwargs['feeds'] = f
-    on_feed = OnFeed(**feeds_kwargs)
-    futures.append(executor.submit(on_feed))
+  if feeds is not None and len(feeds) != 0:
+    feeds = [k for k, v in feeds.items() if v]
+    feeds = np.array_split(feeds, feeds_kwargs.pop('split', 1))
+    feeds_kwargs['engine_kwargs'] = engine_kwargs
+    for f in feeds:
+      feeds_kwargs['feeds'] = f
+      on_feed = OnFeed(**feeds_kwargs)
+      futures.append(executor.submit(on_feed))
   wait(futures)
 
 
@@ -96,7 +98,7 @@ class OnMessage:
       d['time'] = datetime.fromtimestamp(float(data['T']) / 1000.0, tz=timezone.utc)
       d['p'] = float(data['p'])
       d['q'] = float(data['q'])
-      d['t'] = not data['m']  # True - Buy, False - Sell
+      d['m'] = not data['m']  # True - taker buy, False - taker sell
     else:
       raise NotImplementedError(s)
     df = pd.DataFrame.from_records([d], index='time')
@@ -108,7 +110,7 @@ class OnMessage:
 
     
 class OnFeed:
-  def __init__(self, engine_kwargs, feeds, delay=3, before=None, verbose=False):
+  def __init__(self, engine_kwargs, feeds, delay=0, before=None, verbose=False):
     self.feeds = feeds
     self.delay = delay
     self.before = before
@@ -179,10 +181,12 @@ class OnFeed:
         print(self.delay - ((time.time() - t0) % self.delay))
       time.sleep(self.delay - ((time.time() - t0) % self.delay))
 
-  
+
+@hydra.main(version_base=None)
+def app(cfg: DictConfig) -> None:
+  print(OmegaConf.to_yaml(cfg))
+  get_data(**OmegaConf.to_object(cfg))
+
   
 if __name__ == "__main__":
-  cfg = sys.argv[1] if len(sys.argv) > 1 else 'get_data.yaml'
-  with open(cfg) as f:
-    kwargs = yaml.safe_load(f)
-  get_data(**kwargs)
+  app()

@@ -1,5 +1,7 @@
+defaults:
+ - ./@train_kwargs: train_multi_tft
+
 model_path: multi_tft.ckpt
-train_kwargs: train_multi_tft.yaml
 verbose: true
 past: 3600
 predict_kwargs:

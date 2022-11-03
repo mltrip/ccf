@@ -3,6 +3,8 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import hydra
+from omegaconf import DictConfig, OmegaConf
 import numpy as np
 import pandas as pd
 from sqlalchemy import create_engine
@@ -15,8 +17,8 @@ from evidently.test_suite import TestSuite
 from ccf.read_data import read_data
 
 
-def app(read_data_kwargs, delay=0, start=None, end=None, log_dir='monitor',
-        test_kwargs=None, report_kwargs=None, column_mapping_kwargs=None):
+def monitor(read_data_kwargs, delay=0, start=None, end=None, log_dir='monitor',
+            test_kwargs=None, report_kwargs=None, column_mapping_kwargs=None):
   # Initialize Test
   if test_kwargs is not None:
     for i, t in enumerate(test_kwargs['tests']):
@@ -59,9 +61,12 @@ def app(read_data_kwargs, delay=0, start=None, end=None, log_dir='monitor',
           m.save_html(filename)
     time.sleep(delay)
   
-  
+
+@hydra.main(version_base=None)
+def app(cfg: DictConfig) -> None:
+  print(OmegaConf.to_yaml(cfg))
+  monitor(**OmegaConf.to_object(cfg))
+
+
 if __name__ == "__main__":
-  cfg = sys.argv[1] if len(sys.argv) > 1 else 'monitor.yaml'
-  with open(cfg) as f:
-    kwargs = yaml.safe_load(f)
-  app(**kwargs)
+  app()  

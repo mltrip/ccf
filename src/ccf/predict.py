@@ -4,11 +4,12 @@ from pathlib import Path
 import time
 from copy import deepcopy
 
+import hydra
+from omegaconf import DictConfig, OmegaConf
 import pandas as pd
 import pytorch_forecasting as pf
 import pytorch_lightning as pl
 from sqlalchemy import create_engine
-import yaml
 
 from ccf.make_dataset import make_dataset
 import ccf
@@ -17,8 +18,6 @@ import ccf
 def predict(model_path, train_kwargs, engine_kwargs, write_kwargs, 
             predict_kwargs, past, verbose=False, prediction_prefix='pred',
             dataloader_kwargs=None):
-  with open(train_kwargs) as f:
-    train_kwargs = yaml.safe_load(f)
   if model_path is None:
     model = pf.models.Baseline()
   else:
@@ -105,8 +104,11 @@ def predict(model_path, train_kwargs, engine_kwargs, write_kwargs,
     time.sleep(max(0, resample_seconds - dt_total))
     
   
+@hydra.main(version_base=None)
+def app(cfg: DictConfig) -> None:
+  print(OmegaConf.to_yaml(cfg))
+  predict(**OmegaConf.to_object(cfg))
+
+
 if __name__ == "__main__":
-  cfg = sys.argv[1] if len(sys.argv) > 1 else 'predict.yaml'
-  with open(cfg) as f:
-    kwargs = yaml.safe_load(f)
-  predict(**kwargs)
+  app()

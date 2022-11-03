@@ -1,12 +1,14 @@
-model_path: multi_tgt_rnn.ckpt
-train_kwargs: train_multi_tgt_rnn.yaml
+defaults:
+ - ./@train_kwargs: train_multi_tgt_tft
+
+model_path: ~
 verbose: true
-past: 3600
+past: 60
 predict_kwargs:
   return_index: true
   mode: prediction  # prediction or quantiles
 engine_kwargs:
-  url: sqlite:///multi_tgt_rnn@prediction.db
+  url: sqlite:///multi_tgt_tft_naive@prediction.db
 write_kwargs:
   name: data
   if_exists: append

@@ -3,11 +3,12 @@ from datetime import datetime, timedelta, timezone
 import shutil
 from pathlib import Path
 
+import hydra
+from omegaconf import DictConfig, OmegaConf
 import pandas as pd
 import pytorch_forecasting as pf
 import pytorch_lightning as pl
 from sqlalchemy import create_engine
-import yaml
 
 import ccf
 from ccf.make_dataset import make_dataset
@@ -77,9 +78,12 @@ def train(dataset_kwargs, dataloader_kwargs,
     shutil.copyfile(best, model_path)
   return trainer
   
-  
+
+@hydra.main(version_base=None)
+def app(cfg: DictConfig) -> None:
+  print(OmegaConf.to_yaml(cfg))
+  train(**OmegaConf.to_object(cfg))
+
+
 if __name__ == "__main__":
-  cfg = sys.argv[1] if len(sys.argv) > 1 else 'train.yaml'
-  with open(cfg) as f:
-    kwargs = yaml.safe_load(f)
-  trainer = train(**kwargs)
+  app()

@@ -1,5 +1,5 @@
 feedparser
+hydra-core
 pandas
-PyYAML
 SQLAlchemy
 websocket-client

@@ -1,8 +1,9 @@
 altair
 evidently
+hydra-core
 numpy
 pandas
-PyYAML
 plotly
+PyYAML
 SQLAlchemy
 streamlit
