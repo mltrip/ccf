@@ -42,7 +42,7 @@ while true; do PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn train_
 ## Predict with [TFT](https://pytorch-forecasting.readthedocs.io/en/stable/tutorials/stallion.html) model
 * With memory leak:(
 ```sh
-PYTHONPATH=../src/ python ../src/ccf/predict.py predict_tft.yaml
+PYTHONPATH=../src/ python ../src/ccf/predict.py -cd conf -cn predict_multi_tgt_tft
 ```
 * Workaround of memory leak;) 
 ```sh
