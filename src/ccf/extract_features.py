@@ -46,6 +46,7 @@ def extract_features(raw_data_kwargs, feature_data_kwargs, pre_features, post_fe
       raise ValueError(f)
   post_features = new_post_features
   while True:
+    print(f'{datetime.utcnow()}')
     t0 = time.time()
     # Read
     raw = read_data(**raw_data_kwargs)
@@ -70,19 +71,17 @@ def extract_features(raw_data_kwargs, feature_data_kwargs, pre_features, post_fe
     # Write
     for n, old_df in old_feature.items():
       new_df = new_feature[n]
-      d = new_df.index.difference(old_df.index)
-      new_df = new_df[new_df.index.isin(d)]
+      if len(old_df) > 0:
+        new_df = new_df[new_df.index > old_df.index.max()]
       if verbose:
-        print(n)
-        print(d)
-        print(old_df.tail(1))
-        print(new_df.tail(1))
-      wk = feature_io[n]['write_kwargs']
-      new_df.to_sql(**wk)
+        print(f'{n}, old: {len(old_df)}, new: {len(new_df)}')
+      if len(new_df) > 0:
+        wk = feature_io[n]['write_kwargs']
+        new_df.to_sql(**wk)
     dt = time.time() - t0
-    if verbose:
-      print(f'{datetime.utcnow()}, dt: {dt:.3f}')
-    time.sleep(max(0, delay - dt))
+    wt = max(0, delay - dt)
+    print(f'dt: {dt:.3f}, wt: {wt:.3f}')
+    time.sleep(wt)
   
   
 def m_p(name, raw, old_feature, pre_feature, depth=1):

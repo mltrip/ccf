@@ -1,0 +1,6 @@
+hydra-core
+numpy
+pandas
+pytorch-forecasting
+SQLAlchemy
+torch

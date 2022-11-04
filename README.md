@@ -1,76 +1,131 @@
-# ccf
-CryptoCurrency Forecasting App for [ML System Design Course on ODS.ai](https://ods.ai/tracks/ml-system-design-22)
-
-# Install
-* Install python 3.9
-* Install requirements for Data part:
-```
+# CCF
+Crypto Currency Forecasting App for [ML System Design Course on ODS.ai](https://ods.ai/tracks/ml-system-design-22)
+***
+## ARCHITECTURE (TODO implement it!)
+***
+![architecture](docs/architecture.png)
+App consists of 6 main parts
+> We could install and run different parts of the App independently
+### <span style="color:#4dd0e1"> DATA </span> 
+In this part data from `exchanges` and `news rss` are collected in the `raw data` database
+### <span style="color:#a2fca2"> FEATURES </span>
+Here are continiuos feature extracting from `raw data` database and saving in the `feature store` (it could be the same database as raw). `Dataset` creation occurs dynamically at the <span style="color:#eeff41"> ML </span> and <span style="color:#ffab40"> PREDICTIONS </span>  parts, but the logic is described here
+### <span style="color:#eeff41"> ML </span> 
+Here we create `datasets`, train/tune `models` and add/update them in the `models registry`
+### <span style="color:#ffab40"> PREDICTIONS </span> 
+This part is for making `predictions` based on `models` from `models registry` and `datasets`
+### <span style="color:#adadad"> METRICS </span>
+There are metrics collectors and monitors with techincal information about `raw data`, `features`, training/tuning, `models`, `predictions`, etc
+### <span style="color:#eeeeee"> UI </span>
+We show `users`: `predictions`, performance `metrics`, `raw data`, etc. This part uses some information from <span style="color:#adadad"> METRICS </span> part
+***
+## INSTALL
+***
+### Python 3.9
+### <span style="color:#4dd0e1"> DATA </span> 
+```sh
 pip install -r src/ccf/requirements_data.txt
-``` 
-* Install requirements for ML part:
 ```
+### <span style="color:#a2fca2"> FEATURES </span>
+```sh
+pip install -r src/ccf/requirements_features.txt
+``` 
+### <span style="color:#eeff41"> ML </span> 
+```sh
 pip install -r src/ccf/requirements_ml.txt
 ```
-* Install requirements dor App part:
+### <span style="color:#ffab40"> PREDICTIONS </span> 
+```sh
+pip install -r src/ccf/requirements_predictions.txt
 ```
-pip install -r src/ccf/requirements_app.txt
+### <span style="color:#adadad"> METRICS </span>
+```sh
+pip install -r src/ccf/requirements_metrics.txt
 ```
-
-# Run
-## Go to working directory
+### <span style="color:#eeeeee"> UI </span>
+```sh
+pip install -r src/ccf/requirements_ui.txt
+```
+***
+## RUN
+***
 ```sh
 cd work
 ```
-## Get data
+### <span style="color:#4dd0e1"> GET DATA </span>
 * Linux (by default)
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/get_data.py -cd conf -cn get_data_multi
 ```
-* Windows
+* Windows (as example)
 ```sh
 cmd /C  "set PYTHONPATH=../src && python ../src/ccf/get_data.py -cd conf -cn get_data_multi"
 ```
-## Train [TFT](https://pytorch-forecasting.readthedocs.io/en/stable/tutorials/stallion.html) model
-* Once
+
+### <span style="color:#a2fca2"> EXTRACT FEATURES </span>
+```sh
+PYTHONPATH=../src/ python ../src/ccf/extract_features.py -cd conf -cn extract_features
+```
+> There could be a memeory leak (see <span style="color:#ffab40"> MAKE PREDICTIONS </span> for a workaround)
+```sh
+while true; do PYTHONPATH=../src/ timeout 1800 python ../src/ccf/extract_features.py -cd conf -cn extract_features; done
+```
+### <span style="color:#eeff41"> TRAIN/TUNE MODEL </span> 
+* Train once
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn train_multi_tgt_tft
 ```
-* Every ~hour
+* Tune every ~1 hour
 ```sh
 while true; do PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn train_multi_tgt_tft; sleep 3600; done
 ```
-## Predict with [TFT](https://pytorch-forecasting.readthedocs.io/en/stable/tutorials/stallion.html) model
+### <span style="color:#ffab40"> MAKE PREDICTIONS </span> 
 * With memory leak:(
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/predict.py -cd conf -cn predict_multi_tgt_tft
 ```
-* Workaround of memory leak;) 
+* Workaround of memory leak;) (just restart script every ~0.5 hour)
 ```sh
 while true; do PYTHONPATH=../src/ timeout 1800 python ../src/ccf/predict.py -cd conf -cn predict_multi_tgt_tft; done
 ```
-* Naive
+* Naive model (predict last known target)
 ```sh
 while true; do PYTHONPATH=../src/ timeout 1800 python ../src/ccf/predict.py -cd conf -cn predict_multi_tgt_tft_naive; done
 ```
-## Run Streamlit UI
+### <span style="color:#adadad"> MONITOR METRICS </span> 
+* Access metrics reports directory by 8000 port
 ```sh
-PYTHONPATH=../src/ streamlit run ../src/ccf/apps/ui.py conf/ui_multi_tgt.yaml
+cd work/monitor
+python -m http.server 8000
 ```
-## Run Evidently Monitor
-* Raw data
+* <span style="color:#4dd0e1"> DATA </span>
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_raw
 ```
-* Target
+* <span style="color:#a2fca2"> FEATURES </span>
+```sh
+PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_features
+```
+* <span style="color:#eeff41"> TRAIN/TUNE </span>
+```sh
+tensorboard --logdir tensorboard/ --host 0.0.0.0 --port 6007
+```
+* <span style="color:#eeff41"> TODO MODELS with MLFLOW </span>
+* <span style="color:#ffab40"> PREDICTIONS </span>
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_multi_tgt_tft_a.yaml
 PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_multi_tgt_tft_b.yaml
 PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_multi_tgt_tft_naive_a.yaml
 PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_multi_tgt_tft_naive_b.yaml
 ```
-
-# Configs
-Data `work/conf/get_data_multi.yaml`
+### <span style="color:#eeeeee"> RUN UI </span> 
+```sh
+PYTHONPATH=../src/ streamlit run ../src/ccf/apps/ui.py conf/ui_multi_tgt_tft.yaml
+```
+***
+## CONFIGS EXAMPLES
+***
+### <span style="color:#4dd0e1"> GET DATA `work/conf/get_data_multi.yaml` </span>
 ```yaml
 defaults:
  - feeds: all
@@ -88,84 +143,145 @@ feeds_kwargs:
   before: 3600
   verbose: false
 ```
-Train `work/conf/train_multi_tgt_tft.yaml`
+### <span style="color:#a2fca2"> EXTRACT FEATURES `work/conf/extract_features.yaml` </span>
+```yaml
+verbose: true
+delay: 1
+remove_pre_features: false
+pre_features:
+- feature: m_p
+  depth: ~
+- feature: get
+  columns: [ a_p_*, b_p_* ]
+post_features:
+- feature: relative
+  kind: rat
+  shift: 1
+- feature: relative
+  shift: 0
+  kind: rat
+  columns: [ "o_m_p_[1-9]*", "o_a_p_[1-9]*", "o_b_p_[1-9]*" ]
+  column: o_m_p_0
+- feature: relative
+  shift: 0
+  kind: rat
+  columns: [ "o_a_p_[1-9]*" ]
+  column: o_a_p_0
+- feature: relative
+  shift: 0
+  kind: rat
+  columns: [ "o_b_p_[1-9]*" ]
+  column: o_b_p_0
+resample_kwargs:
+  rule: 1S
+aggregate_kwargs:
+  func: last
+interpolate_kwargs:
+  func: pad
+feature_data_kwargs:
+  start: -5
+  end: ~
+  concat: false
+  query:
+    feature:
+      btcusdt:
+        engine_kwargs:
+          url: sqlite:///btcusdt@feature.db
+        read_kwargs:
+          name: data
+          columns: ~
+        write_kwargs:
+          name: data
+          if_exists: append
+      ethusdt:
+        engine_kwargs:
+          url: sqlite:///ethusdt@feature.db
+        read_kwargs:
+          name: data
+          columns: ~
+        write_kwargs:
+          name: data
+          if_exists: append
+      ethbtc:
+        engine_kwargs:
+          url: sqlite:///ethbtc@feature.db
+        read_kwargs:
+          name: data
+          columns: ~
+        write_kwargs:
+          name: data
+          if_exists: append
+raw_data_kwargs:
+  start: -5
+  end: ~
+  concat: False
+  query:
+    btcusdt:
+      o:
+        engine_kwargs:
+          url: sqlite:///btcusdt@depth5@1000ms.db
+        read_kwargs:
+          name: data
+          columns: ~
+    ethusdt:
+      o:
+        engine_kwargs:
+          url: sqlite:///ethusdt@depth5@1000ms.db
+        read_kwargs:
+          name: data
+          columns: ~
+    ethbtc:
+      o:
+        engine_kwargs:
+          url: sqlite:///ethbtc@depth5@1000ms.db
+        read_kwargs:
+          name: data
+          columns: ~
+```
+### <span style="color:#eeff41"> TRAIN/TUNE MULTI TARGET TFT `work/conf/train_multi_tgt_tft.yaml` </span>
 ```yaml
 model_path: multi_tgt_tft.ckpt
 tune: true
-dataset_kwargs:
-  start: -3600
-  end: ~
+create_dataset_kwargs:
   split: 0.8
-  engine_kwargs:
-    btcusdt:
-      orderbook:
-        url: sqlite:///btcusdt@depth5@1000ms.db
-      trades:
-        url: sqlite:///btcusdt@trade.db  
-      news:
-        url: sqlite:///news.db
-    ethusdt:
-      orderbook:
-        url: sqlite:///ethusdt@depth5@1000ms.db
-      trades:
-        url: sqlite:///ethusdt@trade.db  
-      news:
-        url: sqlite:///news.db
-    ethbtc:
-      orderbook:
-        url: sqlite:///ethbtc@depth5@1000ms.db
-      trades:
-        url: sqlite:///ethbtc@trade.db  
-      news:
-        url: sqlite:///news.db
-  read_kwargs:
-    btcusdt:
-      orderbook:
-        name: data
-      trades:
-        name: data
-      news:
-        name: data
-    ethusdt:
-      orderbook:
-        name: data
-      trades:
-        name: data
-      news:
-        name: data
-    ethbtc:
-      orderbook:
-        name: data
-      trades:
-        name: data
-      news:
-        name: data
-  features_kwargs:
-    post_features:
-    - time_idx
-    - group
-    pre_features:
-    - m_p
-    resample_kwargs:
-      rule: 1S
-    aggregate_kwargs:
-      orderbook:
-        func: last
-      trades:
-        func: last
-      news:
-        func: last
-    interpolate_kwargs:
-      orderbook:
-        method: pad
-      trades:
-        method: pad
-      news: ~
+  feature_data_kwargs:
+    start: -360
+    end: ~
+    concat: false
+    query:
+      feature:
+        btcusdt:
+          engine_kwargs:
+            url: sqlite:///btcusdt@feature.db
+          read_kwargs:
+            name: data
+            columns: ~
+          write_kwargs:
+            name: data
+            if_exists: append
+        ethusdt:
+          engine_kwargs:
+            url: sqlite:///ethusdt@feature.db
+          read_kwargs:
+            name: data
+            columns: ~
+          write_kwargs:
+            name: data
+            if_exists: append
+        ethbtc:
+          engine_kwargs:
+            url: sqlite:///ethbtc@feature.db
+          read_kwargs:
+            name: data
+            columns: ~
+          write_kwargs:
+            name: data
+            if_exists: append
   dataset_kwargs:
     time_idx: time_idx
     allow_missing_timesteps: true
     add_relative_time_idx: true
-    target: [a_p_0, b_p_0]
+    target: [o_a_p_0, o_b_p_0]
     group_ids:
     - group
     static_categoricals:
@@ -173,8 +289,8 @@ dataset_kwargs:
     max_encoder_length: 10
     max_prediction_length: 5
     time_varying_unknown_reals:
-    - a_p_0
-    - b_p_0
+    - o_a_p_0
+    - o_b_p_0
     target_normalizer:
       class: GroupNormalizer
       groups: [ group ]
@@ -228,14 +344,15 @@ trainer_kwargs:
     verbose: false
     mode: min
 ```
-Predict `conf/work/predict_multi_tgt_tft.yaml`
+### <span style="color:#ffab40"> MAKE PREDICTIONS WITH MULTI TARGET TFT `work/conf/predict_multi_tgt_tft.yaml` </span>
 ```yaml 
 defaults:
  - ./@train_kwargs: train_multi_tgt_tft
 
 model_path: multi_tgt_tft.ckpt
 verbose: true
-past: 3600
+past: 360
+rule: 1S
 predict_kwargs:
   return_index: true
   mode: prediction  # prediction or quantiles
@@ -245,147 +362,7 @@ write_kwargs:
   name: data
   if_exists: append
 ```
-UI `conf/work/ui_multi_tgt.yaml`
-```yaml 
-delay: 1
-read_data_kwargs:
-  start: -30
-  end: ~
-  query:
-    btcusdt:
-      target:
-        engine_kwargs:
-          url: sqlite:///btcusdt@depth5@1000ms.db
-        read_kwargs:
-          name: data
-          columns: [ time, a_p_0, b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-      tft:
-        engine_kwargs:
-          url: sqlite:///multi_tgt_tft@prediction.db
-        read_kwargs:
-          name: data
-          group: btcusdt
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-      rnn:
-        engine_kwargs:
-          url: sqlite:///multi_tgt_rnn@prediction.db
-        read_kwargs:
-          name: data
-          group: btcusdt
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-      naive:
-        engine_kwargs:
-          url: sqlite:///multi_tgt_tft_naive@prediction.db
-        read_kwargs:
-          name: data
-          group: btcusdt
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-    ethusdt:
-      target:
-        engine_kwargs:
-          url: sqlite:///ethusdt@depth5@1000ms.db
-        read_kwargs:
-          name: data
-          columns: [ time, a_p_0, b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-      tft:
-        engine_kwargs:
-          url: sqlite:///multi_tgt_tft@prediction.db
-        read_kwargs:
-          name: data
-          group: ethusdt
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-      rnn:
-        engine_kwargs:
-          url: sqlite:///multi_tgt_rnn@prediction.db
-        read_kwargs:
-          name: data
-          group: ethusdt
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-      naive:
-        engine_kwargs:
-          url: sqlite:///multi_tgt_tft_naive@prediction.db
-        read_kwargs:
-          name: data
-          group: ethusdt
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-    ethbtc:
-      target:
-        engine_kwargs:
-          url: sqlite:///ethbtc@depth5@1000ms.db
-        read_kwargs:
-          name: data
-          columns: [ time, a_p_0, b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-      tft:
-        engine_kwargs:
-          url: sqlite:///multi_tgt_tft@prediction.db
-        read_kwargs:
-          name: data
-          group: ethbtc
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-      rnn:
-        engine_kwargs:
-          url: sqlite:///multi_tgt_rnn@prediction.db
-        read_kwargs:
-          name: data
-          group: ethbtc
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-      naive:
-        engine_kwargs:
-          url: sqlite:///multi_tgt_tft_naive@prediction.db
-        read_kwargs:
-          name: data
-          group: ethbtc
-          columns: [ time, pred-a_p_0, pred-b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-```
-UI `conf/work/monitor_raw.yaml`
+### <span style="color:#adadad"> MONITOR RAW DATA METRICS `conf/work/monitor_raw.yaml` </span>
 ```yaml 
 delay: 600
 log_dir: monitor/raw
@@ -445,4 +422,159 @@ read_data_kwargs:
           url: sqlite:///news.db
         read_kwargs:
           name: data
+```
+### <span style="color:#adadad"> MONITOR FEATURES METRICS `conf/work/monitor_reatures.yaml` </span>
+```yaml 
+delay: 600
+log_dir: monitor/features
+report_kwargs:
+  metrics: 
+  - class: DataDriftPreset
+  - class: DataQualityPreset
+test_kwargs:
+  tests:
+  - class: DataQualityTestPreset
+  - class: DataStabilityTestPreset
+column_mapping_kwargs:
+  datetime: time
+read_data_kwargs:
+  start: -600
+  end: ~
+  concat: false
+  query:
+    feature:
+      btcusdt:
+        engine_kwargs:
+          url: sqlite:///btcusdt@feature.db
+        read_kwargs:
+          name: data
+          columns: ~
+        write_kwargs:
+          name: data
+          if_exists: append
+      ethusdt:
+        engine_kwargs:
+          url: sqlite:///ethusdt@feature.db
+        read_kwargs:
+          name: data
+          columns: ~
+        write_kwargs:
+          name: data
+          if_exists: append
+      ethbtc:
+        engine_kwargs:
+          url: sqlite:///ethbtc@feature.db
+        read_kwargs:
+          name: data
+          columns: ~
+        write_kwargs:
+          name: data
+          if_exists: append
+```
+### <span style="color:#eeeeee"> RUN MULTI TARGET TFT UI `conf/work/ui_multi_tgt_tft.yaml` </span>
+```yaml 
+delay: 1
+read_data_kwargs:
+  start: -30
+  end: ~
+  query:
+    btcusdt:
+      target:
+        engine_kwargs:
+          url: sqlite:///btcusdt@feature.db
+        read_kwargs:
+          name: data
+          columns: [ time, o_a_p_0, o_b_p_0 ]
+          resample_kwargs:
+            rule: 1S
+          aggregate_kwargs:
+            func: last
+      tft:
+        engine_kwargs:
+          url: sqlite:///multi_tgt_tft@prediction.db
+        read_kwargs:
+          name: data
+          group: btcusdt
+          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
+          resample_kwargs:
+            rule: 1S
+          aggregate_kwargs:
+            func: last
+      naive:
+        engine_kwargs:
+          url: sqlite:///multi_tgt_tft_naive@prediction.db
+        read_kwargs:
+          name: data
+          group: btcusdt
+          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
+          resample_kwargs:
+            rule: 1S
+          aggregate_kwargs:
+            func: last
+    ethusdt:
+      target:
+        engine_kwargs:
+          url: sqlite:///ethusdt@feature.db
+        read_kwargs:
+          name: data
+          columns: [ time, o_a_p_0, o_b_p_0 ]
+          resample_kwargs:
+            rule: 1S
+          aggregate_kwargs:
+            func: last
+      tft:
+        engine_kwargs:
+          url: sqlite:///multi_tgt_tft@prediction.db
+        read_kwargs:
+          name: data
+          group: ethusdt
+          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
+          resample_kwargs:
+            rule: 1S
+          aggregate_kwargs:
+            func: last
+      naive:
+        engine_kwargs:
+          url: sqlite:///multi_tgt_tft_naive@prediction.db
+        read_kwargs:
+          name: data
+          group: ethusdt
+          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
+          resample_kwargs:
+            rule: 1S
+          aggregate_kwargs:
+            func: last
+    ethbtc:
+      target:
+        engine_kwargs:
+          url: sqlite:///ethbtc@feature.db
+        read_kwargs:
+          name: data
+          columns: [ time, o_a_p_0, o_b_p_0 ]
+          resample_kwargs:
+            rule: 1S
+          aggregate_kwargs:
+            func: last
+      tft:
+        engine_kwargs:
+          url: sqlite:///multi_tgt_tft@prediction.db
+        read_kwargs:
+          name: data
+          group: ethbtc
+          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
+          resample_kwargs:
+            rule: 1S
+          aggregate_kwargs:
+            func: last
+      naive:
+        engine_kwargs:
+          url: sqlite:///multi_tgt_tft_naive@prediction.db
+        read_kwargs:
+          name: data
+          group: ethbtc
+          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
+          resample_kwargs:
+            rule: 1S
+          aggregate_kwargs:
+            func: last
 ```
