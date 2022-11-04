@@ -1,58 +1,54 @@
 # CCF
 Crypto Currency Forecasting App for [ML System Design Course on ODS.ai](https://ods.ai/tracks/ml-system-design-22)
-***
+
 ## ARCHITECTURE (TODO implement it!)
-***
 ![architecture](docs/architecture.png)
+
 App consists of 6 main parts
 > We could install and run different parts of the App independently
-### <span style="color:#4dd0e1"> DATA </span> 
+### $$\textcolor{#4dd0e1}{\text{DATA}}$$
 In this part data from `exchanges` and `news rss` are collected in the `raw data` database
-### <span style="color:#a2fca2"> FEATURES </span>
-Here are continiuos feature extracting from `raw data` database and saving in the `feature store` (it could be the same database as raw). `Dataset` creation occurs dynamically at the <span style="color:#eeff41"> ML </span> and <span style="color:#ffab40"> PREDICTIONS </span>  parts, but the logic is described here
-### <span style="color:#eeff41"> ML </span> 
+### $$\textcolor{#a2fca2}{\text{FEATURES}}$$
+Here are continiuos feature extracting from `raw data` database and saving in the `feature store` (it could be the same database as raw). `Dataset` creation occurs dynamically at the ML and PREDICTIONS parts, but the logic is described here
+### $$\textcolor{#eeff41}{\text{ML}}$$
 Here we create `datasets`, train/tune `models` and add/update them in the `models registry`
-### <span style="color:#ffab40"> PREDICTIONS </span> 
+### $$\textcolor{#ffab40}{\text{PREDICTIONS}}$$
 This part is for making `predictions` based on `models` from `models registry` and `datasets`
-### <span style="color:#adadad"> METRICS </span>
+### $$\textcolor{#adadad}{\text{METRICS}}$$
 There are metrics collectors and monitors with techincal information about `raw data`, `features`, training/tuning, `models`, `predictions`, etc
-### <span style="color:#eeeeee"> UI </span>
-We show `users`: `predictions`, performance `metrics`, `raw data`, etc. This part uses some information from <span style="color:#adadad"> METRICS </span> part
-***
+### $$\textcolor{#eeeeee}{\text{UI}}$$
+We show `users`: `predictions`, performance `metrics`, `raw data`, etc. This part uses some information from METRICS part
 ## INSTALL
-***
 ### Python 3.9
-### <span style="color:#4dd0e1"> DATA </span> 
+### $$\textcolor{#4dd0e1}{\text{DATA}}$$ 
 ```sh
 pip install -r src/ccf/requirements_data.txt
 ```
-### <span style="color:#a2fca2"> FEATURES </span>
+### $$\textcolor{#a2fca2}{\text{FEATURES}}$$
 ```sh
 pip install -r src/ccf/requirements_features.txt
 ``` 
-### <span style="color:#eeff41"> ML </span> 
+### $$\textcolor{#eeff41}{\text{ML}}$$ 
 ```sh
 pip install -r src/ccf/requirements_ml.txt
 ```
-### <span style="color:#ffab40"> PREDICTIONS </span> 
+### $$\textcolor{#ffab40}{\text{PREDICTIONS}}$$ 
 ```sh
 pip install -r src/ccf/requirements_predictions.txt
 ```
-### <span style="color:#adadad"> METRICS </span>
+### $$\textcolor{#adadad}{\text{METRICS}}$$
 ```sh
 pip install -r src/ccf/requirements_metrics.txt
 ```
-### <span style="color:#eeeeee"> UI </span>
+### $$\textcolor{#eeeeee}{\text{UI}}$$
 ```sh
 pip install -r src/ccf/requirements_ui.txt
 ```
-***
 ## RUN
-***
 ```sh
 cd work
 ```
-### <span style="color:#4dd0e1"> GET DATA </span>
+### $$\textcolor{#4dd0e1}{\text{GET DATA}}$$ 
 * Linux (by default)
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/get_data.py -cd conf -cn get_data_multi
@@ -61,16 +57,15 @@ PYTHONPATH=../src/ python ../src/ccf/get_data.py -cd conf -cn get_data_multi
 ```sh
 cmd /C  "set PYTHONPATH=../src && python ../src/ccf/get_data.py -cd conf -cn get_data_multi"
 ```
-
-### <span style="color:#a2fca2"> EXTRACT FEATURES </span>
+### $$\textcolor{#a2fca2}{\text{EXTRACT FEATURES}}$$
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/extract_features.py -cd conf -cn extract_features
 ```
-> There could be a memeory leak (see <span style="color:#ffab40"> MAKE PREDICTIONS </span> for a workaround)
+> There could be a memeory leak, workaround to avoid it;)
 ```sh
 while true; do PYTHONPATH=../src/ timeout 1800 python ../src/ccf/extract_features.py -cd conf -cn extract_features; done
 ```
-### <span style="color:#eeff41"> TRAIN/TUNE MODEL </span> 
+### $$\textcolor{#eeff41}{\text{TRAIN/TUNE MODEL}}$$ 
 * Train once
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn train_multi_tgt_tft
@@ -79,7 +74,7 @@ PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn train_multi_tgt_tft
 ```sh
 while true; do PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn train_multi_tgt_tft; sleep 3600; done
 ```
-### <span style="color:#ffab40"> MAKE PREDICTIONS </span> 
+### $$\textcolor{#ffab40}{\text{MAKE PREDICTIONS}}$$
 * With memory leak:(
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/predict.py -cd conf -cn predict_multi_tgt_tft
@@ -92,40 +87,39 @@ while true; do PYTHONPATH=../src/ timeout 1800 python ../src/ccf/predict.py -cd 
 ```sh
 while true; do PYTHONPATH=../src/ timeout 1800 python ../src/ccf/predict.py -cd conf -cn predict_multi_tgt_tft_naive; done
 ```
-### <span style="color:#adadad"> MONITOR METRICS </span> 
+### $$\textcolor{#adadad}{\text{MONITOR METRICS}}$$ 
 * Access metrics reports directory by 8000 port
 ```sh
 cd work/monitor
 python -m http.server 8000
 ```
-* <span style="color:#4dd0e1"> DATA </span>
+#### $$\textcolor{#4dd0e1}{\text{DATA}}$$
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_raw
 ```
-* <span style="color:#a2fca2"> FEATURES </span>
+#### $$\textcolor{#a2fca2}{\text{FEATURES}}$$
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_features
 ```
-* <span style="color:#eeff41"> TRAIN/TUNE </span>
+#### $$\textcolor{#eeff41}{\text{TRAIN/TUNE}}$$
 ```sh
 tensorboard --logdir tensorboard/ --host 0.0.0.0 --port 6007
 ```
-* <span style="color:#eeff41"> TODO MODELS with MLFLOW </span>
-* <span style="color:#ffab40"> PREDICTIONS </span>
+#### $$\textcolor{#eeff41}{\text{TODO MODELS with MLFLOW}}$$
+#### $$\textcolor{#ffab40}{\text{PREDICTIONS}}$$
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_multi_tgt_tft_a.yaml
 PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_multi_tgt_tft_b.yaml
 PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_multi_tgt_tft_naive_a.yaml
 PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_multi_tgt_tft_naive_b.yaml
 ```
-### <span style="color:#eeeeee"> RUN UI </span> 
+### $$\textcolor{#eeeeee}{\text{RUN UI}}$$
 ```sh
 PYTHONPATH=../src/ streamlit run ../src/ccf/apps/ui.py conf/ui_multi_tgt_tft.yaml
 ```
-***
 ## CONFIGS EXAMPLES
-***
-### <span style="color:#4dd0e1"> GET DATA `work/conf/get_data_multi.yaml` </span>
+### $$\textcolor{#4dd0e1}{\text{GET DATA}}$$
+`work/conf/get_data_multi.yaml`
 ```yaml
 defaults:
  - feeds: all
@@ -143,7 +137,8 @@ feeds_kwargs:
   before: 3600
   verbose: false
 ```
-### <span style="color:#a2fca2"> EXTRACT FEATURES `work/conf/extract_features.yaml` </span>
+### $$\textcolor{#a2fca2}{\text{EXTRACT FEATURES}}$$
+`work/conf/extract_features.yaml`
 ```yaml
 verbose: true
 delay: 1
@@ -238,7 +233,8 @@ raw_data_kwargs:
           name: data
           columns: ~
 ```
-### <span style="color:#eeff41"> TRAIN/TUNE MULTI TARGET TFT `work/conf/train_multi_tgt_tft.yaml` </span>
+### $$\textcolor{#eeff41}{\text{TRAIN/TUNE MULTI TARGET TFT}}$$ 
+`work/conf/train_multi_tgt_tft.yaml`
 ```yaml
 model_path: multi_tgt_tft.ckpt
 tune: true
@@ -344,7 +340,8 @@ trainer_kwargs:
     verbose: false
     mode: min
 ```
-### <span style="color:#ffab40"> MAKE PREDICTIONS WITH MULTI TARGET TFT `work/conf/predict_multi_tgt_tft.yaml` </span>
+### $$\textcolor{#ffab40}{\text{MAKE PREDICTIONS WITH MULTI TARGET TFT}}$$
+`work/conf/predict_multi_tgt_tft.yaml`
 ```yaml 
 defaults:
  - ./@train_kwargs: train_multi_tgt_tft
@@ -362,7 +359,8 @@ write_kwargs:
   name: data
   if_exists: append
 ```
-### <span style="color:#adadad"> MONITOR RAW DATA METRICS `conf/work/monitor_raw.yaml` </span>
+### $$\textcolor{#adadad}{\text{MONITOR RAW DATA METRICS}}$$
+`conf/work/monitor_raw.yaml`
 ```yaml 
 delay: 600
 log_dir: monitor/raw
@@ -423,7 +421,8 @@ read_data_kwargs:
         read_kwargs:
           name: data
 ```
-### <span style="color:#adadad"> MONITOR FEATURES METRICS `conf/work/monitor_reatures.yaml` </span>
+### $$\textcolor{#adadad}{\text{MONITOR FEATURES METRICS}}$$
+`conf/work/monitor_reatures.yaml`
 ```yaml 
 delay: 600
 log_dir: monitor/features
@@ -471,7 +470,8 @@ read_data_kwargs:
           name: data
           if_exists: append
 ```
-### <span style="color:#eeeeee"> RUN MULTI TARGET TFT UI `conf/work/ui_multi_tgt_tft.yaml` </span>
+### $$\textcolor{#eeeeee}{\text{RUN MULTI TARGET TFT UI}}$$
+`conf/work/ui_multi_tgt_tft.yaml`
 ```yaml 
 delay: 1
 read_data_kwargs:
