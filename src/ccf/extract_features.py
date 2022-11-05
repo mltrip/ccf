@@ -74,7 +74,7 @@ def extract_features(raw_data_kwargs, feature_data_kwargs, pre_features, post_fe
       if len(old_df) > 0:
         new_df = new_df[new_df.index > old_df.index.max()]
       if verbose:
-        print(f'{n}, old: {len(old_df)}, new: {len(new_df)}')
+        print(f'{n}, old: {old_df.shape}, new: {new_df.shape}')
       if len(new_df) > 0:
         wk = feature_io[n]['write_kwargs']
         new_df.to_sql(**wk)
@@ -83,24 +83,53 @@ def extract_features(raw_data_kwargs, feature_data_kwargs, pre_features, post_fe
     print(f'dt: {dt:.3f}, wt: {wt:.3f}')
     time.sleep(wt)
   
-  
-def m_p(name, raw, old_feature, pre_feature, depth=1):
+
+def pqv(name, raw, old_feature, pre_feature, depth=None):
   o = raw[name]['o']
-  depth = len(o.columns) if depth is None else depth  # +-
+  # Columns
+  a_q_cs = [x for x in o if x.startswith('a_q_')]
+  b_q_cs = [x for x in o if x.startswith('b_q_')]
+  a_p_cs = [x for x in o if x.startswith('a_p_')]
+  b_p_cs = [x for x in o if x.startswith('b_p_')]
+  a_v_cs = ['_'.join(['o', 'a', 'v', x.split('_')[2]]) for x in a_q_cs]
+  b_v_cs = ['_'.join(['o', 'b', 'v', x.split('_')[2]]) for x in b_q_cs]
   dfs = []
-  for d in range(depth):
-    a, b, m = f'a_p_{d}', f'b_p_{d}', f'o_m_p_{d}'
-    if a in o and b in o:
-      df = 0.5*(o[a] + o[b])
-      df.name = m
-      dfs.append(df)
+  # Volumes
+  a_vs = []
+  for a_q_c, a_p_c, a_v_c in zip(a_q_cs, a_p_cs, a_v_cs):
+    df = (o[a_q_c]*o[a_p_c]).rename(a_v_c)
+    a_vs.append(df)
+  a_vs = pd.concat(a_vs, axis=1)
+  dfs.append(a_vs)
+  b_vs = []
+  for b_q_c, b_p_c, b_v_c in zip(b_q_cs, b_p_cs, b_v_cs):
+    df = (o[b_q_c]*o[b_p_c]).rename(b_v_c)
+    b_vs.append(df)
+  b_vs = pd.concat(b_vs, axis=1)
+  dfs.append(b_vs)
+  # Sums
+  a_q = o[a_q_cs].sum(axis=1).rename('o_a_q')
+  b_q = o[b_q_cs].sum(axis=1).rename('o_b_q')
+  a_v = a_vs.sum(axis=1).rename('o_a_v')
+  b_v = b_vs.sum(axis=1).rename('o_b_v')
+  dfs.append(a_q)
+  dfs.append(b_q)
+  dfs.append(a_v)
+  dfs.append(b_v)
+  # Mids
+  m_q = (0.5*(a_q + b_q)).rename('o_m_q')
+  m_v = (0.5*(a_v + b_v)).rename('o_m_v')
+  m_p = (0.5*(o['a_p_0'] + o['b_p_0'])).rename('o_m_p')
+  dfs.append(m_q)
+  dfs.append(m_v)
+  dfs.append(m_p)
   return dfs
- 
+
 
 def get(name, raw, old_feature, pre_feature, columns=None):
-  columns = list(df.columns) if columns is None else columns
   dfs = []
   for n, df in raw[name].items():
+    columns = list(df.columns) if columns is None else columns
     columns = expand_columns(df, columns)
     if len(columns) > 0:
       df = df[columns].add_prefix(f'{n}_')
@@ -119,10 +148,10 @@ def relative(name, raw, old_feature, pre_feature,
   prefix = f'{kind}_{str(shift)}'
   if column is not None:
     b = df[column].shift(shift) if shift != 0 else df[column]
-    new_columns = {x: '-'.join([prefix, x, column]) for x in df.columns}
+    new_columns = {x: '-'.join([prefix, x, column]) for x in columns}
   else:
     b = df[columns].shift(shift) if shift != 0 else df[columns]
-    new_columns = {x: '-'.join([prefix, x, x]) for x in df.columns}
+    new_columns = {x: '-'.join([prefix, x, x]) for x in columns}
   if kind == 'pct':
     new_df = a.div(b, axis=0) - 1
   elif kind == 'rat':

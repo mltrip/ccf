@@ -1,6 +1,6 @@
 delay: 3600
 verbose: true
-log_dir: monitor/features
+log_dir: monitor/features_lograt
 report_kwargs:
   metrics: 
   - class: DataDriftPreset
@@ -19,7 +19,7 @@ read_data_kwargs:
     feature:
       btcusdt:
         engine_kwargs:
-          url: sqlite:///btcusdt@feature.db
+          url: sqlite:///btcusdt@feature_lograt.db
         read_kwargs:
           name: data
           columns: ~
@@ -28,7 +28,7 @@ read_data_kwargs:
           if_exists: append
       ethusdt:
         engine_kwargs:
-          url: sqlite:///ethusdt@feature.db
+          url: sqlite:///ethusdt@feature_lograt.db
         read_kwargs:
           name: data
           columns: ~
@@ -37,7 +37,7 @@ read_data_kwargs:
           if_exists: append
       ethbtc:
         engine_kwargs:
-          url: sqlite:///ethbtc@feature.db
+          url: sqlite:///ethbtc@feature_lograt.db
         read_kwargs:
           name: data
           columns: ~

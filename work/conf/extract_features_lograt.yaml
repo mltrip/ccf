@@ -1,9 +1,49 @@
 verbose: true
 delay: 1
-remove_pre_features: false
+remove_pre_features: true
 pre_features:
+- feature: pqv
 - feature: get
-post_features: []
+post_features:
+- feature: relative
+  kind: lograt
+  shift: 1
+- feature: relative
+  kind: lograt
+  columns: [ "o_a_p_.*", "o_b_p_.*" ]
+  column: o_m_p
+- feature: relative
+  kind: lograt
+  columns: [ "o_a_p_[1-9].*" ]
+  column: o_a_p_0
+- feature: relative
+  kind: lograt
+  columns: [ "o_b_p_[1-9].*" ]
+  column: o_b_p_0
+- feature: relative
+  kind: lograt
+  columns: [ "o_a_q.*", "o_b_q.*" ]
+  column: o_m_q
+- feature: relative
+  kind: lograt
+  columns: [ "o_a_q_.*", "o_b_q.*" ]
+  column: o_a_q
+- feature: relative
+  kind: lograt
+  columns: [ "o_a_q.*", "o_b_q_.*" ]
+  column: o_b_q
+- feature: relative
+  kind: lograt
+  columns: [ "o_a_v.*", "o_b_v.*" ]
+  column: o_m_v
+- feature: relative
+  kind: lograt
+  columns: [ "o_a_v_.*", "o_b_v.*" ]
+  column: o_a_v
+- feature: relative
+  kind: lograt
+  columns: [ "o_a_v.*", "o_b_v_.*" ]
+  column: o_b_v
 resample_kwargs:
   rule: 1S
 aggregate_kwargs:
@@ -18,7 +58,7 @@ feature_data_kwargs:
     feature:
       btcusdt:
         engine_kwargs:
-          url: sqlite:///btcusdt@feature.db
+          url: sqlite:///btcusdt@feature_lograt.db
         read_kwargs:
           name: data
           columns: ~
@@ -27,7 +67,7 @@ feature_data_kwargs:
           if_exists: append
       ethusdt:
         engine_kwargs:
-          url: sqlite:///ethusdt@feature.db
+          url: sqlite:///ethusdt@feature_lograt.db
         read_kwargs:
           name: data
           columns: ~
@@ -36,7 +76,7 @@ feature_data_kwargs:
           if_exists: append
       ethbtc:
         engine_kwargs:
-          url: sqlite:///ethbtc@feature.db
+          url: sqlite:///ethbtc@feature_lograt.db
         read_kwargs:
           name: data
           columns: ~
