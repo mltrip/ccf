@@ -1,9 +1,9 @@
 defaults:
  - _self_
- - query@create_dataset_kwargs.feature_data_kwargs.query: features
- - dataset@create_dataset_kwargs.dataset_kwargs: multi
+ - query@create_dataset_kwargs.feature_data_kwargs.query: features_lograt
+ - dataset@create_dataset_kwargs.dataset_kwargs: multi_lograt
 
-model_path: multi_tgt_tft.ckpt
+model_path: multi_tgt_tft_lograt.ckpt
 tune: true
 create_dataset_kwargs:
   split: 0.8

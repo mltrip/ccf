@@ -15,9 +15,11 @@ from ccf.create_dataset import create_dataset
 import ccf
 
 
-def predict(model_path, train_kwargs, engine_kwargs, write_kwargs, 
+def predict(model_path, train_kwargs, data_kwargs, 
             predict_kwargs, past, verbose=False, prediction_prefix='pred',
             rule='1S', dataloader_kwargs=None):
+  engine_kwargs = data_kwargs['query']['prediction']['engine_kwargs'] 
+  write_kwargs = data_kwargs['query']['prediction']['write_kwargs']
   if model_path is None:
     model = pf.models.Baseline()
   else:

@@ -5,11 +5,11 @@ import pandas as pd
 import numpy as np
 
 
-def expand_columns(df, columns):
+def expand_columns(ref_columns, columns):
   new_columns = []
   for c in columns:
     n = len(new_columns)
-    for cc in df.columns:
+    for cc in ref_columns:
       if re.match(c, cc):
         new_columns.append(cc)
     if len(new_columns) == n:

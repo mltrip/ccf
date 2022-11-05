@@ -14,10 +14,18 @@ import yaml
 from ccf.read_data import read_data
 
 
-def make_time_charts(data):
+def make_time_charts(data, accumulate=False):
   charts = []
   for name, df in data.items():
     value_vars = df.columns
+    if accumulate:
+      for c in df:
+        if 'pct_' in c:
+          df[c] = df[c].cumsum()
+        elif 'lograt_' in c:
+          df[c] = np.exp(df[c].cumsum())
+        elif 'rat_' in c:
+          df[c] = df[c].cumprod()
     df['time'] = df.index
     df = df.melt(id_vars=['time'], 
                  value_vars=value_vars, 
@@ -40,7 +48,7 @@ def make_time_charts(data):
   return charts
 
 
-def ui(read_data_kwargs, delay=0):
+def ui(read_data_kwargs, delay=0, accumulate=False):
   st.set_page_config(
       page_title="CryptoCurrency Forecasting",
       page_icon="₿",
@@ -49,7 +57,7 @@ def ui(read_data_kwargs, delay=0):
   placeholder = st.empty()
   while True:
     data = read_data(**read_data_kwargs)
-    charts = make_time_charts(data)
+    charts = make_time_charts(data, accumulate)
     with placeholder.container():
       for chart in charts:
         st.altair_chart(chart, use_container_width=True)

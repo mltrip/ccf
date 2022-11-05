@@ -1,0 +1,21 @@
+time_idx: time_idx
+allow_missing_timesteps: true
+add_relative_time_idx: true
+target:
+- o_a_p_0
+- o_b_p_0
+group_ids:
+- group
+static_categoricals:
+- group
+max_encoder_length: 10
+max_prediction_length: 5
+time_varying_unknown_reals:
+- o_a_p_0
+- o_b_p_0
+target_normalizer:
+  class: GroupNormalizer
+  groups: [ group ]
+scalers:
+  class: GroupNormalizer
+  groups: [ group ]
