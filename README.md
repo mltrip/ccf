@@ -100,6 +100,7 @@ PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_raw
 #### $$\textcolor{#a2fca2}{\text{FEATURES}}$$
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_features
+PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_features_lograt
 ```
 #### $$\textcolor{#eeff41}{\text{TRAIN/TUNE}}$$
 ```sh

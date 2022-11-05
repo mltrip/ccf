@@ -4,9 +4,10 @@ from copy import deepcopy
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 import pandas as pd
 
+from ccf.utils import expand_columns
 
 
 def read_data(query, start=None, end=None, concat=True):
@@ -39,9 +40,20 @@ def read_data(query, start=None, end=None, concat=True):
       resample_kwargs = rk.pop('resample_kwargs', None)
       aggregate_kwargs = rk.pop('aggregate_kwargs', None)
       interpolate_kwargs = rk.pop('interpolate_kwargs', None)
-      group = rk.pop('group', None)
+      engine = create_engine(**ek)
+      rk['con'] = engine
+      try:
+        with engine.connect() as connection:
+          ref_columns = list(connection.execute(text(f"SELECT * from {name} LIMIT 0")).keys())
+      except Exception:
+        ref_columns = None
       columns = rk.pop('columns', None)
-      sql_columns = ','.join([f'`{x}`' for x in columns]) if columns is not None else '*'
+      if ref_columns is not None and columns is not None:
+        columns = expand_columns(ref_columns, columns)
+        sql_columns = ','.join([f'`{x}`' for x in columns]) if len(columns) > 0 else '*'
+      else:
+        sql_columns = '*'
+      group = rk.pop('group', None)
       sql_group = f" AND `group` = '{group}'" if group is not None else ''
       if start is not None and end is not None:
         rk['sql'] = f"SELECT {sql_columns} FROM '{name}' WHERE time > '{start}' AND time < '{end}'{sql_group}"
@@ -51,16 +63,16 @@ def read_data(query, start=None, end=None, concat=True):
         rk['sql'] = f"SELECT {sql_columns} FROM '{name}' WHERE time < '{end}'{sql_group}"
       else:  # start is None and end is None
         rk['sql'] = f"SELECT {sql_columns} FROM '{name}'{sql_group}"
-      rk['con'] = create_engine(**ek)
       try:
         df = pd.read_sql(**rk)
       except Exception as e:
         print(e)
         df = pd.DataFrame(columns=columns if columns is not None else [])
-      if resample_kwargs is not None and aggregate_kwargs is not None:
-        df = df.resample(**resample_kwargs).aggregate(**aggregate_kwargs)
-        if interpolate_kwargs is not None:
-          df = df.interpolate(**interpolate_kwargs)
+      else:
+        if resample_kwargs is not None and aggregate_kwargs is not None:
+          df = df.resample(**resample_kwargs).aggregate(**aggregate_kwargs)
+          if interpolate_kwargs is not None:
+            df = df.interpolate(**interpolate_kwargs)
       for c in df:
         try:
           df[c] = df[c].astype(float)

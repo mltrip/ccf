@@ -39,7 +39,7 @@ def create_dataset(feature_data_kwargs, dataset_kwargs,
               'static_categoricals',
               'target']:
     cs = dataset_kwargs.get(key, [])
-    cs = expand_columns(df, cs)
+    cs = expand_columns(df.columns, cs)
     dataset_kwargs[key] = cs
     columns.update(cs)
   target = dataset_kwargs.get('target', [])

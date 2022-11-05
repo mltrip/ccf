@@ -130,7 +130,7 @@ def get(name, raw, old_feature, pre_feature, columns=None):
   dfs = []
   for n, df in raw[name].items():
     columns = list(df.columns) if columns is None else columns
-    columns = expand_columns(df, columns)
+    columns = expand_columns(df.columns, columns)
     if len(columns) > 0:
       df = df[columns].add_prefix(f'{n}_')
       dfs.append(df)
@@ -141,7 +141,7 @@ def relative(name, raw, old_feature, pre_feature,
              kind='pct', column=None, columns=None, shift=0):
   df = pre_feature[name]
   columns = list(df.columns) if columns is None else columns
-  columns = expand_columns(df, columns)
+  columns = expand_columns(df.columns, columns)
   if len(columns) == 0:
     return []
   a = df[columns]

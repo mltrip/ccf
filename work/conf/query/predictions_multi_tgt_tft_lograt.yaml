@@ -1,0 +1,13 @@
+prediction:
+  engine_kwargs:
+    url: sqlite:///multi_tgt_tft_lograt@prediction.db
+  read_kwargs:
+    name: data
+    columns: [ time, "pred-.*" ]
+    resample_kwargs:
+      rule: 1S
+    aggregate_kwargs:
+      func: last
+  write_kwargs:
+   name: data
+   if_exists: append

@@ -1,0 +1,28 @@
+feature:
+  btcusdt:
+    engine_kwargs:
+      url: sqlite:///btcusdt@feature_lograt.db
+    read_kwargs:
+      name: data
+      columns: ~
+    write_kwargs:
+      name: data
+      if_exists: append
+  ethusdt:
+    engine_kwargs:
+      url: sqlite:///ethusdt@feature_lograt.db
+    read_kwargs:
+      name: data
+      columns: ~
+    write_kwargs:
+      name: data
+      if_exists: append
+  ethbtc:
+    engine_kwargs:
+      url: sqlite:///ethbtc@feature_lograt.db
+    read_kwargs:
+      name: data
+      columns: ~
+    write_kwargs:
+      name: data
+      if_exists: append

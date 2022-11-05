@@ -1,10 +1,10 @@
 defaults:
- - ./@train_kwargs: train_multi_tgt_tft
- - query@data_kwargs.query: predictions_multi_tgt_tft_naive
-
+ - ./@train_kwargs: train_multi_tgt_tft_lograt
+ - query@data_kwargs.query: predictions_multi_tgt_tft_lograt_naive
+ 
 model_path: ~
 verbose: true
-past: 60
+past: 360
 rule: 1S
 predict_kwargs:
   return_index: true
