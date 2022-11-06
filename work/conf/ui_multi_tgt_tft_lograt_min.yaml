@@ -13,7 +13,7 @@ read_data_kwargs:
           columns: [ time, lograt_1-o_a_p_0-o_a_p_0, lograt_1-o_b_p_0-o_b_p_0 ]
       tft:
         engine_kwargs:
-          url: sqlite:///multi_tgt_tft_lograt_min@prediction.db
+          url: sqlite:///multi_tgt_tft_lograt@prediction.db
         read_kwargs:
           name: data
           group: btcusdt
@@ -42,7 +42,7 @@ read_data_kwargs:
           columns: [ time, lograt_1-o_a_p_0-o_a_p_0, lograt_1-o_b_p_0-o_b_p_0 ]
       tft:
         engine_kwargs:
-          url: sqlite:///multi_tgt_tft_lograt_min@prediction.db
+          url: sqlite:///multi_tgt_tft_lograt@prediction.db
         read_kwargs:
           name: data
           group: ethusdt
@@ -71,7 +71,7 @@ read_data_kwargs:
           columns: [ time, lograt_1-o_a_p_0-o_a_p_0, lograt_1-o_b_p_0-o_b_p_0 ]
       tft:
         engine_kwargs:
-          url: sqlite:///multi_tgt_tft_lograt_min@prediction.db
+          url: sqlite:///multi_tgt_tft_lograt@prediction.db
         read_kwargs:
           name: data
           group: ethusdt

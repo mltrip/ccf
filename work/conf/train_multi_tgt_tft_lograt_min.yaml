@@ -33,7 +33,7 @@ model_kwargs:
   log_interval: 0
   reduce_on_plateau_patience: 2
 trainer_kwargs:
-  max_epochs: 32
+  max_epochs: 1
   accelerator: cpu  # gpu
   # devices: [ 0 ]
   gradient_clip_val: 0.1

@@ -65,18 +65,19 @@ def predict(model_path, train_kwargs, data_kwargs,
       for g, gdf in df.groupby('group'):
         g_idx = idxs[idxs['group'] == g]
         p_idx, t_idx = g_idx.iloc[0].name, g_idx.iloc[0].time_idx
+        t_last = gdf.index[gdf['time_idx'] == t_idx - 1].tolist()[0]
         df_future = gdf[gdf['time_idx'] >= t_idx]
+        horizons = (df_future.index - t_last).total_seconds().tolist() 
         tgt_dfs = []
         for tgt_idx, tgt in enumerate(ds.target_names):
-          tgt_ts = tgt.split('-')  # tokens
-          tgt_ts[0] = prediction_prefix  # change target prefix to prediction prefix
-          pred_name = '-'.join(tgt_ts)
+          pred_suffix = '-'.join(tgt.split('-')[1:])  # remove target prefix
           if predict_kwargs['mode'] == 'quantiles':
             ps = pred[tgt_idx][p_idx].tolist()
-            data = [x + [g] for x in ps]
-            qs = model.loss.quantiles
-            columns = [f'{pred_name}-{x}' for x in qs]
-            columns += ['group']
+            data = [x + [g] + [y] for x, y in zip(ps, horizons)]
+            qs = model.loss.quantiles[tgt_idx] if len(ds.target_names) > 1 else qs
+            columns = ['-'.join([f'{prediction_prefix}_{x}', pred_suffix]) for x in qs]
+            columns.append('group')
+            columns.append('horizon')
             pred_df = pd.DataFrame(
               data=data, 
               columns=columns,
@@ -84,10 +85,10 @@ def predict(model_path, train_kwargs, data_kwargs,
             tgt_dfs.append(pred_df)
           elif predict_kwargs['mode'] == 'prediction':
             ps = pred[tgt_idx][p_idx].tolist()
-            data = [[x, g] for x in ps]
-            pred_df = pd.DataFrame(
+            data = [[x, g, y] for x, y in zip(ps, horizons)] 
+            pred_df = pd.DataFrame( 
               data=data, 
-              columns=[pred_name, 'group'],
+              columns=['-'.join([prediction_prefix, pred_suffix]), 'group', 'horizon'],
               index=df_future.index)
             tgt_dfs.append(pred_df)
           else:

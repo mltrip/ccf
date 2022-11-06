@@ -19,11 +19,11 @@ post_features:
   column: o_m_p
 - feature: relative
   kind: lograt
-  columns: [ "o_a_p_[1-9].*" ]
+  columns: [ "o_a_p_[1-9].*", "o_b_p_.*" ]
   column: o_a_p_0
 - feature: relative
   kind: lograt
-  columns: [ "o_b_p_[1-9].*" ]
+  columns: [ "o_b_p_[1-9].*", "o_a_p_.*" ]
   column: o_b_p_0
 - feature: relative
   kind: lograt
