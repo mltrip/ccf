@@ -1,6 +1,6 @@
 prediction:
   engine_kwargs:
-    url: sqlite:///multi_tgt_tft_naive@prediction.db
+    url: sqlite:///multi_tgt_tft_lograt_min@prediction.db
   read_kwargs:
     name: data
   write_kwargs:
