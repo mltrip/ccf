@@ -39,6 +39,7 @@ def create_dataset(feature_data_kwargs, dataset_kwargs,
               'static_categoricals',
               'target']:
     cs = dataset_kwargs.get(key, [])
+    cs = [cs] if isinstance(cs, str) else cs
     cs = expand_columns(df.columns, cs)
     dataset_kwargs[key] = cs
     columns.update(cs)
@@ -79,8 +80,8 @@ def create_dataset(feature_data_kwargs, dataset_kwargs,
   dataset_kwargs['target_normalizer'] = target_scaler
   # Filter
   df = df[list(columns)]
-  # df = df.replace([np.inf, -np.inf, np.nan], 0)
-  df = df.dropna()  # Requires allow_missing_timesteps = True
+  # df = df.replace([np.inf, -np.inf, np.nan], 0)  # Fill missing values with 0
+  df = df.dropna()  # Remove rows with missing values (Requires allow_missing_timesteps = True)
   if split is not None:
     df1s, df2s = [], []
     for g, gdf in df.groupby('group'):
