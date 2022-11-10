@@ -4,45 +4,49 @@ defaults:
  - dataset@create_dataset_kwargs.dataset_kwargs: multi_lograt
 
 model_path: multi_tgt_tft_lograt.ckpt
-tune: true
+tune: false
 create_dataset_kwargs:
   split: 0.8
   feature_data_kwargs:
-    start: -360
+    start: ~
     end: ~
     concat: false
 dataloader_kwargs:
   train:
     train: true
-    num_workers: 2
-    batch_size: 32
+    num_workers: 16
+    batch_size: 1024
   val:
     train: false
-    num_workers: 2
-    batch_size: 32
+    num_workers: 16
+    batch_size: 1024
 model_kwargs:
   class: TemporalFusionTransformer
-  learning_rate: 0.003
+  learning_rate: 0.0078125
   hidden_size: 32
-  attention_head_size: 1
-  dropout: 0.1
+  attention_head_size: 4
+  dropout: 0
   hidden_continuous_size: 16
+  lstm_layers: 2
   # output_size: 7  # Inferred from loss
   loss:
     class: QuantileLoss
   log_interval: 0
   reduce_on_plateau_patience: 2
+  reduce_on_plateau_reduction: 2
+  reduce_on_plateau_min_lr: 1.0e-10
+  weight_decay: 0
 trainer_kwargs:
   max_epochs: 32
-  accelerator: cpu  # gpu
+  accelerator: gpu  # gpu
   # devices: [ 0 ]
-  gradient_clip_val: 0.1
-  log_every_n_steps: 50
+  gradient_clip_val: 0
+  log_every_n_steps: 100
   # limit_train_batches: 10
   logger:
   - class: TensorBoardLogger
     save_dir: tensorboard
-    name: multi_tgt_tft
+    name: multi_tgt_tft_lograt
   callbacks:
   - class: LearningRateMonitor
     logging_interval: step
