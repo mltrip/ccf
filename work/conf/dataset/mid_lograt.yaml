@@ -1,0 +1,17 @@
+time_idx: time_idx
+allow_missing_timesteps: true
+add_relative_time_idx: true
+target: lograt_1-o_m_p-o_m_p
+group_ids:
+- group
+static_categoricals:
+- group
+max_encoder_length: 60
+max_prediction_length: 60
+time_varying_unknown_reals:
+- lograt_0.*
+- lograt_1.*
+target_normalizer:
+  class: EncoderNormalizer
+scalers:
+  class: EncoderNormalizer
