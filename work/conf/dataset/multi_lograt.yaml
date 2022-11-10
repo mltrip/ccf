@@ -14,8 +14,6 @@ time_varying_unknown_reals:
 - lograt_0.*
 - lograt_1.*
 target_normalizer:
-  class: GroupNormalizer
-  groups: [ group ]
+  class: EncoderNormalizer
 scalers:
-  class: GroupNormalizer
-  groups: [ group ]
+  class: EncoderNormalizer

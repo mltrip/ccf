@@ -3,7 +3,7 @@ defaults:
  - query@create_dataset_kwargs.feature_data_kwargs.query: features_lograt
  - dataset@create_dataset_kwargs.dataset_kwargs: mid_lograt
 
-model_path: mid_tft_lograt.ckpt
+model_path: mid_tft_lograt_min.ckpt
 tune: true
 create_dataset_kwargs:
   split: 0.8
@@ -15,19 +15,19 @@ dataloader_kwargs:
   train:
     train: true
     num_workers: 16
-    batch_size: 128
+    batch_size: 1024
   val:
     train: false
     num_workers: 16
-    batch_size: 128
+    batch_size: 1024
 model_kwargs:
   class: TemporalFusionTransformer
   learning_rate: 0.0078125
-  hidden_size: 32
-  attention_head_size: 4
+  hidden_size: 8
+  attention_head_size: 1
   dropout: 0
-  hidden_continuous_size: 16
-  lstm_layers: 2
+  hidden_continuous_size: 8
+  lstm_layers: 1
   # output_size: 7  # Inferred from loss
   loss:
     class: QuantileLoss
@@ -46,7 +46,7 @@ trainer_kwargs:
   logger:
   - class: TensorBoardLogger
     save_dir: tensorboard
-    name: mid_tft_lograt
+    name: mid_tft_lograt_min
   callbacks:
   - class: LearningRateMonitor
     logging_interval: step
