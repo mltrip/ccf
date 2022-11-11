@@ -20,43 +20,70 @@ from ccf.utils import expand_columns
 def create_dataset(feature_data_kwargs, dataset_kwargs,
                    split=None, target_prefix='tgt', df_only=False):
   features = read_data(**feature_data_kwargs)['feature']
+  time_idx = dataset_kwargs['time_idx']
+  max_enc_len = dataset_kwargs['max_encoder_length']
+  max_pred_len = dataset_kwargs['max_prediction_length']
+  dfs = []
+  cnt = 0
   for n, df in features.items():
+    min_len = max_enc_len + max_pred_len
+    if dataset_kwargs.get('predict_mode', False):
+      new_rows = [df]
+      last_dt = df.index.to_series().diff().dt.total_seconds().iloc[-1]
+      last_row = df.iloc[[-1]]
+      for _ in range(max_pred_len):
+        last_row.index = last_row.index + timedelta(seconds=last_dt)
+        new_rows.append(last_row.copy())
+      df = pd.concat(new_rows)
+    df_len = len(df)
+    nan_len = df.isna().any(axis=1).sum()
+    cnt_len = df_len - nan_len
+    if cnt_len < min_len:
+      print(f'Warning! {n} data length {cnt_len} < {min_len} = {df_len} - {nan_len} < {max_enc_len} + {max_pred_len}')
+      continue
+    df[time_idx] = np.arange(df_len)
+    df = df.reset_index()
+    df = df.set_index(np.arange(cnt, cnt + df_len))
+    cnt += df_len
     df['group'] = n
-    df['time_idx'] = np.arange(len(df))
-  df = pd.concat(features.values(), axis=0)
+    dfs.append(df)
+  if len(dfs) == 0:
+    return None, None, None, None
+  df = pd.concat(dfs)
+  df = df.set_index('time')
   if len(df) == 0:
     return None, None, None, None
   # Dataset
   columns = set()
-  time_idx = dataset_kwargs['time_idx']
   columns.add(time_idx)
-  for key in ['group_ids', 
+  for key in ['target',
+              'group_ids', 
               'time_varying_unknown_reals',
-              'time_varying_known_reals',
-              'static_reals',
               'time_varying_unknown_categoricals',
+              'time_varying_known_reals',
               'time_varying_known_categoricals',
-              'static_categoricals',
-              'target']:
+              'static_reals',
+              'static_categoricals']:
     cs = dataset_kwargs.get(key, [])
     cs = [cs] if isinstance(cs, str) else cs
     cs = expand_columns(df.columns, cs)
-    dataset_kwargs[key] = cs
+    if key == 'target':  # rename target with prefix
+      for i, c in enumerate(cs):
+        cc = f'{target_prefix}-{c}'
+        df[cc] = df[c]
+        cs[i] = cc
+      dataset_kwargs[key] = cs if len(cs) != 1 else cs[0]
+    else:
+      dataset_kwargs[key] = cs
     columns.update(cs)
-  target = dataset_kwargs.get('target', [])
-  target = [target] if isinstance(target, str) else target
-  for i, t in enumerate(target):
-    tt = f'{target_prefix}-{t}'
-    df[tt] = df[t]
-    target[i] = tt
-  dataset_kwargs['target'] = target if len(target) != 1 else target[0]
-  columns.update(target)
   # Scalers
   all_scalers = {}
   scalers = dataset_kwargs.get('scalers', {})
+  target = dataset_kwargs.get('target', [])
+  target = [target] if isinstance(target, str) else target
   if isinstance(scalers, dict):
     if 'class' in scalers:
-      black_list = target + ['group', 'time_idx']
+      black_list = target + ['group', time_idx]
       scalers = {x: deepcopy(scalers) for x in columns 
                  if x not in black_list}
     for column, scaler_kwargs in scalers.items():

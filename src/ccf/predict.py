@@ -37,7 +37,10 @@ def predict(model_path, train_kwargs, data_kwargs,
   resample_seconds = pd.to_timedelta(rule).total_seconds()
   dks['split'] = None
   dks['feature_data_kwargs']['start'] = -past
-  dks['feature_data_kwargs']['end'] = max_prediction_length*resample_seconds
+  # dks['feature_data_kwargs']['start'] = -max_encoder_length*resample_seconds
+  # dks['feature_data_kwargs']['end'] = max_prediction_length*resample_seconds
+  # dks['feature_data_kwargs']['end'] = None
+  dks['feature_data_kwargs']['end'] = None
   dks['dataset_kwargs']['predict_mode'] = True
   while True:
     t0 = time.time()
@@ -74,7 +77,9 @@ def predict(model_path, train_kwargs, data_kwargs,
           if predict_kwargs['mode'] == 'quantiles':
             ps = pred[tgt_idx][p_idx].tolist()
             data = [x + [g] + [y] for x, y in zip(ps, horizons)]
-            qs = model.loss.quantiles[tgt_idx] if len(ds.target_names) > 1 else qs
+            qs = model.loss.quantiles
+            if len(ds.target_names) > 1:
+              qs = qs[tgt_idx]
             columns = ['-'.join([f'{prediction_prefix}_{x}', pred_suffix]) for x in qs]
             columns.append('group')
             columns.append('horizon')

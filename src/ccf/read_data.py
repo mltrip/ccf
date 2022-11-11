@@ -55,14 +55,16 @@ def read_data(query, start=None, end=None, concat=True):
         sql_columns = '*'
       group = rk.pop('group', None)
       sql_group = f" AND `group` = '{group}'" if group is not None else ''
+      horizon = rk.pop('horizon', None)
+      sql_horizon = f" AND `horizon` = '{horizon}'" if horizon is not None else ''
       if start is not None and end is not None:
-        rk['sql'] = f"SELECT {sql_columns} FROM '{name}' WHERE time > '{start}' AND time < '{end}'{sql_group}"
+        rk['sql'] = f"SELECT {sql_columns} FROM '{name}' WHERE time > '{start}' AND time < '{end}'{sql_group}{sql_horizon}"
       elif start is not None:
-        rk['sql'] = f"SELECT {sql_columns} FROM '{name}' WHERE time > '{start}'{sql_group}"
+        rk['sql'] = f"SELECT {sql_columns} FROM '{name}' WHERE time > '{start}'{sql_group}{sql_horizon}"
       elif end is not None:
-        rk['sql'] = f"SELECT {sql_columns} FROM '{name}' WHERE time < '{end}'{sql_group}"
+        rk['sql'] = f"SELECT {sql_columns} FROM '{name}' WHERE time < '{end}'{sql_group}{sql_horizon}"
       else:  # start is None and end is None
-        rk['sql'] = f"SELECT {sql_columns} FROM '{name}'{sql_group}"
+        rk['sql'] = f"SELECT {sql_columns} FROM '{name}'{sql_group}{sql_horizon}"
       try:
         df = pd.read_sql(**rk)
       except Exception as e:
@@ -71,8 +73,8 @@ def read_data(query, start=None, end=None, concat=True):
       else:
         if resample_kwargs is not None and aggregate_kwargs is not None:
           df = df.resample(**resample_kwargs).aggregate(**aggregate_kwargs)
-          if interpolate_kwargs is not None:
-            df = df.interpolate(**interpolate_kwargs)
+        if interpolate_kwargs is not None:
+          df = df.interpolate(**interpolate_kwargs)
       for c in df:
         try:
           df[c] = df[c].astype(float)
