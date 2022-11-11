@@ -18,7 +18,7 @@ from ccf.utils import expand_columns
 
 
 def create_dataset(feature_data_kwargs, dataset_kwargs,
-                   split=None, target_prefix='tgt', df_only=False):
+                   split=None, target_prefix='tgt', df_only=False, verbose=False):
   features = read_data(**feature_data_kwargs)['feature']
   time_idx = dataset_kwargs['time_idx']
   max_enc_len = dataset_kwargs['max_encoder_length']
@@ -125,6 +125,8 @@ def create_dataset(feature_data_kwargs, dataset_kwargs,
       ds2 = pf.TimeSeriesDataSet.from_dataset(ds, df2.reset_index(), stop_randomization=True)
     else:
       ds2 = None
+    if verbose:
+      print(ds)
     return ds, ds2, df, df2
   else:
     return None, None, df, df2

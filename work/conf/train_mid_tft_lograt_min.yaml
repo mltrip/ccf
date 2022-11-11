@@ -37,12 +37,12 @@ model_kwargs:
   reduce_on_plateau_min_lr: 1.0e-10
   weight_decay: 0
 trainer_kwargs:
-  max_epochs: 32
+  max_epochs: 64
   accelerator: gpu  # gpu
-  # devices: [ 0 ]
+  devices: ~
   gradient_clip_val: 0
   log_every_n_steps: 100
-  # limit_train_batches: 10
+  limit_train_batches: ~
   logger:
   - class: TensorBoardLogger
     save_dir: tensorboard
