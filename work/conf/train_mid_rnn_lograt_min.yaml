@@ -1,12 +1,13 @@
 defaults:
  - query@create_dataset_kwargs.feature_data_kwargs.query: features_lograt
- - dataset@create_dataset_kwargs.dataset_kwargs: multi_lograt
+ - dataset@create_dataset_kwargs.dataset_kwargs: mid_lograt_rnn
  - _self_
- 
-model_path: multi_tgt_tft_lograt.ckpt
-tune: false
+
+model_path: mid_rnn_lograt_min.ckpt
+tune: true
 create_dataset_kwargs:
   split: 0.8
+  verbose: true
   feature_data_kwargs:
     start: ~
     end: ~
@@ -21,23 +22,23 @@ dataloader_kwargs:
     num_workers: 16
     batch_size: 1024
 model_kwargs:
-  class: TemporalFusionTransformer
+  class: RecurrentNetwork
+  cell_type: LSTM
   learning_rate: 0.0078125
-  hidden_size: 32
-  attention_head_size: 4
+  hidden_size: 8
+  rnn_layers: 1
   dropout: 0
-  hidden_continuous_size: 16
-  lstm_layers: 2
-  # output_size: 7  # Inferred from loss
   loss:
-    class: QuantileLoss
+    class: MAE
+    # class: QuantileLoss  # Does not implemented
+    # quantiles: [ 0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98 ]
   log_interval: 0
   reduce_on_plateau_patience: 2
   reduce_on_plateau_reduction: 2
   reduce_on_plateau_min_lr: 1.0e-10
   weight_decay: 0
 trainer_kwargs:
-  max_epochs: 32
+  max_epochs: 64
   accelerator: gpu  # gpu
   devices: ~
   gradient_clip_val: 0
@@ -46,7 +47,7 @@ trainer_kwargs:
   logger:
   - class: TensorBoardLogger
     save_dir: tensorboard
-    name: multi_tgt_tft_lograt
+    name: mid_rnn_lograt_min
   callbacks:
   - class: LearningRateMonitor
     logging_interval: step
