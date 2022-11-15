@@ -3,6 +3,7 @@ accumulate: false
 read_data_kwargs:
   start: -60
   end: ~
+  drop_duplicates: true
   query:
     btcusdt:
       target:
@@ -19,10 +20,10 @@ read_data_kwargs:
           group: btcusdt
           horizon: 60
           columns: [ time, "pred-.*", "pred_0.5-.*", "pred_.*" ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
+          # resample_kwargs:
+          #   rule: 1S
+          # aggregate_kwargs:
+          #   func: last
       # naive:
       #   engine_kwargs:
       #     url: sqlite:///mid_tft_lograt_naive@prediction.db
@@ -49,10 +50,10 @@ read_data_kwargs:
           group: ethusdt
           horizon: 60
           columns: [ time, "pred-.*", "pred_0.5-.*", "pred_.*" ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
+          # resample_kwargs:
+          #   rule: 1S
+          # aggregate_kwargs:
+          #   func: last
       # naive:
       #   engine_kwargs:
       #     url: sqlite:///mid_tft_lograt_naive@prediction.db
@@ -79,10 +80,10 @@ read_data_kwargs:
           group: ethusdt
           horizon: 60
           columns: [ time, "pred-.*", "pred_0.5-.*", "pred_.*" ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
+          # resample_kwargs:
+          #   rule: 1S
+          # aggregate_kwargs:
+          #   func: last
       # naive:
       #   engine_kwargs:
       #     url: sqlite:///mid_tft_lograt_naive@prediction.db

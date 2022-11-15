@@ -1,0 +1,43 @@
+defaults:
+ - query@data_kwargs.query: metrics_lograt
+ - query@raw_data_kwargs.query: raw_three
+ - query@feature_data_kwargs.query: features_lograt
+ - query@predict_data_kwargs.query.mid_tft_lograt_min: predictions_mid_tft_lograt_min
+ - query@predict_data_kwargs.query.mid_tft_lograt_min_2: predictions_mid_tft_lograt_min
+ - _self_
+
+verbose: true
+delay: 1
+relative: true
+kinds: [ none, rat, val ]
+horizons: [ 15, 30, 45, 60 ]
+data_kwargs: {}
+raw_data_kwargs:
+  start: -60
+  end: 0
+feature_data_kwargs:
+  start: -60
+  end: 0
+  concat: false
+predict_data_kwargs:
+  start: -60
+  end: 0
+  concat: false
+  drop_duplicates: false
+  query:
+    mid_tft_lograt_min:
+      prediction:
+        read_kwargs:
+          columns: [ time, horizon, group, "pred_0.5-.*" ]
+    mid_tft_lograt_min_2:
+      prediction:
+        read_kwargs:
+          columns: [ time, horizon, group, "pred_0.5-.*" ]
+metrics:
+- class: sklearn.metrics.mean_absolute_error
+  label: MAE
+- class: sklearn.metrics.mean_squared_error
+  label: RMSE
+  squared: false
+- class: sklearn.metrics.r2_score
+  label: R2

@@ -1,0 +1,13 @@
+delay: 900
+read_metrics_kwargs:
+  start: -900
+  end: 0
+  drop_duplicates: false
+  concat: false
+  query:
+    lograt:
+      metric:
+        engine_kwargs:
+          url: sqlite:///metric_lograt.db
+        read_kwargs:
+          name: data

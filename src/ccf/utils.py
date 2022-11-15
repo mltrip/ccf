@@ -18,3 +18,16 @@ def expand_columns(ref_columns, columns):
     warnings.warn(f'Warning! No columns found with patterns: {columns}')
   new_columns = list(set(new_columns))  # remove duplicates
   return new_columns
+
+
+def rat2val(ratios, initial_value=1):
+  if 'lograt_' in ratios.name:
+    ratios = np.exp(ratios.fillna(0).cumsum())
+  elif 'rat_' in ratios.name:
+    ratios = ratios.fillna(1).cumprod()
+  elif 'pct_' in ratios.name:
+    ratios = 1 + ratios.fillna(0).cumsum()
+  else:
+    raise NotImplementedError(ratios.name)
+  ratios = ratios * initial_value
+  return ratios

@@ -27,7 +27,7 @@ def create_dataset(feature_data_kwargs, dataset_kwargs,
   cnt = 0
   for n, df in features.items():
     min_len = max_enc_len + max_pred_len
-    if dataset_kwargs.get('predict_mode', False):
+    if dataset_kwargs.get('predict_mode', False) and len(df) > 1:  # 2 timesteps min
       new_rows = [df]
       last_dt = df.index.to_series().diff().dt.total_seconds().iloc[-1]
       last_row = df.iloc[[-1]]
