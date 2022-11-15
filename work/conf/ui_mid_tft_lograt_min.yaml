@@ -19,22 +19,15 @@ read_data_kwargs:
           name: data
           group: btcusdt
           horizon: 60
-          columns: [ time, "pred-.*", "pred_0.5-.*", "pred_.*" ]
-          # resample_kwargs:
-          #   rule: 1S
-          # aggregate_kwargs:
-          #   func: last
-      # naive:
-      #   engine_kwargs:
-      #     url: sqlite:///mid_tft_lograt_naive@prediction.db
-      #   read_kwargs:
-      #     name: data
-      #     group: btcusdt
-      #     columns: [ time, "pred-.*" ]
-      #     resample_kwargs:
-      #       rule: 1S
-      #     aggregate_kwargs:
-      #       func: last
+          # columns: [ time, "pred-.*", "pred_0.5-.*", "pred_.*" ]
+          columns: [ time, "pred-.*", "pred_0.5-.*"]
+      naive:
+        engine_kwargs:
+          url: sqlite:///mid_tft_lograt_min_naive@prediction.db
+        read_kwargs:
+          name: data
+          group: btcusdt
+          columns: [ time, "pred-.*" ]
     ethusdt:
       target:
         engine_kwargs:
@@ -49,22 +42,15 @@ read_data_kwargs:
           name: data
           group: ethusdt
           horizon: 60
-          columns: [ time, "pred-.*", "pred_0.5-.*", "pred_.*" ]
-          # resample_kwargs:
-          #   rule: 1S
-          # aggregate_kwargs:
-          #   func: last
-      # naive:
-      #   engine_kwargs:
-      #     url: sqlite:///mid_tft_lograt_naive@prediction.db
-      #   read_kwargs:
-      #     name: data
-      #     group: ethusdt
-      #     columns: [ time, "pred-.*" ]
-      #     resample_kwargs:
-      #       rule: 1S
-      #     aggregate_kwargs:
-      #       func: last
+          # columns: [ time, "pred-.*", "pred_0.5-.*", "pred_.*" ]
+          columns: [ time, "pred-.*", "pred_0.5-.*"]
+      naive:
+        engine_kwargs:
+          url: sqlite:///mid_tft_lograt_min_naive@prediction.db
+        read_kwargs:
+          name: data
+          group: ethusdt
+          columns: [ time, "pred-.*" ]
     ethbtc:
       target:
         engine_kwargs:
@@ -77,21 +63,14 @@ read_data_kwargs:
          url: sqlite:///mid_tft_lograt_min@prediction.db
         read_kwargs:
           name: data
-          group: ethusdt
+          group: ethbtc
           horizon: 60
-          columns: [ time, "pred-.*", "pred_0.5-.*", "pred_.*" ]
-          # resample_kwargs:
-          #   rule: 1S
-          # aggregate_kwargs:
-          #   func: last
-      # naive:
-      #   engine_kwargs:
-      #     url: sqlite:///mid_tft_lograt_naive@prediction.db
-      #   read_kwargs:
-      #     name: data
-      #     group: ethusdt
-      #     columns: [ time, "pred-.*" ]
-      #     resample_kwargs:
-      #       rule: 1S
-      #     aggregate_kwargs:
-      #       func: last
+          # columns: [ time, "pred-.*", "pred_0.5-.*", "pred_.*" ]
+          columns: [ time, "pred-.*", "pred_0.5-.*"]
+      naive:
+        engine_kwargs:
+          url: sqlite:///mid_tft_lograt_min_naive@prediction.db
+        read_kwargs:
+          name: data
+          group: ethbtc
+          columns: [ time, "pred-.*" ]

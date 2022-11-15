@@ -28,6 +28,7 @@ def rat2val(ratios, initial_value=1):
   elif 'pct_' in ratios.name:
     ratios = 1 + ratios.fillna(0).cumsum()
   else:
-    raise NotImplementedError(ratios.name)
+    return ratios
+    # raise NotImplementedError(ratios.name)
   ratios = ratios * initial_value
   return ratios

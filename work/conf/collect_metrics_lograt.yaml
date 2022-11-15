@@ -3,7 +3,7 @@ defaults:
  - query@raw_data_kwargs.query: raw_three
  - query@feature_data_kwargs.query: features_lograt
  - query@predict_data_kwargs.query.mid_tft_lograt_min: predictions_mid_tft_lograt_min
- - query@predict_data_kwargs.query.mid_tft_lograt_min_2: predictions_mid_tft_lograt_min
+ - query@predict_data_kwargs.query.mid_tft_lograt_min_naive: predictions_mid_tft_lograt_min_naive
  - _self_
 
 verbose: true
@@ -29,10 +29,10 @@ predict_data_kwargs:
       prediction:
         read_kwargs:
           columns: [ time, horizon, group, "pred_0.5-.*" ]
-    mid_tft_lograt_min_2:
+    mid_tft_lograt_min_naive:
       prediction:
         read_kwargs:
-          columns: [ time, horizon, group, "pred_0.5-.*" ]
+          columns: [ time, horizon, group, "pred-.*" ]
 metrics:
 - class: sklearn.metrics.mean_absolute_error
   label: MAE

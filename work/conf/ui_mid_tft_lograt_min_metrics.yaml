@@ -1,6 +1,7 @@
-delay: 900
+delay: 3600
+metrics_kind: heatmap
 read_metrics_kwargs:
-  start: -900
+  start: -3600
   end: 0
   drop_duplicates: false
   concat: false

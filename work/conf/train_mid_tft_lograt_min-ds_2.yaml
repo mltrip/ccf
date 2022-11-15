@@ -1,0 +1,66 @@
+defaults:
+ - query@create_dataset_kwargs.feature_data_kwargs.query: features_lograt
+ - dataset@create_dataset_kwargs.dataset_kwargs: mid_lograt
+ - _self_
+
+model_path: mid_tft_lograt_min-ds_2.ckpt
+tune: true
+create_dataset_kwargs:
+  split: 0.8
+  verbose: true
+  feature_data_kwargs:
+    start: ~
+    end: ~
+    concat: false
+  dataset_kwargs:
+    max_encoder_length: 60
+dataloader_kwargs:
+  train:
+    train: true
+    num_workers: 16
+    batch_size: 1024
+  val:
+    train: false
+    num_workers: 16
+    batch_size: 1024
+model_kwargs:
+  class: TemporalFusionTransformer
+  learning_rate: 0.0009765625
+  hidden_size: 8
+  attention_head_size: 1
+  dropout: 0
+  hidden_continuous_size: 8
+  lstm_layers: 1
+  loss:
+    class: QuantileLoss
+    # quantiles: [ 0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98 ]
+  log_interval: 0
+  reduce_on_plateau_patience: 2
+  reduce_on_plateau_reduction: 2
+  reduce_on_plateau_min_lr: 1.0e-10
+  weight_decay: 0
+trainer_kwargs:
+  max_epochs: 64
+  accelerator: gpu  # gpu
+  devices: ~
+  gradient_clip_val: 0
+  log_every_n_steps: 100
+  limit_train_batches: ~
+  logger:
+  - class: TensorBoardLogger
+    save_dir: tensorboard
+    name: mid_tft_lograt_min-ds_2
+  callbacks:
+  - class: LearningRateMonitor
+    logging_interval: step
+  - class: ModelCheckpoint
+    monitor: val_loss
+    filename: '{epoch}-{step}-{val_loss:.3f}'
+    save_last: true
+    save_top_k: 1
+  - class: EarlyStopping
+    monitor: val_loss
+    min_delta: 0
+    patience: 8
+    verbose: false
+    mode: min
