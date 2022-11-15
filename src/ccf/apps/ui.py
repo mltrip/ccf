@@ -100,7 +100,7 @@ def ui(read_data_kwargs=None, read_metrics_kwargs=None, delay=0, accumulate=Fals
       data = read_data(**read_data_kwargs)
       charts = make_time_charts(data, accumulate)
       with placeholder.container():
-          for chart in metrics_charts:
+          for chart in charts:
             st.altair_chart(chart, use_container_width=True)
     if read_metrics_kwargs is not None:
       metrics_data = read_data(**read_metrics_kwargs)
