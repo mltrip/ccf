@@ -10,7 +10,7 @@ import pandas as pd
 from ccf.utils import expand_columns
 
 
-def read_data(query, start=None, end=None, concat=True):
+def read_data(query, start=None, end=None, concat=True, drop_duplicates=False):
   now = datetime.utcnow()
   if isinstance(start, (int, float)):
     start = now + timedelta(seconds=start)
@@ -80,6 +80,9 @@ def read_data(query, start=None, end=None, concat=True):
           df[c] = df[c].astype(float)
         except Exception:
           pass
+      if drop_duplicates:
+        # df = df.drop_duplicates()
+        df = df[~df.index.duplicated(keep='first')]
       dfs[nn] = df
     if concat:
       for nn, df in dfs.items():

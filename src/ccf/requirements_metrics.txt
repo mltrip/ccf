@@ -2,4 +2,5 @@ evidently
 hydra-core
 numpy
 pandas
+scikit-learn
 SQLAlchemy

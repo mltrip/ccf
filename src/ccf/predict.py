@@ -43,6 +43,7 @@ def predict(model_path, train_kwargs, data_kwargs,
   dks['feature_data_kwargs']['end'] = None
   dks['dataset_kwargs']['predict_mode'] = True
   while True:
+    print(datetime.utcnow())
     t0 = time.time()
     ds, _, df, _ = create_dataset(**deepcopy(dks))
     if verbose:
@@ -105,10 +106,11 @@ def predict(model_path, train_kwargs, data_kwargs,
       write_kwargs['con'] = create_engine(**engine_kwargs)
       pred_df.to_sql(**write_kwargs)
     dt_total = time.time() - t0
+    wt = max(0, resample_seconds - dt_total)
     if verbose:
       dt_pred = time.time() - (t0 + dt_data)
-      print(f'{datetime.utcnow()}, status: {status}, dt_data: {dt_data:.3f}, dt_pred: {dt_pred:.3f}, dt_total: {dt_total:.3f}')
-    time.sleep(max(0, resample_seconds - dt_total))
+      print(f'status: {status}, n: {len(pred_df) if status else 0}, dt_data: {dt_data:.3f}, dt_pred: {dt_pred:.3f}, dt_total: {dt_total:.3f}, wt: {wt:.3f}')
+    time.sleep(wt)
     
   
 @hydra.main(version_base=None)
