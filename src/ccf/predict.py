@@ -16,30 +16,30 @@ import ccf
 
 
 def predict(model_path, train_kwargs, data_kwargs, 
-            predict_kwargs, past, verbose=False, prediction_prefix='pred',
-            rule='1S', dataloader_kwargs=None):
+            predict_kwargs, past, verbose=False, 
+            prediction_prefix='pred', dataloader_kwargs=None, delay=0):
   engine_kwargs = data_kwargs['query']['prediction']['engine_kwargs'] 
   write_kwargs = data_kwargs['query']['prediction']['write_kwargs']
-  if model_path is None:
-    model = pf.models.Baseline()
-  else:
+  model_path = Path(model_path)
+  if model_path.is_file():
     model_name = train_kwargs['model_kwargs']['class']
-    c = getattr(pf.models, model_name, None)
-    if c is None:
-      c = getattr(ccf.models, model_name, None)
-    if c is None:
-      raise NotImplementedError(model_name) 
+  else:
+    model_name = str(model_path)
+  c = getattr(pf.models, model_name, None)
+  if c is None:
+    c = getattr(ccf.models, model_name, None)
+  if c is None:
+    raise NotImplementedError(model_name)
+  if model_path.is_file():
     model = c.load_from_checkpoint(model_path)
+  else:
+    model = c()
   dks = train_kwargs['create_dataset_kwargs']
   max_prediction_length = dks['dataset_kwargs']['max_prediction_length']
   max_encoder_length = dks['dataset_kwargs']['max_encoder_length']
   min_length = max_encoder_length + max_prediction_length
-  resample_seconds = pd.to_timedelta(rule).total_seconds()
   dks['split'] = None
   dks['feature_data_kwargs']['start'] = -past
-  # dks['feature_data_kwargs']['start'] = -max_encoder_length*resample_seconds
-  # dks['feature_data_kwargs']['end'] = max_prediction_length*resample_seconds
-  # dks['feature_data_kwargs']['end'] = None
   dks['feature_data_kwargs']['end'] = None
   dks['dataset_kwargs']['predict_mode'] = True
   while True:
@@ -106,7 +106,7 @@ def predict(model_path, train_kwargs, data_kwargs,
       write_kwargs['con'] = create_engine(**engine_kwargs)
       pred_df.to_sql(**write_kwargs)
     dt_total = time.time() - t0
-    wt = max(0, resample_seconds - dt_total)
+    wt = max(0, delay - dt_total)
     if verbose:
       dt_pred = time.time() - (t0 + dt_data)
       print(f'status: {status}, n: {len(pred_df) if status else 0}, dt_data: {dt_data:.3f}, dt_pred: {dt_pred:.3f}, dt_total: {dt_total:.3f}, wt: {wt:.3f}')

@@ -114,9 +114,18 @@ PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_multi_
 PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_multi_tgt_tft_naive_a.yaml
 PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_multi_tgt_tft_naive_b.yaml
 ```
+* collect predictions metrics
+```sh
+PYTHONPATH=../src/ python ../src/ccf/collect_metrics.py -cd conf -cn collect_metrics_lograt
+```
 ### $$\textcolor{#eeeeee}{\text{RUN UI}}$$
+* predictions
 ```sh
 PYTHONPATH=../src/ streamlit run ../src/ccf/apps/ui.py conf/ui_multi_tgt_tft.yaml
+```
+* collected prediction metrics
+```sh
+PYTHONPATH=../src/ streamlit run ../src/ccf/apps/ui.py conf/ui_mid_tft_lograt_min_metrics.yaml
 ```
 ## CONFIGS EXAMPLES
 ### $$\textcolor{#4dd0e1}{\text{GET DATA}}$$

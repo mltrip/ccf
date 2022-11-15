@@ -1,0 +1,8 @@
+prediction:
+  engine_kwargs:
+    url: sqlite:///mid_tft_lograt_min_naive@prediction.db
+  read_kwargs:
+    name: data
+  write_kwargs:
+   name: data
+   if_exists: append
