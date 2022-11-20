@@ -2,6 +2,7 @@ import sys
 from datetime import datetime, timedelta, timezone
 import time
 from copy import deepcopy
+import gc
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
@@ -17,11 +18,7 @@ def extract_features(raw_data_kwargs, feature_data_kwargs, pre_features, post_fe
                      resample_kwargs, aggregate_kwargs, interpolate_kwargs, 
                      remove_pre_features=False,
                      delay=0, verbose=False):
-  feature_io = deepcopy(feature_data_kwargs['query']['feature'])
-  for n in feature_io:
-    ek = feature_io[n]['engine_kwargs']
-    feature_io[n]['write_kwargs']['con'] = create_engine(**ek)
-  # Init pre features
+  # Initialize pre features
   new_pre_features = []
   for f in pre_features:
     if isinstance(f, str):
@@ -33,7 +30,7 @@ def extract_features(raw_data_kwargs, feature_data_kwargs, pre_features, post_fe
     else:
       raise ValueError(f)
   pre_features = new_pre_features
-  # Init post features
+  # Initialize post features
   new_post_features = []
   for f in post_features:
     if isinstance(f, str):
@@ -48,6 +45,11 @@ def extract_features(raw_data_kwargs, feature_data_kwargs, pre_features, post_fe
   while True:
     print(f'{datetime.utcnow()}')
     t0 = time.time()
+    # Create engine
+    feature_io = deepcopy(feature_data_kwargs['query']['feature'])
+    for n in feature_io:
+      ek = feature_io[n]['engine_kwargs']
+      feature_io[n]['write_kwargs']['con'] = create_engine(**ek)
     # Read
     raw = read_data(**raw_data_kwargs)
     old_feature = read_data(**feature_data_kwargs)['feature']
@@ -83,7 +85,7 @@ def extract_features(raw_data_kwargs, feature_data_kwargs, pre_features, post_fe
     print(f'dt: {dt:.3f}, wt: {wt:.3f}')
     time.sleep(wt)
   
-
+  
 def pqv(name, raw, old_feature, pre_feature, depth=None):
   o = raw[name]['o']
   # Columns

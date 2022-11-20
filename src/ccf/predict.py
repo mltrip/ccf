@@ -3,6 +3,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import time
 from copy import deepcopy
+import gc
+import os
+import functools
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
@@ -35,9 +38,6 @@ def predict(model_path, train_kwargs, data_kwargs,
   else:
     model = c()
   dks = train_kwargs['create_dataset_kwargs']
-  max_prediction_length = dks['dataset_kwargs']['max_prediction_length']
-  max_encoder_length = dks['dataset_kwargs']['max_encoder_length']
-  min_length = max_encoder_length + max_prediction_length
   dks['split'] = None
   dks['feature_data_kwargs']['start'] = -past
   dks['feature_data_kwargs']['end'] = None
@@ -52,22 +52,22 @@ def predict(model_path, train_kwargs, data_kwargs,
       status = None
     else:
       status = True
-    # else:
-    #   status = True if len(df) >= min_length else False
-    # dl = ds.to_dataloader(**dataloader_kwargs)
+    gc.collect()
+    wrappers = [x for x in gc.get_objects() 
+                if isinstance(x, functools._lru_cache_wrapper)]
+    for wrapper in wrappers:
+      wrapper.cache_clear()
     if status is not None and status:
-      # df = df.tail(min_length)
-      # df_past = df.head(max_encoder_length)
-      # df_future = df.tail(max_prediction_length)
-      # pred_time_idx = df_future.iloc[0].time_idx
-      # predict_kwargs['data'] = ds.filter(
-      #   lambda x: x.time_idx_first_prediction == pred_time_idx)
+      # dl = ds.to_dataloader(**dataloader_kwargs)
       predict_kwargs['data'] = ds
       pred, idxs = model.predict(**predict_kwargs)
       pred = [pred] if len(ds.target_names) == 1 else pred
       pred_dfs = []
       for g, gdf in df.groupby('group'):
         g_idx = idxs[idxs['group'] == g]
+        if len(g_idx) == 0:
+          print(f'Warning! No group {g} in predictions')
+          continue
         p_idx, t_idx = g_idx.iloc[0].name, g_idx.iloc[0].time_idx
         t_last = gdf.index[gdf['time_idx'] == t_idx - 1].tolist()[0]
         df_future = gdf[gdf['time_idx'] >= t_idx]
@@ -102,14 +102,15 @@ def predict(model_path, train_kwargs, data_kwargs,
         tgt_df = pd.concat(tgt_dfs, axis=1)
         tgt_df = tgt_df.loc[:, ~tgt_df.columns.duplicated()]
         pred_dfs.append(tgt_df)
-      pred_df = pd.concat(pred_dfs)
-      write_kwargs['con'] = create_engine(**engine_kwargs)
-      pred_df.to_sql(**write_kwargs)
-    dt_total = time.time() - t0
-    wt = max(0, delay - dt_total)
+      if len(pred_dfs) > 0:
+        pred_df = pd.concat(pred_dfs)
+        write_kwargs['con'] = create_engine(**engine_kwargs)
+        pred_df.to_sql(**write_kwargs)
+    dt = time.time() - t0
+    wt = max(0, delay - dt)
     if verbose:
       dt_pred = time.time() - (t0 + dt_data)
-      print(f'status: {status}, n: {len(pred_df) if status else 0}, dt_data: {dt_data:.3f}, dt_pred: {dt_pred:.3f}, dt_total: {dt_total:.3f}, wt: {wt:.3f}')
+      print(f'status: {status}, n: {len(pred_df) if status else 0}, horizon: {pred_df.index.max() if status else ""}, dt_data: {dt_data:.3f}, dt_pred: {dt_pred:.3f}, dt: {dt:.3f}, wt: {wt:.3f}')
     time.sleep(wt)
     
   

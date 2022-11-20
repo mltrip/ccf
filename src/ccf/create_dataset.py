@@ -120,8 +120,12 @@ def create_dataset(feature_data_kwargs, dataset_kwargs,
     df, df2 = df, None
   if not df_only:
     dataset_kwargs['data'] = df.reset_index()
-    ds = pf.TimeSeriesDataSet(**dataset_kwargs)  # FIXME Memory leak!
-    if df2 is not None:
+    try:
+      ds = pf.TimeSeriesDataSet(**dataset_kwargs)
+    except Exception as e:
+      print(e)
+      ds = None
+    if df2 is not None and ds is not None:
       ds2 = pf.TimeSeriesDataSet.from_dataset(ds, df2.reset_index(), stop_randomization=True)
     else:
       ds2 = None

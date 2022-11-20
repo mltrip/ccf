@@ -4,6 +4,7 @@ defaults:
  - query@feature_data_kwargs.query: features_lograt
  - query@predict_data_kwargs.query.mid_tft_lograt_min: predictions_mid_tft_lograt_min
  - query@predict_data_kwargs.query.mid_tft_lograt_min_naive: predictions_mid_tft_lograt_min_naive
+ - query@predict_data_kwargs.query.mid_tft_lograt_min-ds_2: predictions_mid_tft_lograt_min-ds_2
  - _self_
 
 verbose: true
@@ -26,6 +27,10 @@ predict_data_kwargs:
   drop_duplicates: false
   query:
     mid_tft_lograt_min:
+      prediction:
+        read_kwargs:
+          columns: [ time, horizon, group, "pred_0.5-.*" ]
+    mid_tft_lograt_min-ds_2:
       prediction:
         read_kwargs:
           columns: [ time, horizon, group, "pred_0.5-.*" ]

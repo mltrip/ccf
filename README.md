@@ -59,33 +59,25 @@ cmd /C  "set PYTHONPATH=../src && python ../src/ccf/get_data.py -cd conf -cn get
 ```
 ### $$\textcolor{#a2fca2}{\text{EXTRACT FEATURES}}$$
 ```sh
-PYTHONPATH=../src/ python ../src/ccf/extract_features.py -cd conf -cn extract_features
-```
-> There could be a memeory leak, workaround to avoid it;)
-```sh
-while true; do PYTHONPATH=../src/ timeout 1800 python ../src/ccf/extract_features.py -cd conf -cn extract_features; done
+PYTHONPATH=../src/ python ../src/ccf/extract_features.py -cd conf -cn extract_features_lograt
 ```
 ### $$\textcolor{#eeff41}{\text{TRAIN/TUNE MODEL}}$$ 
 * Train once
 ```sh
-PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn train_multi_tgt_tft
+PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn train_mid_tft_lograt_min
 ```
 * Tune every ~1 hour
 ```sh
-while true; do PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn train_multi_tgt_tft; sleep 3600; done
+while true; do PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn train_mid_tft_lograt_min; sleep 3600; done
 ```
 ### $$\textcolor{#ffab40}{\text{MAKE PREDICTIONS}}$$
-* With memory leak:(
+* Model
 ```sh
-PYTHONPATH=../src/ python ../src/ccf/predict.py -cd conf -cn predict_multi_tgt_tft
-```
-* Workaround of memory leak;) (just restart script every ~0.5 hour)
-```sh
-while true; do PYTHONPATH=../src/ timeout 1800 python ../src/ccf/predict.py -cd conf -cn predict_multi_tgt_tft; done
+PYTHONPATH=../src/ python ../src/ccf/predict.py -cd conf -cn predict_mid_tft_lograt_min
 ```
 * Naive model (predict last known target)
 ```sh
-while true; do PYTHONPATH=../src/ timeout 1800 python ../src/ccf/predict.py -cd conf -cn predict_multi_tgt_tft_naive; done
+PYTHONPATH=../src/ python ../src/ccf/predict.py -cd conf -cn predict_mid_tft_lograt_min_naive
 ```
 ### $$\textcolor{#adadad}{\text{MONITOR METRICS}}$$ 
 * Access metrics reports directory by 8000 port
@@ -121,7 +113,7 @@ PYTHONPATH=../src/ python ../src/ccf/collect_metrics.py -cd conf -cn collect_met
 ### $$\textcolor{#eeeeee}{\text{RUN UI}}$$
 * predictions
 ```sh
-PYTHONPATH=../src/ streamlit run ../src/ccf/apps/ui.py conf/ui_multi_tgt_tft.yaml
+PYTHONPATH=../src/ streamlit run ../src/ccf/apps/ui.py conf/ui_mid_tft_lograt_min.yaml
 ```
 * collected prediction metrics
 ```sh

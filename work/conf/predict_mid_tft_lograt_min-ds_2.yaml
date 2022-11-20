@@ -4,7 +4,7 @@ defaults:
  
 model_path: mid_tft_lograt_min-ds_2.ckpt
 verbose: true
-past: 62
+past: 70
 delay: 1
 predict_kwargs:
   return_index: true

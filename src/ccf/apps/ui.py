@@ -80,7 +80,7 @@ def make_metrics_box(data):
         #       color=alt.Color('color', scale=alt.Scale(scheme='category20')),
         #   )
         # )
-        chart = alt.Chart(dff, title=f'{n} {label} {group}').mark_boxplot().encode(
+        chart = alt.Chart(dff, title=f'{n} {label} {group} {len(dff)}').mark_boxplot().encode(
           x='model:N',
           y='value:Q',
           row='kind:N',
@@ -100,7 +100,11 @@ def make_metrics_heatmap(data):
       # ['horizon', 'group', 'metric', 'label', 'value', 'model', 'prediction', 'kind', 'target']
       for (kind, group, label), dff in df.groupby(['kind', 'group', 'label']):
         dff['name'] = dff['model']
-        base = alt.Chart(dff, title=f'{n} {group} {label} {kind}').transform_aggregate(
+        # base = alt.Chart(dff, title=f'{n} {group} {label} {kind} {len(dff)}').transform_joinaggregate(
+        #   mean_value='mean(value)',
+        #   count_value='count(value)',
+        #   groupby=['horizon', 'name']
+        base = alt.Chart(dff, title=f'{n} {group} {label} {kind} {len(dff)}').transform_aggregate(
           mean_value='mean(value)',
           groupby=['horizon', 'name']
         ).encode(
@@ -115,15 +119,20 @@ def make_metrics_heatmap(data):
         )
         text = base.mark_text(baseline='middle').encode(
           text='mean_value:Q',
-            # color=alt.condition(
-            #     alt.datum.num_cars > 100,
-            #     alt.value('black'),
-            #     alt.value('white')
-            # )
         )
-        chart = (heatmap + text).properties(width=800, height=400)
-        # chart = heatmap + text
-        charts.append(chart)
+        # heatmap2 = base.mark_rect().encode(
+        #   color=alt.Color('count_value:Q',
+        #     scale=alt.Scale(scheme='redyellowgreen', reverse=True),
+        #     legend=alt.Legend(direction='vertical')
+        #   )
+        # )
+        # text2 = base.mark_text(baseline='middle').encode(
+        #   text='count_value:O',
+        # )
+        c1 = (heatmap + text).properties(width=800, height=400)
+        # c2 = (heatmap2 + text2).properties(width=400, height=400)
+        # chart = c1 | c2
+        charts.append(c1)
   return charts
 
 
@@ -138,6 +147,7 @@ def ui(read_data_kwargs=None, read_metrics_kwargs=None,
   while True:
     print(datetime.utcnow())
     t0 = time.time()
+    # placeholder.empty()
     if read_data_kwargs is not None:
       data = read_data(**read_data_kwargs)
       charts = make_time_charts(data, accumulate)
