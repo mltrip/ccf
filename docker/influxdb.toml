@@ -1,0 +1,6 @@
+query-concurrency = 20
+# query-queue-size = 15
+# secret-store = "vault"
+# session-length = 120
+# tls-cert = "/path/to/influxdb.crt"
+# tls-key = "/path/to/influxdb.key"
