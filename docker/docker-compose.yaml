@@ -1,0 +1,98 @@
+version: '3.3'
+
+services:
+
+  zookeeper:
+    container_name: zookeeper
+    networks:
+      - db
+    image: quay.io/strimzi/kafka:0.28.0-kafka-3.1.0
+    command: [
+        "sh", "-c",
+        "bin/zookeeper-server-start.sh config/zookeeper.properties"
+      ]
+    ports:
+    - "2181:2181"
+    environment:
+      LOG_DIR: /tmp/logs
+
+  kafka:
+    container_name: kafka
+    networks:
+      - db
+    image: quay.io/strimzi/kafka:0.28.0-kafka-3.1.0
+    command: [
+      "sh", "-c",
+      "bin/kafka-server-start.sh config/server.properties --override listeners=$${KAFKA_LISTENERS} --override advertised.listeners=$${KAFKA_ADVERTISED_LISTENERS} --override zookeeper.connect=$${KAFKA_ZOOKEEPER_CONNECT} --override listener.security.protocol.map=$${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP} --override inter.broker.listener.name=$${KAFKA_INTER_BROKER_LISTENER_NAME}"
+      ]
+    depends_on:
+    - zookeeper
+    ports:
+    - "9094:9094"
+    environment:
+      LOG_DIR: "/tmp/logs"
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: INTERNAL://kafka:9092,OUTSIDE://kafka:9094
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,OUTSIDE://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,OUTSIDE:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+  influxdb:
+    image: influxdb:latest
+    networks:
+      - db
+    volumes:
+      # Mount for influxdb data directory and configuration
+      - influxdb2:/var/lib/influxdb2:rw
+      - influxdb2-config:/etc/influxdb2:rw
+      - ${PWD}/influxdb.toml:/etc/influxdb2/influxdb.toml
+      - /etc/ssl/influxdb-selfsigned.crt:/etc/ssl/influxdb-selfsigned.crt:rw
+      - /etc/ssl/influxdb-selfsigned.key:/etc/ssl/influxdb-selfsigned.key:rw
+    environment:
+#     - DOCKER_INFLUXDB_INIT_MODE=upgrade
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=myusername
+      - DOCKER_INFLUXDB_INIT_PASSWORD=passwordpasswordpassword
+      - DOCKER_INFLUXDB_INIT_ORG=myorg
+      - DOCKER_INFLUXDB_INIT_BUCKET=mybucket
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=mytoken
+      - DOCKER_INFLUXDB_CONFIG_PATH=/etc/influxdb2/influxdb.toml
+      - DOCKER_INFLUXDB_BOLT_PATH=/etc/influxdb2/influxdb.bolt
+      - DOCKER_INFLUXDB_ENGINE_PATH=/etc/influxdb2/engine
+      - DOCKER_INFLUXDB_INIT_RETENTION=2h
+      - INFLUXD_TLS_CERT=/etc/ssl/influxdb-selfsigned.crt
+      - INFLUXD_TLS_KEY=/etc/ssl/influxdb-selfsigned.key
+    restart: unless-stopped
+    ports:
+      - "8086:8086"
+      
+  telegraf:
+    image: telegraf:latest
+    container_name: telegraf
+    networks:
+      - db
+    environment: 
+      - INFLUX_HOST=https://influxdb:8086
+      - INFLUX_TOKEN=mytoken
+      - INFLUX_ORG=myorg
+      - INFLUX_BUCKET=mybucket
+      - KAFKA_HOST=kafka:9092
+      - KAFKA_TOPIC=garden_sensor_data
+    volumes:
+      #  Sync timezone with host
+      - /etc/localtime:/etc/localtime:ro
+      #  Map Telegraf configuration file
+      - ${PWD}/telegraf.toml:/etc/telegraf/telegraf.conf:ro
+      #  Map /tmp to permanent storage  (this includes /tmp/metrics.out)
+      - ${PWD}/telegraf:/tmp:rw
+    restart: unless-stopped
+    depends_on:
+      - influxdb
+      
+volumes:
+  influxdb2:
+  influxdb2-config:
+
+networks:
+  db:
+    driver: bridge

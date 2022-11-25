@@ -3,3 +3,4 @@ hydra-core
 pandas
 SQLAlchemy
 websocket-client
+kafka-python
