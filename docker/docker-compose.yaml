@@ -23,7 +23,7 @@ services:
     image: quay.io/strimzi/kafka:0.28.0-kafka-3.1.0
     command: [
       "sh", "-c",
-      "bin/kafka-server-start.sh config/server.properties --override listeners=$${KAFKA_LISTENERS} --override advertised.listeners=$${KAFKA_ADVERTISED_LISTENERS} --override zookeeper.connect=$${KAFKA_ZOOKEEPER_CONNECT} --override listener.security.protocol.map=$${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP} --override inter.broker.listener.name=$${KAFKA_INTER_BROKER_LISTENER_NAME}"
+      "bin/kafka-server-start.sh config/server.properties --override listeners=$${KAFKA_LISTENERS} --override advertised.listeners=$${KAFKA_ADVERTISED_LISTENERS} --override zookeeper.connect=$${KAFKA_ZOOKEEPER_CONNECT} --override listener.security.protocol.map=$${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP} --override inter.broker.listener.name=$${KAFKA_INTER_BROKER_LISTENER_NAME} --override log.retention.ms=$${KAFKA_LOG_RETENTION_MS} --override log.retention.check.interval.ms=$${KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS}"
       ]
     depends_on:
     - zookeeper
@@ -36,6 +36,8 @@ services:
       KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,OUTSIDE://localhost:9094
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,OUTSIDE:PLAINTEXT
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_LOG_RETENTION_MS: 3600000
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 1800000
 
   influxdb:
     container_name: influxdb
