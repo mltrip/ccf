@@ -38,6 +38,7 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
 
   influxdb:
+    container_name: influxdb
     image: influxdb:latest
     networks:
       - db
@@ -91,6 +92,7 @@ services:
     restart: unless-stopped
     depends_on:
       - influxdb
+      - kafka
       
   telegraf_trade:
     image: telegraf:latest
@@ -115,6 +117,7 @@ services:
     restart: unless-stopped
     depends_on:
       - influxdb
+      - kafka
       
   telegraf_news:
     image: telegraf:latest
@@ -139,6 +142,7 @@ services:
     restart: unless-stopped
     depends_on:
       - influxdb
+      - kafka
       
   telegraf_feature:
     image: telegraf:latest
@@ -163,6 +167,7 @@ services:
     restart: unless-stopped
     depends_on:
       - influxdb
+      - kafka
       
   telegraf_prediction:
     image: telegraf:latest
@@ -186,7 +191,8 @@ services:
       - ${PWD}/telegraf_prediction:/tmp:rw
     restart: unless-stopped
     depends_on:
-      - influxdb      
+      - influxdb
+      - kafka
  
   telegraf_metric:
     image: telegraf:latest
@@ -210,7 +216,8 @@ services:
       - ${PWD}/telegraf_metric:/tmp:rw
     restart: unless-stopped
     depends_on:
-      - influxdb   
+      - influxdb 
+      - kafka
  
 volumes:
   influxdb2:

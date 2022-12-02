@@ -37,7 +37,7 @@ def get_trade():
   data = {}
   data['t_p'] = random.uniform(0, 1)  # trade price
   data['t_q'] = random.uniform(0, 1)  # trade quantity
-  data['t_s'] = random.randint(0, 1)  # trade side: buy (0) or sell (1)
+  data['t_s'] = random.randint(0, 1)  # trade side: 0 - maker_sell/taker_buy or 1 - maker_buy/taker_sell
   key = random.choice(list(KEY2PART.keys()))
   exchange, base, quote = key.split('/')
   data['exchange'] = exchange

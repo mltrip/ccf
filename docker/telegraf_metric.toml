@@ -101,7 +101,7 @@
   # sasl_version = 1
 
   ## Name of the consumer group.
-  # consumer_group = "telegraf_metrics_consumers"
+  consumer_group = "telegraf_metric"
 
   ## Compression codec represents the various compression codecs recognized by
   ## Kafka in messages.
