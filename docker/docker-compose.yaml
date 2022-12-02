@@ -48,47 +48,170 @@ services:
       - ${PWD}/influxdb.toml:/etc/influxdb2/influxdb.toml
       - /etc/ssl/influxdb-selfsigned.crt:/etc/ssl/influxdb-selfsigned.crt:rw
       - /etc/ssl/influxdb-selfsigned.key:/etc/ssl/influxdb-selfsigned.key:rw
+    env_file:
+      - .env.secret
     environment:
-#     - DOCKER_INFLUXDB_INIT_MODE=upgrade
+      # - DOCKER_INFLUXDB_INIT_MODE=upgrade
       - DOCKER_INFLUXDB_INIT_MODE=setup
-      - DOCKER_INFLUXDB_INIT_USERNAME=myusername
-      - DOCKER_INFLUXDB_INIT_PASSWORD=passwordpasswordpassword
-      - DOCKER_INFLUXDB_INIT_ORG=myorg
-      - DOCKER_INFLUXDB_INIT_BUCKET=mybucket
-      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=mytoken
+      - DOCKER_INFLUXDB_INIT_USERNAME=ccf
+      # - DOCKER_INFLUXDB_INIT_PASSWORD=password
+      - DOCKER_INFLUXDB_INIT_ORG=mltrip
+      - DOCKER_INFLUXDB_INIT_BUCKET=ccf
+      # - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN=token
       - DOCKER_INFLUXDB_CONFIG_PATH=/etc/influxdb2/influxdb.toml
       - DOCKER_INFLUXDB_BOLT_PATH=/etc/influxdb2/influxdb.bolt
       - DOCKER_INFLUXDB_ENGINE_PATH=/etc/influxdb2/engine
-      - DOCKER_INFLUXDB_INIT_RETENTION=2h
+      # - DOCKER_INFLUXDB_INIT_RETENTION=2h
       - INFLUXD_TLS_CERT=/etc/ssl/influxdb-selfsigned.crt
       - INFLUXD_TLS_KEY=/etc/ssl/influxdb-selfsigned.key
     restart: unless-stopped
     ports:
       - "8086:8086"
       
-  telegraf:
+  telegraf_lob:
     image: telegraf:latest
-    container_name: telegraf
     networks:
       - db
+    env_file:
+      - .env.secret
     environment: 
       - INFLUX_HOST=https://influxdb:8086
-      - INFLUX_TOKEN=mytoken
-      - INFLUX_ORG=myorg
-      - INFLUX_BUCKET=mybucket
+      # - INFLUX_TOKEN=token
+      - INFLUX_ORG=mltrip
+      - INFLUX_BUCKET=ccf
       - KAFKA_HOST=kafka:9092
-      - KAFKA_TOPIC=garden_sensor_data
+      - KAFKA_TOPIC=lob
     volumes:
       #  Sync timezone with host
       - /etc/localtime:/etc/localtime:ro
       #  Map Telegraf configuration file
-      - ${PWD}/telegraf.toml:/etc/telegraf/telegraf.conf:ro
+      - ${PWD}/telegraf_lob.toml:/etc/telegraf/telegraf.conf:ro
       #  Map /tmp to permanent storage  (this includes /tmp/metrics.out)
-      - ${PWD}/telegraf:/tmp:rw
+      - ${PWD}/telegraf_lob:/tmp:rw
     restart: unless-stopped
     depends_on:
       - influxdb
       
+  telegraf_trade:
+    image: telegraf:latest
+    networks:
+      - db
+    env_file:
+      - .env.secret
+    environment: 
+      - INFLUX_HOST=https://influxdb:8086
+      # - INFLUX_TOKEN=token
+      - INFLUX_ORG=mltrip
+      - INFLUX_BUCKET=ccf
+      - KAFKA_HOST=kafka:9092
+      - KAFKA_TOPIC=trade
+    volumes:
+      #  Sync timezone with host
+      - /etc/localtime:/etc/localtime:ro
+      #  Map Telegraf configuration file
+      - ${PWD}/telegraf_trade.toml:/etc/telegraf/telegraf.conf:ro
+      #  Map /tmp to permanent storage  (this includes /tmp/metrics.out)
+      - ${PWD}/telegraf_trade:/tmp:rw
+    restart: unless-stopped
+    depends_on:
+      - influxdb
+      
+  telegraf_news:
+    image: telegraf:latest
+    networks:
+      - db
+    env_file:
+      - .env.secret
+    environment: 
+      - INFLUX_HOST=https://influxdb:8086
+      # - INFLUX_TOKEN=token
+      - INFLUX_ORG=mltrip
+      - INFLUX_BUCKET=ccf
+      - KAFKA_HOST=kafka:9092
+      - KAFKA_TOPIC=news
+    volumes:
+      #  Sync timezone with host
+      - /etc/localtime:/etc/localtime:ro
+      #  Map Telegraf configuration file
+      - ${PWD}/telegraf_news.toml:/etc/telegraf/telegraf.conf:ro
+      #  Map /tmp to permanent storage  (this includes /tmp/metrics.out)
+      - ${PWD}/telegraf_news:/tmp:rw
+    restart: unless-stopped
+    depends_on:
+      - influxdb
+      
+  telegraf_feature:
+    image: telegraf:latest
+    networks:
+      - db
+    env_file:
+      - .env.secret
+    environment: 
+      - INFLUX_HOST=https://influxdb:8086
+      # - INFLUX_TOKEN=token
+      - INFLUX_ORG=mltrip
+      - INFLUX_BUCKET=ccf
+      - KAFKA_HOST=kafka:9092
+      - KAFKA_TOPIC=feature
+    volumes:
+      #  Sync timezone with host
+      - /etc/localtime:/etc/localtime:ro
+      #  Map Telegraf configuration file
+      - ${PWD}/telegraf_feature.toml:/etc/telegraf/telegraf.conf:ro
+      #  Map /tmp to permanent storage  (this includes /tmp/metrics.out)
+      - ${PWD}/telegraf_feature:/tmp:rw
+    restart: unless-stopped
+    depends_on:
+      - influxdb
+      
+  telegraf_prediction:
+    image: telegraf:latest
+    networks:
+      - db
+    env_file:
+      - .env.secret
+    environment: 
+      - INFLUX_HOST=https://influxdb:8086
+      # - INFLUX_TOKEN=token
+      - INFLUX_ORG=mltrip
+      - INFLUX_BUCKET=ccf
+      - KAFKA_HOST=kafka:9092
+      - KAFKA_TOPIC=prediction
+    volumes:
+      #  Sync timezone with host
+      - /etc/localtime:/etc/localtime:ro
+      #  Map Telegraf configuration file
+      - ${PWD}/telegraf_prediction.toml:/etc/telegraf/telegraf.conf:ro
+      #  Map /tmp to permanent storage  (this includes /tmp/metrics.out)
+      - ${PWD}/telegraf_prediction:/tmp:rw
+    restart: unless-stopped
+    depends_on:
+      - influxdb      
+ 
+  telegraf_metric:
+    image: telegraf:latest
+    networks:
+      - db
+    env_file:
+      - .env.secret
+    environment: 
+      - INFLUX_HOST=https://influxdb:8086
+      # - INFLUX_TOKEN=token
+      - INFLUX_ORG=mltrip
+      - INFLUX_BUCKET=ccf
+      - KAFKA_HOST=kafka:9092
+      - KAFKA_TOPIC=metric
+    volumes:
+      #  Sync timezone with host
+      - /etc/localtime:/etc/localtime:ro
+      #  Map Telegraf configuration file
+      - ${PWD}/telegraf_metric.toml:/etc/telegraf/telegraf.conf:ro
+      #  Map /tmp to permanent storage  (this includes /tmp/metrics.out)
+      - ${PWD}/telegraf_metric:/tmp:rw
+    restart: unless-stopped
+    depends_on:
+      - influxdb   
+ 
 volumes:
   influxdb2:
   influxdb2-config:

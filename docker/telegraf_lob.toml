@@ -135,10 +135,13 @@
   ## Each data format has its own unique set of configuration options, read
   ## more about them here:
   ## https://github.com/influxdata/telegraf/blob/master/docs/DATA_FORMATS_INPUT.md
-  data_format = "json"
-
-#[[inputs.cpu]]
-#  percpu = true
-#  totalcpu = true
-#  collect_cpu_time = false
-#  report_active = false
+  # data_format = "json"
+  data_format = "json_v2"
+  [[inputs.kafka_consumer.json_v2]]
+      measurement_name = "lob"
+      timestamp_path = "timestamp"
+      timestamp_format = "unix_ns"
+      [[inputs.kafka_consumer.json_v2.object]]
+            path = "@this"
+            tags = ["exchange", "base", "quote"]
+            excluded_keys = ["timestamp"]
