@@ -1,0 +1,8 @@
+defaults:
+  - _self_
+
+topic: trade
+admin_kwargs:
+  bootstrap_servers: "kafka:9092"
+verbose: true
+mapping: {}

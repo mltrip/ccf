@@ -1,0 +1,8 @@
+defaults:
+  - ./@mapping: mapping
+  - _self_
+
+topic: lob
+admin_kwargs:
+  bootstrap_servers: "kafka:9092"
+verbose: true
