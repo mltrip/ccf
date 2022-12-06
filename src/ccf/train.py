@@ -11,7 +11,7 @@ import pytorch_lightning as pl
 from sqlalchemy import create_engine
 
 import ccf
-from ccf.create_dataset import create_dataset
+from ccf.create_dataset import Dataset
 
 
 def train(create_dataset_kwargs, dataloader_kwargs,
@@ -19,7 +19,8 @@ def train(create_dataset_kwargs, dataloader_kwargs,
           model_path=None, tune=False):
   model_path = Path(model_path) if model_path is not None else None
   # Dataset
-  ds_t, ds_v, df_t, df_v = create_dataset(**create_dataset_kwargs)
+  dataset = Dataset(**create_dataset_kwargs)
+  ds_t, ds_v, df_t, df_v = dataset()
   if ds_t is None:
     raise ValueError('Bad dataset!')
   # Dataloader

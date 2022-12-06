@@ -10,11 +10,11 @@ import numpy as np
 import pandas as pd
 from pandas.api.types import is_numeric_dtype
 
-from ccf.agents.base import Agent
+from ccf.agents.base import Kafka
 from ccf.utils import expand_columns
 
 
-class Delta(Agent):      
+class Delta(Kafka):
   def __init__(self, quant, consumers, producers, verbose=False,
                feature=None, minsize=5, maxsize=5, delay=0, kind='lograt'):
     super().__init__(consumers, producers, verbose)
