@@ -4,3 +4,6 @@ pandas
 pytorch-forecasting
 SQLAlchemy
 torch
+pyspark
+TA-Lib
+pandas_ta

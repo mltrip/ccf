@@ -1,33 +1,33 @@
 https://cointelegraph.com/rss: Yes
-https://www.newsbtc.com/feed: Yes
+https://www.newsbtc.com/feed: No  # 301
 https://www.cryptoninjas.net/feed/: Yes
 https://news.bitcoin.com/feed/: Yes
-https://blog.coinbase.com/feed: Yes
+https://blog.coinbase.com/feed: No  # 403
 https://www.financemagnates.com/cryptocurrency/feed/: Yes
 https://blog.kraken.com/feed: Yes
 https://themarketscompass.substack.com/feed: Yes
 https://www.bitcoin-rss.com/: Yes
 https://medium.com/feed/buyucoin-talks: Yes
 https://medium.com/feed/@nikita-monastyrskiy: Yes
-https://blog.wazirx.com/feed/: Yes
+https://blog.wazirx.com/feed/: No  # 301
 https://blog.paxful.com/feed: No
 https://coinstats.app/blog/feed/: Yes
 https://blog-eu.bitflyer.com/rss/: Yes
-https://cryptopotato.com/feed: Yes
+https://cryptopotato.com/feed: No  # 301
 https://www.bitdegree.org/crypto/news/rss: Yes
 https://cryptobriefing.com/feed/: Yes
 https://cryptoslate.com/feed/: Yes
 https://u.today/rss: Yes
 https://bitcoinist.com/feed/: Yes
-https://www.buyucoin.com/crypto-labs/feed: Yes
-https://bitcoinmagazine.com/feed: Yes
+https://www.buyucoin.com/crypto-labs/feed: No  # 301
+https://bitcoinmagazine.com/feed: No  # 301
 https://coinpedia.org/feed/: Yes
-https://zebpay.com/feed/: Yes
+https://zebpay.com/feed/: No  # 403
 https://www.cryptonewsz.com/feed/: Yes
 https://blog.liquid.com/rss.xml: Yes
-https://blog.aragon.org/feed: Yes
+https://blog.aragon.org/feed: No  # 301
 https://zycrypto.com/feed/: Yes
-https://99bitcoins.com/feed/: Yes
+https://99bitcoins.com/feed/: No  # None
 https://nowpayments.io/blog/feed: Yes
 https://coinquora.com/news/feed/: Yes
 https://www.coinspeaker.com/feed/: Yes
@@ -109,13 +109,13 @@ https://vestorportal.com/rss/: Yes
 https://www.coin-tradeandmine.com/feed/: Yes
 http://cryptopost.com/feed/: Yes
 https://thecryptogarage.com/feed/: Yes
-https://www.newscryptotoday.de/feeds/posts/default: No  # Status - None
+https://www.newscryptotoday.de/feeds/posts/default: No  # None
 https://diamcircle.io/feed/: Yes
-https://techyno.com/feed/: No  # Status - None
+https://techyno.com/feed/: No  # None
 https://mcc.exchange/feed/: Yes
 http://ccxnews.com/feed/: Yes
 https://coinregwatch.com/feed/: Yes
-https://www.coin24h.com/feed/: Yes
+https://www.coin24h.com/feed/: No  # None
 https://cryptonews.exchange/feed/: Yes
 https://www.btcethereum.com/blog/feed/: Yes
 https://www.coinkurry.com/feed/: Yes
@@ -190,8 +190,8 @@ https://gocryptowise.com/blog/feed/: Yes
 https://blog.infiniteblocktech.com/feed/: Yes
 https://cryptosyringe.com/feed: Yes
 http://www.thecryptoquartet.com/feed/: Yes
-https://sludgefeed.com/category/cryptocurrency/feed/: No  # Status - None 
-https://api.blocktv.com/api/feed/news.rss: No  # Status - None
+https://sludgefeed.com/category/cryptocurrency/feed/: No  # None 
+https://api.blocktv.com/api/feed/news.rss: No  # None
 https://rehmann.co/blog/category/cryptocurrency/feed/: Yes
 https://blockfinest.com/feed/: Yes
 https://cryptocoinssupermarket.com/feed: Yes
@@ -200,7 +200,7 @@ https://devcoins.org/: Yes
 https://cryptohero8.com/feed/: Yes
 http://icosource.io/blog/feed: Yes
 https://theycallitcrypto.com/feed/: Yes
-https://coinpress.io/feed/: No  # Status - None
+https://coinpress.io/feed/: No  # None
 https://crypto101.com/feed/: Yes
 https://cryptocurrencyblog.co.za/crypto-news?format=feed&type=rss: Yes
 https://ashleyknowles.net/feed/: Yes
@@ -274,13 +274,13 @@ https://www.cryptocurrencyfreak.com/feed/: Yes
 https://bitrazzi.com/feed/: Yes
 http://mycriptocurrency.blogspot.com/feeds/posts/default?alt=rss: Yes
 http://cryptocoindude.com/feed/: Yes
-https://icoinblog.com/feed/: No  # Status - None
+https://icoinblog.com/feed/: No  # None
 https://cryptotradingreview.com/feed/: Yes
-http://cryptoinvestorpro.com/feed: No  # Status - None
+http://cryptoinvestorpro.com/feed: No  # None
 https://cryptocurrency.tech/feed/: Yes
-http://btcworldnews.com/feed/: No  # Status - None
-http://feeds.feedburner.com/nigeriabitcoincommunity: No  # Status - None
-http://fetchrss.com/rss/608cfdce491e3967e35a5c12608cfeacee1b217b11729ab2.xml: No  # Status - None
+http://btcworldnews.com/feed/: No  # None
+http://feeds.feedburner.com/nigeriabitcoincommunity: No  # None
+http://fetchrss.com/rss/608cfdce491e3967e35a5c12608cfeacee1b217b11729ab2.xml: No  # None
 http://infoonbitcoin.com/feed/: Yes
 http://www.bitcoinbazis.hu/feed/: Yes
 https://7bitcoins.com/feed/: Yes
@@ -363,6 +363,6 @@ https://www.cryptocurrencynewscast.online/feeds/posts/default?alt=rss: Yes
 https://www.cryptocynews.com/feed/: Yes
 https://www.cryptostache.com/feed/: Yes
 https://www.etoro.com/news-and-analysis/feed/: Yes
-https://www.hegion.com/feed: No  # Status - 404
+https://www.hegion.com/feed: No  # 404
 https://www.mycryptopedia.com/feed/: Yes
 https://www.ukbitcoinblog.com/feed/: Yes

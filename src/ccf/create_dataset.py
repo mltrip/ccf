@@ -1,4 +1,5 @@
 import sys
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import gc
@@ -22,7 +23,7 @@ from ccf import agents as ccf_agents
 
 class Dataset:
   def __init__(self, quant, size, agents, dataset_kwargs, executor=None, replace_nan=None,
-               split=None, target_prefix='tgt', df_only=False, verbose=False):
+               split=None, target_prefix='tgt', df_only=False, watermark=None, verbose=False):
     self.quant = int(quant) if quant is not None else quant
     self.size = size
     for name, kwargs in agents.items():
@@ -37,6 +38,7 @@ class Dataset:
     self.split = split
     self.target_prefix = target_prefix
     self.df_only = df_only
+    self.watermark = int(watermark) if watermark is not None else watermark
     self.verbose = verbose
   
   def __call__(self):
@@ -51,10 +53,14 @@ class Dataset:
       agents[name] = getattr(ccf_agents, class_name)(**kwargs)
     data = {}
     e = ThreadPoolExecutor(**self.executor)
+    do_drop = False
     while True:
+      t0 = time.time()
       if len(agents) == 1:
         for name, agent in agents.items():
           result = agent()
+          for feature, df in result.items():
+            data.setdefault(feature, deque()).append(df)
       else:
         f2c = {}
         for name, agent in agents.items():
@@ -63,11 +69,18 @@ class Dataset:
           f2c[future] = [agent, future_kwargs]
         for future in as_completed(f2c):
           result = future.result()
-      for feature, df in result.items():
-        data.setdefault(feature, deque()).append(df)
+          for feature, df in result.items():
+            data.setdefault(feature, deque()).append(df)
       len_data = [len(v) for v in data.values()]
-      print(len_data)
+      print(datetime.utcnow(), time.time() - t0, len_data)
       if all([v >= self.size for v in len_data]):
+        if self.watermark is not None:
+          do_drop = False
+          last_time = min([v[-1].iloc[-1].name for v in data.values()])
+          delta_time = time.time_ns() - last_time.timestamp()*1e9
+          if delta_time > self.watermark:
+            do_drop = True
+          print(f'delay: {timedelta(microseconds=delta_time/1e3)}, {datetime.utcnow()}, {last_time},  watermark: {timedelta(microseconds=self.watermark/1e3)}, do_drop: {do_drop}')
         features = {k: pd.concat(v) for k, v in data.items()}
         for f, d in data.items():
           d.popleft()
@@ -89,7 +102,6 @@ class Dataset:
       e = ThreadPoolExecutor(**executor)
       f2c = {}
       for name, agent in agents.items():
-        print(name)
         future_kwargs = {}
         future = e.submit(agent, **future_kwargs)
         f2c[future] = [agent, future_kwargs]
@@ -99,6 +111,7 @@ class Dataset:
     return features
 
   def create_dataset(self, features):
+    t0 = time.time()
     dataset_kwargs = deepcopy(self.dataset_kwargs)
     time_idx = dataset_kwargs['time_idx']
     group_ids = dataset_kwargs['group_ids']
@@ -256,6 +269,7 @@ class Dataset:
         ds2 = None
       if self.verbose:
         print(ds)
+      print(f'dt dataset: {time.time() - t0:.3f}')
       return ds, ds2, df, df2
     else:
       return None, None, df, df2

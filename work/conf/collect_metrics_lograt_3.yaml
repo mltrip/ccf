@@ -8,7 +8,7 @@ defaults:
  - _self_
 
 verbose: true
-delay: 1
+delay: 60
 relative: true
 kinds: [ none, rat, val ]
 horizons: [ 15, 30, 45, 60 ]
@@ -44,5 +44,3 @@ metrics:
 - class: sklearn.metrics.mean_squared_error
   label: RMSE
   squared: false
-# - class: sklearn.metrics.r2_score
-#   label: R2

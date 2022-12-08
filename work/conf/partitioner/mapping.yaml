@@ -1,4 +1,4 @@
-# inter: [ 0 ]
-binance/btc/usdt: [ 0 ]
-binance/eth/usdt: [ 1 ]
-binance/eth/btc: [ 2 ]
+inter: [ 0 ]
+binance-btc-usdt: [ 1 ]
+binance-eth-usdt: [ 2 ]
+binance-eth-btc: [ 3 ]

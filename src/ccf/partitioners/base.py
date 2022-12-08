@@ -29,9 +29,11 @@ class Partitioner:
     try:
       r = admin.create_partitions({self.topic: new_partitions})
     except InvalidPartitionsError as e:
-      print(e)
-    else:  
-      print(r)
+      if self.verbose:
+        print(e)
+    else:
+      if self.verbose:
+        print(r)
   
   def serialize_key(self, key):
     return key.encode('ascii') if isinstance(key, str) else key

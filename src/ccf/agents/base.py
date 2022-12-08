@@ -29,6 +29,7 @@ class Kafka(Agent):
           c = getattr(ccf_partitioners, class_name)
           partitioner = c(**partitioner)
           partitioners[topic] = partitioner
+        partitioner.update()
         consumer['key_deserializer'] = partitioner.deserialize_key
         consumer['value_deserializer'] = partitioner.deserialize_value
         if keys is None:
@@ -42,7 +43,7 @@ class Kafka(Agent):
       if len(topics_partitions) > 0:
         consumer.assign(topics_partitions)
       else:
-        consumer.subsribe(topics)
+        consumer.subscribe(topics)
       consumers[name] = consumer
       consumers_topic_keys[name] = topic_keys
       consumers_partitioners[name] = partitioners
@@ -66,6 +67,8 @@ class Kafka(Agent):
           c = getattr(ccf_partitioners, class_name)
           partitioner = c(**partitioner)
           partitioners[topic] = partitioner
+        partitioner.update()
+        producer['partitioner'] = partitioner
         producer['key_serializer'] = partitioner.serialize_key
         producer['value_serializer'] = partitioner.serialize_value
       producer = KafkaProducer(**producer)

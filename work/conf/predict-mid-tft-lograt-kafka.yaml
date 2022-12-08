@@ -5,6 +5,7 @@ defaults:
 model_path: mid-tft-lograt-kafka.ckpt
 verbose: false
 size: 10
+watermark: 2e9
 horizons: [ 1, 5 ]
 predict_kwargs:
   return_index: true
@@ -17,4 +18,4 @@ agents:
       p_1:
         bootstrap_servers: "kafka:9092"
         topic_keys:
-          prediction: [ binance/btc/usdt, binance/eth/usdt, binance/eth/btc  ]
+          prediction: [ binance-btc-usdt, binance-eth-usdt, binance-eth-btc  ]

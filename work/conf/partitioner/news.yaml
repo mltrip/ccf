@@ -1,8 +1,9 @@
 defaults:
   - _self_
 
-topic: trade
+class: Partitioner
+topic: news
 admin_kwargs:
   bootstrap_servers: "kafka:9092"
-verbose: true
+verbose: false
 mapping: {}

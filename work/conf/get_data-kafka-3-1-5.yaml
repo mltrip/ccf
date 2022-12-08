@@ -1,0 +1,54 @@
+defaults:
+ - _self_
+ - partitioner@agents.lob.partitioner_kwargs: lob
+ - partitioner@agents.trade.partitioner_kwargs: trade
+ - partitioner@agents.news.partitioner_kwargs: news
+ - feeds@agents.news.feeds: all
+
+executor_kwargs: 
+  class: ProcessPoolExecutor
+  max_workers: 3
+agents:
+  lob:
+    class: Lob
+    topic: lob
+    keys: [ binance-btc-usdt, binance-eth-usdt, binance-eth-btc ]
+    delay: 1
+    depth: 5
+    verbose: true
+    producer_kwargs:
+      bootstrap_servers: "kafka:9092"
+    partitioner_kwargs: ~
+    app_kwargs: ~
+    run_kwargs: ~
+    executor_kwargs:
+      class: ProcessPoolExecutor
+      max_workers: 3
+  trade:
+    class: Trade
+    topic: trade
+    keys: [ binance-btc-usdt, binance-eth-usdt, binance-eth-btc ]
+    delay: 1
+    verbose: true
+    producer_kwargs:
+      bootstrap_servers: "kafka:9092"
+    partitioner_kwargs: ~
+    app_kwargs: ~
+    run_kwargs: ~
+    executor_kwargs:
+      class: ProcessPoolExecutor
+      max_workers: 3
+  news:
+    class: Feed
+    topic: news
+    feeds: {}
+    delay: ~
+    start: -3600
+    feeds_per_group: 150
+    verbose: 2
+    producer_kwargs:
+      bootstrap_servers: "kafka:9092"
+    partitioner_kwargs: ~
+    executor_kwargs:
+      class: ProcessPoolExecutor
+      max_workers: 3

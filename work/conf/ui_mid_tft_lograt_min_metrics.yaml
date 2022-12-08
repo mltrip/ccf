@@ -1,5 +1,5 @@
 delay: 3600
-metrics_kind: box
+metrics_kind: heatmap
 read_metrics_kwargs:
   start: -3600
   end: 0

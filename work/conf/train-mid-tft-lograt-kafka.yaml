@@ -15,8 +15,11 @@ create_dataset_kwargs:
       class: KafkaDataset
       verbose: true
       topics: [ feature ]
+      executor_kwargs:
+        class: ProcessPoolExecutor
+        max_workers: 3
       feature_keys:
-        Delta-default-lograt: [ binance/btc/usdt, binance/eth/usdt, binance/eth/btc ]
+        Delta-default-lograt: [ binance-btc-usdt, binance-eth-usdt, binance-eth-btc ]
       consumer:
         bootstrap_servers: "kafka:9092"
   split: 0.8

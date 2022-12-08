@@ -16,36 +16,36 @@ agents:
     consumers:
       c_1:
         topic_keys:
-          lob: [ binance/btc/usdt ]
-          trade: [ binance/btc/usdt ]
+          lob: [ binance-btc-usdt ]
+          trade: [ binance-btc-usdt ]
     producers:
       p_1:
         topic_keys:
-          feature: [ binance/btc/usdt ]
+          feature: [ binance-btc-usdt ]
   a_2:
     class: Delta
     verbose: true
     consumers:
       c_1:
         topic_keys:
-          lob: [ binance/eth/usdt ]
-          trade: [ binance/eth/usdt ]
+          lob: [ binance-eth-usdt ]
+          trade: [ binance-eth-usdt ]
     producers:
       p_1:
         topic_keys:
-          feature: [ binance/eth/usdt ]
+          feature: [ binance-eth-usdt ]
   a_3:
     class: Delta
     verbose: true
     consumers:
       c_1:
         topic_keys:
-          lob: [ binance/eth/btc ]
-          trade: [ binance/eth/btc ]
+          lob: [ binance-eth-btc ]
+          trade: [ binance-eth-btc ]
     producers:
       p_1:
         topic_keys:
-          feature: [ binance/eth/btc ]
+          feature: [ binance-eth-btc ]
 
     
   

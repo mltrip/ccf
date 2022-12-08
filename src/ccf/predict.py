@@ -25,6 +25,7 @@ from ccf.utils import delta2value
 
 def predict(model_path, train_kwargs, data_kwargs, 
             predict_kwargs, size, agents, verbose=False, horizons=None, executor=None,
+            watermark=None,
             model_version=None, prediction_prefix='pred', dataloader_kwargs=None, delay=0):
   executor = {} if executor is None else executor
   # Initialize agents
@@ -52,6 +53,7 @@ def predict(model_path, train_kwargs, data_kwargs,
   dks = train_kwargs['create_dataset_kwargs']
   dks['split'] = None
   dks['size'] = size
+  dks['watermark'] = watermark
   quant = dks.get('quant', None)
   dks['dataset_kwargs']['predict_mode'] = True
   dataset = Dataset(**deepcopy(dks))
@@ -62,7 +64,8 @@ def predict(model_path, train_kwargs, data_kwargs,
   for ds, _, df, _ in dataset:
     dt_data = time.time() - t0
     t0 = time.time()
-    print(datetime.utcnow(), str(df.tail(1).index))
+    print(datetime.utcnow(), df.index.min(), df.index.max())
+    print(df)
     if verbose:
       print(df)
     # Clean LRU cache (due to memory leak)
@@ -130,7 +133,7 @@ def predict(model_path, train_kwargs, data_kwargs,
                 'target': base_tgt,
                 'horizon': horizon,
                 'timestamp': int(horizon_row.name.timestamp()*1e9)}
-              message_key = '/'.join([horizon_row['exchange'], horizon_row['base'], horizon_row['quote']])
+              message_key = '-'.join([horizon_row['exchange'], horizon_row['base'], horizon_row['quote']])
               messages.setdefault(message_key, []).append(message)
         elif predict_kwargs['mode'] == 'prediction':
           if tgt_rel is not None:
@@ -154,7 +157,7 @@ def predict(model_path, train_kwargs, data_kwargs,
               'target': base_tgt,
               'horizon': horizon,
               'timestamp': int(horizon_row.name.timestamp()*1e9)}
-            message_key = '/'.join([horizon_row['exchange'], horizon_row['base'], horizon_row['quote']])
+            message_key = '-'.join([horizon_row['exchange'], horizon_row['base'], horizon_row['quote']])
             messages.setdefault(message_key, []).append(message)
     dt_pred = time.time() - t0
     t0 = time.time()

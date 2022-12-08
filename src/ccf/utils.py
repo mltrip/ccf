@@ -22,18 +22,20 @@ def expand_columns(ref_columns, columns):
 
 
 def loop(executor, future2callable):
-  for future in as_completed(future2callable):
+  for f in as_completed(future2callable):
     try:
-      r = future.result()
+      r = f.result()
     except Exception as e:
-      print(f'Exception: {future} - {e}')
+      c, ks = future2callable[f]
+      print(f'Exception: {f}, {c}, {ks}')
     else:
-      print(f'Done: {future} - {r}')
+      c, ks = future2callable[f]
+      print(f'Done: {f}, {c}, {ks}')
     finally:  # Resubmit
-      c, kwargs = future2callable[future]
-      new_future = executor.submit(c, **kwargs)
-      new_future2callable = {new_future: [c, kwargs]}
-      loop(executor, new_future2callable)
+      c, ks = future2callable[f]
+      f = executor.submit(c, **ks)
+      f2c = {f: [c, ks]}
+      loop(executor, f2c)
 
       
 def delta2value(deltas, kind, initial_value=1):

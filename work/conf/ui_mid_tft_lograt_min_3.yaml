@@ -1,8 +1,8 @@
 delay: 1
 accumulate: false
 read_data_kwargs:
-  start: -60
-  end: ~
+  start: -120
+  end: -60
   drop_duplicates: true
   query:
     btcusdt:
