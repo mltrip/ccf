@@ -6,7 +6,7 @@ from omegaconf import DictConfig, OmegaConf
 from ccf import agents as ccf_agents
 
 
-def get_data(agents, executor_kwargs):
+def get_data(agents, executor_kwargs=None):
   if executor_kwargs is None:
     executor_kwargs = {'class': 'ThreadPoolExecutor'}
   executor_class = executor_kwargs.pop('class')

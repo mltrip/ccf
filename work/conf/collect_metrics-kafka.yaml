@@ -1,0 +1,31 @@
+defaults:
+  - partitioner@agents.a1.consumer_partitioner: prediction
+  - partitioner@agents.a1.producer_partitioner: metric
+  - _self_
+ 
+executor:
+  class: ProcessPoolExecutor
+  max_workers: 1
+agents:
+  a1:
+    class: Metric
+    executor:
+      class: ProcessPoolExecutor
+      max_workers: 2
+    verbose: true
+    watermark: 30e9
+    consumer:
+      bootstrap_servers: "kafka:9092"
+    producer:
+      bootstrap_servers: "kafka:9092"
+    keys: [ binance-btc-usdt, binance-eth-usdt, binance-eth-btc ]
+    metrics:
+      # - class: sklearn.metrics.mean_absolute_error
+      #   name: MAE
+      - class: MASE
+        name: MASE
+      - class: ROR
+        name: ROR-all-0-0
+        kind: all
+        threshold: 0
+        fees: 0

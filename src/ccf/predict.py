@@ -108,6 +108,7 @@ def predict(model_path, train_kwargs, data_kwargs,
         else:
           actual = pred_df[tgt_name]
         prediction = tgt[index]
+        last_known_actual = actual[0]
         if predict_kwargs['mode'] == 'quantiles':
           quantiles = model.loss.quantiles
           if len(ds.target_names) > 1:
@@ -118,10 +119,10 @@ def predict(model_path, train_kwargs, data_kwargs,
             horizon_row = pred_df[pred_df[ds.time_idx] == horizon_idx].iloc[-1]
             quantile_prediction = prediction[horizon - 1]
             if tgt_rel is not None:
-              last_known_actual = actual[0]
               quantile_prediction = delta2value(quantile_prediction, tgt_rel, last_known_actual)
             for quantile_idx, q in enumerate(quantiles):
               message = {
+                'last': float(last_known_actual),
                 f'quantile_{q}': float(quantile_prediction[quantile_idx]),
                 'exchange': horizon_row['exchange'],
                 'base': horizon_row['base'],
@@ -137,7 +138,6 @@ def predict(model_path, train_kwargs, data_kwargs,
               messages.setdefault(message_key, []).append(message)
         elif predict_kwargs['mode'] == 'prediction':
           if tgt_rel is not None:
-            last_known_actual = actual[0]
             prediction = delta2value(prediction, tgt_rel, last_known_actual)
           hs = np.arange(1, 1 + len(prediction)) if horizons is None else horizons
           for horizon in hs:
@@ -146,6 +146,7 @@ def predict(model_path, train_kwargs, data_kwargs,
             horizon_row = pred_df[pred_df[ds.time_idx] == horizon_idx].iloc[-1]
             # print(horizon_row)
             message = {
+              'last': float(last_known_actual),
               'value': float(prediction[horizon - 1]),
               'exchange': horizon_row['exchange'],
               'base': horizon_row['base'],
