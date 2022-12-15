@@ -176,37 +176,37 @@ def qv(df):
   return dfs
 
 
-def talib(df, function='SMA', function_kwargs=None):
-  function_kwargs = {} if function_kwargs is None else function_kwargs
-  f = getattr(ta, function)
-  ohlc = ['open', 'high', 'low', 'close']
-  tokens = [function] + [str(v) for k, v in function_kwargs.items() if k not in ohlc]
-  prefix = '_'.join(tokens)
-  dfs = []
-  if 'open' in function_kwargs or 'high' in function_kwargs or 'low' in function_kwargs:
-    cs = []
-    for c in ohlc:
-      if c in function_kwargs:
-        function_kwargs[c] = df[c]
-        cs.append(c)
-    try:
-      dfc = f(**function_kwargs)
-    except Exception as e:
-      print(e)
-      dfc = df[cc].replace('?', np.NaN)
-    dfc.name = '-'.join([prefix] + cs)
-    dfs.append(dfc)
-  elif 'close' in function_kwargs:
-    c = function_kwargs.pop('close')
-    for cc in expand_columns(df.columns, [c]):
-      if not is_numeric_dtype(df[cc]):
-        continue
-      try:
-        dfc = f(df[cc], **function_kwargs)
+# def talib(df, function='SMA', function_kwargs=None):
+#   function_kwargs = {} if function_kwargs is None else function_kwargs
+#   f = getattr(ta, function)
+#   ohlc = ['open', 'high', 'low', 'close']
+#   tokens = [function] + [str(v) for k, v in function_kwargs.items() if k not in ohlc]
+#   prefix = '_'.join(tokens)
+#   dfs = []
+#   if 'open' in function_kwargs or 'high' in function_kwargs or 'low' in function_kwargs:
+#     cs = []
+#     for c in ohlc:
+#       if c in function_kwargs:
+#         function_kwargs[c] = df[c]
+#         cs.append(c)
+#     try:
+#       dfc = f(**function_kwargs)
+#     except Exception as e:
+#       print(e)
+#       dfc = df[cc].replace('?', np.NaN)
+#     dfc.name = '-'.join([prefix] + cs)
+#     dfs.append(dfc)
+#   elif 'close' in function_kwargs:
+#     c = function_kwargs.pop('close')
+#     for cc in expand_columns(df.columns, [c]):
+#       if not is_numeric_dtype(df[cc]):
+#         continue
+#       try:
+#         dfc = f(df[cc], **function_kwargs)
         
-      except Exception as e:
-        print(e)
-        dfc = df[cc].replace('?', np.NaN)
-      dfc.name = '-'.join([prefix, cc])
-      dfs.append(dfc)
-  return dfs
+#       except Exception as e:
+#         print(e)
+#         dfc = df[cc].replace('?', np.NaN)
+#       dfc.name = '-'.join([prefix, cc])
+#       dfs.append(dfc)
+#   return dfs

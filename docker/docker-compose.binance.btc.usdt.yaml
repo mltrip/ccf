@@ -1,0 +1,89 @@
+version: '3.3'
+
+services:
+  data:
+    image: ccf
+    container_name: data_binance_btc_usdt
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    networks:
+      - db
+    working_dir: /app/work
+    entrypoint: [ python ]
+    command: [ ../src/ccf/get_data.py, -cd, conf, -cn, get_data-kafka-binance-btc-usdt ]
+    environment:
+      PYTHONPATH: /app/src
+      
+  feature:
+    image: ccf
+    container_name: feature_binance_btc_usdt
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    networks:
+      - db
+    working_dir: /app/work
+    entrypoint: [ python ]
+    command: [ ../src/ccf/extract_features.py, -cd, conf, -cn, extract_features-kafka-binance-btc-usdt ]
+    environment:
+      PYTHONPATH: /app/src
+
+  train:
+    image: ccf
+    container_name: train_binance_btc_usdt
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    networks:
+      - db
+    working_dir: /app/work
+    entrypoint: [ python ]
+    command: [ ../src/ccf/train.py, -cd, conf, -cn, train-mid-lograt-tft-kafka-binance-btc-usdt ]
+    environment:
+      PYTHONPATH: /app/src
+    volumes:
+      - binance_btc_usdt:/app/work
+      
+  predict:
+    image: ccf
+    container_name: predict_binance_btc_usdt
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    networks:
+      - db
+    working_dir: /app/work
+    entrypoint: [ python ]
+    command: [ ../src/ccf/predict.py, -cd, conf, -cn, predict-mid-lograt-tft-kafka-binance-btc-usdt ]
+    environment:
+      PYTHONPATH: /app/src
+    volumes:
+      - binance_btc_usdt:/app/work
+    healthcheck:  # Restart service every interval time to replace model on last tuned by train FIXME MLflow
+      test: ["CMD", "exit", "1"]
+      interval: 1m
+      timeout: 0s
+      retries: 1
+      start_period: 0s
+      
+  metric:
+    image: ccf
+    container_name: metric_binance_btc_usdt
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    networks:
+      - db
+    working_dir: /app/work
+    entrypoint: [ python ]
+    command: [ ../src/ccf/collect_metrics.py, -cd, conf, -cn, collect_metrics-kafka-binance-btc-usdt ]
+    environment:
+      PYTHONPATH: /app/src
+      
+networks:
+  db:
+    driver: bridge
+    
+volumes:
+  binance_btc_usdt:

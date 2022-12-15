@@ -22,20 +22,20 @@ from ccf import partitioners as ccf_partitioners
   
 class Lob(Agent):
   def __init__(self, topic, keys, 
-               partitioner_kwargs=None, producer_kwargs=None, 
-               app_kwargs=None, run_kwargs=None, 
-               executor_kwargs=None,
+               partitioner=None, producer=None, 
+               app=None, run=None, 
+               executor=None,
                depth=None, delay=None, verbose=False):
     super().__init__()
     self.topic = topic
     self.keys = keys
-    self.partitioner_kwargs = {} if partitioner_kwargs is None else partitioner_kwargs
-    self.producer_kwargs = {} if producer_kwargs is None else producer_kwargs
-    self.app_kwargs = {} if app_kwargs is None else app_kwargs
-    self.run_kwargs = {} if run_kwargs is None else run_kwargs
-    if executor_kwargs is None:
-      executor_kwargs = {'class': 'ThreadPoolExecutor'}
-    self.executor_kwargs = executor_kwargs
+    self.partitioner = {} if partitioner is None else partitioner
+    self.producer = {} if producer is None else producer
+    self.app = {} if app is None else app
+    self.run = {} if run is None else run
+    if executor is None:
+      executor = {'class': 'ThreadPoolExecutor'}
+    self.executor = executor
     self.depth = depth
     self.delay = delay
     self.verbose = verbose
@@ -48,17 +48,17 @@ class Lob(Agent):
       raise error
     
   class OnMessage:
-    def __init__(self, topic, key, partitioner_kwargs, producer_kwargs,
+    def __init__(self, topic, key, partitioner, producer,
                  exchange, base, quote, verbose=0):
       self.topic = topic
       self.key = key
-      self.partitioner_kwargs = partitioner_kwargs
-      self.producer_kwargs = producer_kwargs
+      self.partitioner = partitioner
+      self.producer = producer
       self.exchange = exchange
       self.base = base
       self.quote = quote
       self.verbose = verbose
-      self.producer = None  # Lazy init see __call__
+      self._producer = None  # Lazy init see __call__
     
     def __call__(self, wc, message):
       d = {'timestamp': time.time_ns(),
@@ -92,27 +92,29 @@ class Lob(Agent):
         print(datetime.utcnow(), self.topic, self.key, len(d))
       if self.verbose > 1:
         pprint(d)
-      if self.producer is None:  # Lazy init
-        partitioner_class = self.partitioner_kwargs.pop('class')
-        partitioner = getattr(ccf_partitioners, partitioner_class)(**self.partitioner_kwargs)
+      if self._producer is None:  # Lazy init
+        partitioner = deepcopy(self.partitioner)
+        producer = deepcopy(self.producer)
+        partitioner_class = partitioner.pop('class')
+        partitioner = getattr(ccf_partitioners, partitioner_class)(**partitioner)
         partitioner.update()
-        self.producer_kwargs['partitioner'] = partitioner
-        self.producer_kwargs['key_serializer'] = partitioner.serialize_key
-        self.producer_kwargs['value_serializer'] = partitioner.serialize_value
-        self.producer = KafkaProducer(**self.producer_kwargs)
-      self.producer.send(self.topic, key=self.key, value=d)
+        producer['partitioner'] = partitioner
+        producer['key_serializer'] = partitioner.serialize_key
+        producer['value_serializer'] = partitioner.serialize_value
+        self._producer = KafkaProducer(**producer)
+      self._producer.send(self.topic, key=self.key, value=d)
 
   def __call__(self):
     websocket.enableTrace(True if self.verbose > 1 else False)
-    executor_kwargs = deepcopy(self.executor_kwargs)
-    executor_class = executor_kwargs.pop('class')
-    executor = getattr(concurrent.futures, executor_class)(**executor_kwargs)
+    executor = deepcopy(self.executor)
+    executor_class = executor.pop('class')
+    executor = getattr(concurrent.futures, executor_class)(**executor)
     futures = []
     for key in self.keys:
-      partitioner_kwargs = deepcopy(self.partitioner_kwargs)
-      producer_kwargs = deepcopy(self.producer_kwargs)
-      app_kwargs = deepcopy(self.app_kwargs)
-      run_kwargs = deepcopy(self.run_kwargs)
+      partitioner = deepcopy(self.partitioner)
+      producer = deepcopy(self.producer)
+      app = deepcopy(self.app)
+      run = deepcopy(self.run)
       exchange, base, quote = key.split('-')
       if exchange == 'binance':
         suffix = '@'.join(x for x in [
@@ -124,40 +126,40 @@ class Lob(Agent):
       else:
         raise NotImplementedError(exchange)
       print(url)
-      on_message_kwargs = {
+      on_message = {
         'topic': self.topic,
         'key': key,
-        'partitioner_kwargs': partitioner_kwargs,
-        'producer_kwargs': producer_kwargs,
+        'partitioner': partitioner,
+        'producer': producer,
         'exchange': exchange,
         'base': base,
         'quote': quote,
         'verbose': self.verbose}
-      app_kwargs['on_message'] = self.OnMessage(**on_message_kwargs)
-      app_kwargs['on_error'] = self.OnError()
-      app_kwargs['url'] = url
-      app = websocket.WebSocketApp(**app_kwargs)
-      future = executor.submit(app.run_forever, **run_kwargs)
+      app['on_message'] = self.OnMessage(**on_message)
+      app['on_error'] = self.OnError()
+      app['url'] = url
+      app = websocket.WebSocketApp(**app)
+      future = executor.submit(app.run_forever, **run)
       futures.append(future)
-    concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_EXCEPTION)
+    concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
 
     
 class Trade(Agent):
   def __init__(self, topic, keys, 
-               partitioner_kwargs=None, producer_kwargs=None, 
-               app_kwargs=None, run_kwargs=None, 
-               executor_kwargs=None,
+               partitioner=None, producer=None, 
+               app=None, run=None, 
+               executor=None,
                delay=None, verbose=False):
     super().__init__()
     self.topic = topic
     self.keys = keys
-    self.partitioner_kwargs = {} if partitioner_kwargs is None else partitioner_kwargs
-    self.producer_kwargs = {} if producer_kwargs is None else producer_kwargs
-    self.app_kwargs = {} if app_kwargs is None else app_kwargs
-    self.run_kwargs = {} if run_kwargs is None else run_kwargs
-    if executor_kwargs is None:
-      executor_kwargs = {'class': 'ThreadPoolExecutor'}
-    self.executor_kwargs = executor_kwargs
+    self.partitioner = {} if partitioner is None else partitioner
+    self.producer = {} if producer is None else producer
+    self.app = {} if app is None else app
+    self.run = {} if run is None else run
+    if executor is None:
+      executor = {'class': 'ThreadPoolExecutor'}
+    self.executor = executor
     self.delay = delay
     self.verbose = verbose
     
@@ -169,18 +171,18 @@ class Trade(Agent):
       raise error
     
   class OnMessage:
-    def __init__(self, topic, key, partitioner_kwargs, producer_kwargs,
+    def __init__(self, topic, key, partitioner, producer,
                  exchange, base, quote, delay=None, verbose=0):
       self.topic = topic
       self.key = key
-      self.partitioner_kwargs = partitioner_kwargs
-      self.producer_kwargs = producer_kwargs
+      self.partitioner = partitioner
+      self.producer = producer
       self.exchange = exchange
       self.base = base
       self.quote = quote
       self.delay = delay
       self.verbose = verbose
-      self.producer = None  # Lazy init see __call__
+      self._producer = None  # Lazy init see __call__
       self.t = time.time()
     
     def __call__(self, wc, message):
@@ -205,27 +207,29 @@ class Trade(Agent):
         print(datetime.utcnow(), self.topic, self.key, len(d))
       if self.verbose > 1:
         pprint(d)
-      if self.producer is None:  # Lazy init
-        partitioner_class = self.partitioner_kwargs.pop('class')
-        partitioner = getattr(ccf_partitioners, partitioner_class)(**self.partitioner_kwargs)
+      if self._producer is None:  # Lazy init
+        partitioner = deepcopy(self.partitioner)
+        producer = deepcopy(self.producer)
+        partitioner_class = partitioner.pop('class')
+        partitioner = getattr(ccf_partitioners, partitioner_class)(**partitioner)
         partitioner.update()
-        self.producer_kwargs['partitioner'] = partitioner
-        self.producer_kwargs['key_serializer'] = partitioner.serialize_key
-        self.producer_kwargs['value_serializer'] = partitioner.serialize_value
-        self.producer = KafkaProducer(**self.producer_kwargs)
-      self.producer.send(self.topic, key=self.key, value=d)
+        producer['partitioner'] = partitioner
+        producer['key_serializer'] = partitioner.serialize_key
+        producer['value_serializer'] = partitioner.serialize_value
+        self._producer = KafkaProducer(**producer)
+      self._producer.send(self.topic, key=self.key, value=d)
 
   def __call__(self):
     websocket.enableTrace(True if self.verbose > 1 else False)
-    executor_kwargs = deepcopy(self.executor_kwargs)
-    executor_class = executor_kwargs.pop('class')
-    executor = getattr(concurrent.futures, executor_class)(**executor_kwargs)
+    executor = deepcopy(self.executor)
+    executor_class = executor.pop('class')
+    executor = getattr(concurrent.futures, executor_class)(**executor)
     futures = []
     for key in self.keys:
-      partitioner_kwargs = deepcopy(self.partitioner_kwargs)
-      producer_kwargs = deepcopy(self.producer_kwargs)
-      app_kwargs = deepcopy(self.app_kwargs)
-      run_kwargs = deepcopy(self.run_kwargs)
+      partitioner = deepcopy(self.partitioner)
+      producer = deepcopy(self.producer)
+      app = deepcopy(self.app)
+      run = deepcopy(self.run)
       exchange, base, quote = key.split('-')
       if exchange == 'binance':
         suffix = '@'.join(x for x in [f'{base}{quote}', 'trade'])
@@ -233,28 +237,28 @@ class Trade(Agent):
       else:
         raise NotImplementedError(exchange)
       print(url)
-      on_message_kwargs = {
+      on_message = {
         'topic': self.topic,
         'key': key,
-        'partitioner_kwargs': partitioner_kwargs,
-        'producer_kwargs': producer_kwargs,
+        'partitioner': partitioner,
+        'producer': producer,
         'exchange': exchange,
         'base': base,
         'quote': quote,
         'delay': self.delay,
         'verbose': self.verbose}
-      app_kwargs['on_message'] = self.OnMessage(**on_message_kwargs)
-      app_kwargs['on_error'] = self.OnError()
-      app_kwargs['url'] = url
-      app = websocket.WebSocketApp(**app_kwargs)
-      future = executor.submit(app.run_forever, **run_kwargs)
+      app['on_message'] = self.OnMessage(**on_message)
+      app['on_error'] = self.OnError()
+      app['url'] = url
+      app = websocket.WebSocketApp(**app)
+      future = executor.submit(app.run_forever, **run)
       futures.append(future)
-    concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_EXCEPTION)    
+    concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)    
     
      
 class Feed(Agent):
   def __init__(self, topic, feeds, 
-               partitioner_kwargs=None, producer_kwargs=None, executor_kwargs=None, 
+               partitioner=None, producer=None, executor=None, 
                start=0, delay=None, feeds_per_group=1, max_cache=1e5, verbose=False):
     super().__init__()
     self.topic = topic
@@ -265,35 +269,37 @@ class Feed(Agent):
     self.feeds_per_group = feeds_per_group 
     self.max_cache = int(max_cache)
     self.verbose = verbose
-    self.partitioner_kwargs = {} if partitioner_kwargs is None else partitioner_kwargs
-    self.producer_kwargs = {} if producer_kwargs is None else producer_kwargs
-    if executor_kwargs is None:
-      executor_kwargs = {'class': 'ThreadPoolExecutor'}
-    self.executor_kwargs = executor_kwargs
+    self.partitioner = {} if partitioner is None else partitioner
+    self.producer = {} if producer is None else producer
+    if executor is None:
+      executor = {'class': 'ThreadPoolExecutor'}
+    self.executor = executor
     
   class OnFeed:
-    def __init__(self, topic, feeds, partitioner_kwargs=None, producer_kwargs=None, 
+    def __init__(self, topic, feeds, partitioner=None, producer=None, 
                  start=None, delay=None, max_cache=1e5, verbose=False):
       self.topic = topic
       self.feeds = feeds
-      self.partitioner_kwargs = partitioner_kwargs
-      self.producer_kwargs = producer_kwargs
+      self.partitioner = partitioner
+      self.producer = producer
       self.start = start
       self.delay = delay
       self.verbose = verbose
-      self.producer = None  # Lazy init
+      self._producer = None  # Lazy init
       self.cache = set()
       self.max_cache = int(max_cache)
   
     def __call__(self):
-      if self.producer is None:  # Lazy init
-        partitioner_class = self.partitioner_kwargs.pop('class')
-        partitioner = getattr(ccf_partitioners, partitioner_class)(**self.partitioner_kwargs)
+      if self._producer is None:  # Lazy init
+        partitioner = deepcopy(self.partitioner)
+        producer = deepcopy(self.producer)
+        partitioner_class = partitioner.pop('class')
+        partitioner = getattr(ccf_partitioners, partitioner_class)(**partitioner)
         partitioner.update()
-        self.producer_kwargs['partitioner'] = partitioner
-        self.producer_kwargs['key_serializer'] = partitioner.serialize_key
-        self.producer_kwargs['value_serializer'] = partitioner.serialize_value
-        self.producer = KafkaProducer(**self.producer_kwargs)
+        producer['partitioner'] = partitioner
+        producer['key_serializer'] = partitioner.serialize_key
+        producer['value_serializer'] = partitioner.serialize_value
+        self._producer = KafkaProducer(**producer)
       while True:
         if len(self.cache) > self.max_cache:
           self.cache = set()
@@ -340,7 +346,7 @@ class Feed(Agent):
                 print(datetime.utcnow(), self.topic, message['title'], t)
               if self.verbose > 2:
                 pprint(message)
-              self.producer.send(self.topic, value=message)
+              self._producer.send(self.topic, value=message)
           dt = time.time() - t0
         if self.delay is not None:
           wt = max(0, self.delay - dt)
@@ -354,23 +360,23 @@ class Feed(Agent):
     groups = [feeds[i:i+self.feeds_per_group] 
               for i in range(0, len(feeds), self.feeds_per_group)]
     print(f'Number of groups of feeds: {len(groups)} {[len(x) for x in groups]}')
-    executor_kwargs = deepcopy(self.executor_kwargs)
-    executor_class = executor_kwargs.pop('class')
-    executor = getattr(concurrent.futures, executor_class)(**executor_kwargs)
+    executor = deepcopy(self.executor)
+    executor_class = executor.pop('class')
+    executor = getattr(concurrent.futures, executor_class)(**executor)
     futures = []
     for g in groups:
-      on_feed_kwargs = {
+      on_feed = {
         'topic': self.topic,
         'feeds': g,
-        'partitioner_kwargs': deepcopy(self.partitioner_kwargs),
-        'producer_kwargs': deepcopy(self.producer_kwargs),
+        'partitioner': deepcopy(self.partitioner),
+        'producer': deepcopy(self.producer),
         'start': self.start,
         'delay': self.delay,
         'max_cache': self.max_cache,
         'verbose': self.verbose}
-      on_feed = self.OnFeed(**on_feed_kwargs)
+      on_feed = self.OnFeed(**on_feed)
       future = executor.submit(on_feed)
       futures.append(future)
     # print(futures)
-    concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_EXCEPTION)
+    concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
       

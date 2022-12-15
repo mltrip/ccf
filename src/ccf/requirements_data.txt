@@ -1,6 +1,6 @@
 feedparser
 hydra-core
-pandas
-SQLAlchemy
+# pandas
+# SQLAlchemy
 websocket-client
 kafka-python

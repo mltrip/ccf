@@ -5,14 +5,14 @@ defaults:
  - partitioner@agents.news.partitioner: news
  - feeds@agents.news.feeds: all
 
-executor: 
+executor:
   class: ProcessPoolExecutor
   max_workers: 3
 agents:
   lob:
     class: Lob
     topic: lob
-    keys: [ binance-btc-usdt, binance-eth-usdt, binance-eth-btc ]
+    keys: [ binance-btc-usdt ]
     delay: 1
     depth: 5
     verbose: true
@@ -23,11 +23,11 @@ agents:
     run: ~
     executor:
       class: ProcessPoolExecutor
-      max_workers: 3
+      max_workers: 1
   trade:
     class: Trade
     topic: trade
-    keys: [ binance-btc-usdt, binance-eth-usdt, binance-eth-btc ]
+    keys: [ binance-btc-usdt ]
     delay: 1
     verbose: true
     producer:
@@ -37,7 +37,7 @@ agents:
     run: ~
     executor:
       class: ProcessPoolExecutor
-      max_workers: 3
+      max_workers: 1
   news:
     class: Feed
     topic: news
@@ -51,4 +51,4 @@ agents:
     partitioner: ~
     executor:
       class: ProcessPoolExecutor
-      max_workers: 3
+      max_workers: 1

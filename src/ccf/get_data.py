@@ -6,18 +6,18 @@ from omegaconf import DictConfig, OmegaConf
 from ccf import agents as ccf_agents
 
 
-def get_data(agents, executor_kwargs=None):
-  if executor_kwargs is None:
-    executor_kwargs = {'class': 'ThreadPoolExecutor'}
-  executor_class = executor_kwargs.pop('class')
-  executor = getattr(concurrent.futures, executor_class)(**executor_kwargs)
+def get_data(agents, executor=None):
+  if executor is None:
+    executor = {'class': 'ThreadPoolExecutor'}
+  executor_class = executor.pop('class')
+  e = getattr(concurrent.futures, executor_class)(**executor)
   futures = []
   for name, agent_kwargs in agents.items():
     agent_class = agent_kwargs.pop('class')
     a = getattr(ccf_agents, agent_class)(**agent_kwargs)
-    future = executor.submit(a)
+    future = e.submit(a)
     futures.append(future)
-  concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_EXCEPTION)
+  concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
             
 
 @hydra.main(version_base=None)

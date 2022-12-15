@@ -12,16 +12,16 @@ from omegaconf import DictConfig, OmegaConf
 import numpy as np
 import pandas as pd
 # from sqlalchemy import create_engine
-from pyspark.sql import SparkSession
-from pyspark.conf import SparkConf
+# from pyspark.sql import SparkSession
+# from pyspark.conf import SparkConf
 
 from ccf.read_data import read_data
 from ccf.utils import expand_columns
-import talib as ta
+# import talib as ta
 # import pandas_ta as ta
 import numpy as np
-from pyspark.sql import functions as F
-from pyspark.sql import types as T
+# from pyspark.sql import functions as F
+# from pyspark.sql import types as T
 
 from ccf.utils import expand_columns, loop
 from ccf import agents as ccf_agents

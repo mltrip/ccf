@@ -1,9 +1,9 @@
 hydra-core
 numpy
+torch
 pandas
 pytorch-forecasting
-SQLAlchemy
-torch
-pyspark
-TA-Lib
-pandas_ta
+# SQLAlchemy
+# pyspark
+# TA-Lib
+# pandas_ta

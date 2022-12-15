@@ -1,8 +1,0 @@
-prediction:
-  engine_kwargs:
-    url: sqlite:///multi_tgt_tft_lograt@prediction.db
-  read_kwargs:
-    name: data
-  write_kwargs:
-   name: data
-   if_exists: append
