@@ -1,0 +1,39 @@
+version: '3.3'
+
+services:
+  train:
+    image: ccf
+    container_name: train_binance_btc_usdt
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    networks:
+      - db
+    working_dir: /app/work
+    entrypoint: [ python ]
+    command: [ ../src/ccf/train.py, -cd, conf, -cn, train-mid-lograt-tft-kafka-binance-btc-usdt ]
+    # command: [ "sleep", "20" ]
+    environment:
+      PYTHONPATH: /app/src
+    volumes:
+      - binance_btc_usdt:/app/work
+    restart: always
+    # deploy:
+    #   restart_policy:
+    #     condition: any
+    #     delay: 5s
+    #     max_attempts: 3
+    #     window: 120s
+    # healthcheck:  # Restart service every interval time to replace model on last tuned by train FIXME MLflow
+    #   test: ["CMD", "exit", "1"]
+    #   interval: 10m
+    #   timeout: 0s
+    #   retries: 1
+    #   start_period: 0s
+      
+networks:
+  db:
+    driver: bridge
+    
+volumes:
+  binance_btc_usdt:
