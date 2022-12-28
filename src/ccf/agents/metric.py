@@ -16,6 +16,7 @@ import sklearn.metrics
 
 from ccf.agents.base import Agent
 from ccf import partitioners as ccf_partitioners
+from ccf.utils import wait_first_future
 
 
 class Metric(Agent):      
@@ -170,7 +171,7 @@ class Metric(Agent):
         if self.verbose:
           ts = datetime.fromtimestamp(timestamp / 1e9)
           cache = {k: len(v) for k, v in predictions.items()}
-          print(f'{ts}, {message.key}, {message.topic}, {self._metric_name}, cnt: {cnt}, cache: {cache}, dt: {dt:.3f}')
+          print(f'{datetime.utcnow()}, {ts}, {message.key}, {message.topic}, {self._metric_name}, cnt: {cnt}, cache: {cache}, dt: {dt:.3f}')
   
   def __call__(self):
     executor = deepcopy(self.executor)
@@ -194,18 +195,16 @@ class Metric(Agent):
         on_message = self._OnMessage(**on_message)
         future = _executor.submit(on_message)
         futures.append(future)
-    # result = concurrent.futures.wait(futures)
-    for future in concurrent.futures.as_completed(futures):
-      try:
-        result = future.result()
-      except Exception as e:
-        print(e)
-      else:
-        print(result)
+    wait_first_future(_executor, futures)
 
         
 def MASE(y_true, y_pred, y_last):
-  return abs(y_true - y_pred)/abs(y_true - y_last)
+  mae_naive = abs(y_true - y_last)
+  mae = abs(y_true - y_pred)
+  if mae_naive != 0:
+    return mae/mae_naive
+  else:
+    return None
 
 
 def ROR(y_true, y_pred, y_last, kind, threshold, fees):

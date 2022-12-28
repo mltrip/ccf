@@ -1,15 +1,15 @@
 # CCF
 Crypto Currency Forecasting App for [ML System Design Course on ODS.ai](https://ods.ai/tracks/ml-system-design-22)
 
-## ARCHITECTURE (TODO implement it!)
+## Architecture (TODO implement it!)
 ![architecture](docs/architecture.png)
 
 App consists of 6 main parts
 > We could install and run different parts of the App independently
 ### $$\textcolor{#4dd0e1}{\text{DATA}}$$
-In this part data from `exchanges` and `news rss` are collected in the `raw data` database
+In this part data from `exchanges` and `news rss` are collected in the `raw data` database/steam.
 ### $$\textcolor{#a2fca2}{\text{FEATURES}}$$
-Here are continiuos feature extracting from `raw data` database and saving in the `feature store` (it could be the same database as raw). `Dataset` creation occurs dynamically at the ML and PREDICTIONS parts, but the logic is described here
+Here are continiuos feature extracting from `raw data` database/stream and saving in the `feature store`. `Dataset` creation occurs dynamically at the ML and PREDICTIONS parts, but the logic is described here
 ### $$\textcolor{#eeff41}{\text{ML}}$$
 Here we create `datasets`, train/tune `models` and add/update them in the `models registry`
 ### $$\textcolor{#ffab40}{\text{PREDICTIONS}}$$
@@ -18,8 +18,15 @@ This part is for making `predictions` based on `models` from `models registry` a
 There are metrics collectors and monitors with techincal information about `raw data`, `features`, training/tuning, `models`, `predictions`, etc
 ### $$\textcolor{#eeeeee}{\text{UI}}$$
 We show `users`: `predictions`, performance `metrics`, `raw data`, etc. This part uses some information from METRICS part
+## Process (TODO implement it!)
+![architecture](docs/process.png)
+
 ## INSTALL
 ### Python 3.9
+### All
+```sh
+pip install -r requirements.txt
+```
 ### $$\textcolor{#4dd0e1}{\text{DATA}}$$ 
 ```sh
 pip install -r src/ccf/requirements_data.txt
@@ -44,80 +51,84 @@ pip install -r src/ccf/requirements_metrics.txt
 ```sh
 pip install -r src/ccf/requirements_ui.txt
 ```
-## RUN
+## RUN DOCKER
+### DOCKER
+```sh
+cd docker
+```
+### Generate self-signed certificate for InfluxDB
+```sh
+sudo openssl req -x509 -nodes -newkey rsa:2048 -keyout influxdb-selfsigned.key -out influxdb-selfsigned.crt -days <NUMBER_OF_DAYS>
+```
+### Set sensitive environment values
+```sh
+cp .env.secret.example .env.secret
+```
+### Run docker compose with infrastructure (Kafka and InfluxDB)
+```sh
+cp docker compose up -d
+```
+### Build CCF Image
+```sh
+cp docker compose -f docker-compose.binance.btc.usdt.yaml build
+```
+### Run docker compose with get_data, extract_features and collect_metrics
+```sh
+cp docker compose -f docker-compose.binance.btc.usdt.yaml up -d
+```
+### Run docker compose with train model
+```sh
+cp docker compose -f docker-compose.binance.btc.usdt.train.yaml up -d
+```
+### Run docker compose with predict model (periodically restart this compose to update model)
+```sh
+cp docker compose -f docker-compose.binance.btc.usdt.train.yaml up -d
+```
+### Monitor data with InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret)
+## RUN MANUAL
 ```sh
 cd work
 ```
 ### $$\textcolor{#4dd0e1}{\text{GET DATA}}$$ 
 * Linux (by default)
 ```sh
-PYTHONPATH=../src/ python ../src/ccf/get_data.py -cd conf -cn get_data_multi
+PYTHONPATH=../src/ python ../src/ccf/get_data.py -cd conf -cn get_data-kafka-binance-btc-usdt
 ```
 * Windows (as example)
 ```sh
-cmd /C  "set PYTHONPATH=../src && python ../src/ccf/get_data.py -cd conf -cn get_data_multi"
+cmd /C  "set PYTHONPATH=../src && python ../src/ccf/get_data.py -cd conf -cn get_data-kafka-binance-btc-usdt"
 ```
 ### $$\textcolor{#a2fca2}{\text{EXTRACT FEATURES}}$$
 ```sh
-PYTHONPATH=../src/ python ../src/ccf/extract_features.py -cd conf -cn extract_features_lograt
+PYTHONPATH=../src/ python ../src/ccf/extract_features.py -cd conf -cn extract_features-kafka-binance-btc-usdt
 ```
 ### $$\textcolor{#eeff41}{\text{TRAIN/TUNE MODEL}}$$ 
 * Train once
 ```sh
-PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn train_mid_tft_lograt_min
+PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn  train-mid-lograt-tft-kafka-binance-btc-usdt
 ```
 * Tune every ~1 hour
 ```sh
-while true; do PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn train_mid_tft_lograt_min; sleep 3600; done
+while true; do PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn train-mid-lograt-tft-kafka-binance-btc-usdt; sleep 3600; done
 ```
 ### $$\textcolor{#ffab40}{\text{MAKE PREDICTIONS}}$$
-* Model
 ```sh
-PYTHONPATH=../src/ python ../src/ccf/predict.py -cd conf -cn predict_mid_tft_lograt_min
+PYTHONPATH=../src/ python ../src/ccf/predict.py -cd conf -cn predict-mid-lograt-tft-kafka-binance-btc-usdt
 ```
-* Naive model (predict last known target)
+### $$\textcolor{#ffab40}{\text{COLLECT PREDICTIONS METRICS}}$$
 ```sh
-PYTHONPATH=../src/ python ../src/ccf/predict.py -cd conf -cn predict_mid_tft_lograt_min_naive
+PYTHONPATH=../src/ python ../src/ccf/collect_metrics.py -cd conf -cn collect_metrics-kafka-binance-btc-usdt
 ```
 ### $$\textcolor{#adadad}{\text{MONITOR METRICS}}$$ 
-* Access metrics reports directory by 8000 port
-```sh
-cd work/monitor
-python -m http.server 8000
-```
-#### $$\textcolor{#4dd0e1}{\text{DATA}}$$
-```sh
-PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_raw
-```
-#### $$\textcolor{#a2fca2}{\text{FEATURES}}$$
-```sh
-PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_features
-PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_features_lograt
-```
-#### $$\textcolor{#eeff41}{\text{TRAIN/TUNE}}$$
+* Monitor data with InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret)
+* Tensorboard (localhost:6007)
 ```sh
 tensorboard --logdir tensorboard/ --host 0.0.0.0 --port 6007
 ```
-#### $$\textcolor{#eeff41}{\text{TODO MODELS with MLFLOW}}$$
-#### $$\textcolor{#ffab40}{\text{PREDICTIONS}}$$
-```sh
-PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_multi_tgt_tft_a.yaml
-PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_multi_tgt_tft_b.yaml
-PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_multi_tgt_tft_naive_a.yaml
-PYTHONPATH=../src/ python ../src/ccf/apps/monitor.py -cd conf -cn monitor_multi_tgt_tft_naive_b.yaml
-```
-* collect predictions metrics
-```sh
-PYTHONPATH=../src/ python ../src/ccf/collect_metrics.py -cd conf -cn collect_metrics_lograt
-```
 ### $$\textcolor{#eeeeee}{\text{RUN UI}}$$
-* predictions
+* TODO
 ```sh
-PYTHONPATH=../src/ streamlit run ../src/ccf/apps/ui.py conf/ui_mid_tft_lograt_min.yaml
-```
-* collected prediction metrics
-```sh
-PYTHONPATH=../src/ streamlit run ../src/ccf/apps/ui.py conf/ui_mid_tft_lograt_min_metrics.yaml
+PYTHONPATH=../src/ streamlit run ../src/ccf/apps/ui.py conf/ui-mid-lograt-tft-kafka-binance-btc-usdt
 ```
 ## CONFIGS EXAMPLES
 ### $$\textcolor{#4dd0e1}{\text{GET DATA}}$$

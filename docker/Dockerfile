@@ -8,11 +8,12 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 COPY src/ src/
-RUN pip install --no-cache-dir -r src/ccf/requirements_data.txt
-RUN pip install --no-cache-dir -r src/ccf/requirements_features.txt
-RUN pip install --no-cache-dir -r src/ccf/requirements_ml.txt
-RUN pip install --no-cache-dir -r src/ccf/requirements_predictions.txt
-RUN pip install --no-cache-dir -r src/ccf/requirements_metrics.txt
-RUN pip install --no-cache-dir -r src/ccf/requirements_ui.txt
+RUN pip install --no-cache-dir -r src/ccf/requirements.txt
+# RUN pip install --no-cache-dir -r src/ccf/requirements_data.txt
+# RUN pip install --no-cache-dir -r src/ccf/requirements_features.txt
+# RUN pip install --no-cache-dir -r src/ccf/requirements_ml.txt
+# RUN pip install --no-cache-dir -r src/ccf/requirements_predictions.txt
+# RUN pip install --no-cache-dir -r src/ccf/requirements_metrics.txt
+# RUN pip install --no-cache-dir -r src/ccf/requirements_ui.txt
 ARG UPDATE_CONF=0
 COPY work/conf work/conf

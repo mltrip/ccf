@@ -57,9 +57,9 @@ services:
       # Mount for influxdb data directory and configuration
       - influxdb2:/var/lib/influxdb2:rw
       - influxdb2-config:/etc/influxdb2:rw
-      - ${PWD}/influxdb.toml:/etc/influxdb2/influxdb.toml
-      - /etc/ssl/influxdb-selfsigned.crt:/etc/ssl/influxdb-selfsigned.crt:rw
-      - /etc/ssl/influxdb-selfsigned.key:/etc/ssl/influxdb-selfsigned.key:rw
+      - ./influxdb.toml:/etc/influxdb2/influxdb.toml
+      - ./influxdb-selfsigned.crt:/etc/ssl/influxdb-selfsigned.crt:rw
+      - ./influxdb-selfsigned.key:/etc/ssl/influxdb-selfsigned.key:rw
     env_file:
       - .env.secret
     environment:
@@ -97,9 +97,9 @@ services:
       #  Sync timezone with host
       - /etc/localtime:/etc/localtime:ro
       #  Map Telegraf configuration file
-      - ${PWD}/telegraf_lob.toml:/etc/telegraf/telegraf.conf:ro
+      - ./telegraf_lob.toml:/etc/telegraf/telegraf.conf:ro
       #  Map /tmp to permanent storage  (this includes /tmp/metrics.out)
-      - ${PWD}/telegraf_lob:/tmp:rw
+      - ./telegraf_lob:/tmp:rw
     restart: unless-stopped
     depends_on:
       - influxdb
@@ -122,9 +122,9 @@ services:
       #  Sync timezone with host
       - /etc/localtime:/etc/localtime:ro
       #  Map Telegraf configuration file
-      - ${PWD}/telegraf_trade.toml:/etc/telegraf/telegraf.conf:ro
+      - ./telegraf_trade.toml:/etc/telegraf/telegraf.conf:ro
       #  Map /tmp to permanent storage  (this includes /tmp/metrics.out)
-      - ${PWD}/telegraf_trade:/tmp:rw
+      - ./telegraf_trade:/tmp:rw
     restart: unless-stopped
     depends_on:
       - influxdb
@@ -147,9 +147,9 @@ services:
       #  Sync timezone with host
       - /etc/localtime:/etc/localtime:ro
       #  Map Telegraf configuration file
-      - ${PWD}/telegraf_news.toml:/etc/telegraf/telegraf.conf:ro
+      - ./telegraf_news.toml:/etc/telegraf/telegraf.conf:ro
       #  Map /tmp to permanent storage  (this includes /tmp/metrics.out)
-      - ${PWD}/telegraf_news:/tmp:rw
+      - ./telegraf_news:/tmp:rw
     restart: unless-stopped
     depends_on:
       - influxdb
@@ -172,9 +172,9 @@ services:
       #  Sync timezone with host
       - /etc/localtime:/etc/localtime:ro
       #  Map Telegraf configuration file
-      - ${PWD}/telegraf_feature.toml:/etc/telegraf/telegraf.conf:ro
+      - ./telegraf_feature.toml:/etc/telegraf/telegraf.conf:ro
       #  Map /tmp to permanent storage  (this includes /tmp/metrics.out)
-      - ${PWD}/telegraf_feature:/tmp:rw
+      - ./telegraf_feature:/tmp:rw
     restart: unless-stopped
     depends_on:
       - influxdb
@@ -197,9 +197,9 @@ services:
       #  Sync timezone with host
       - /etc/localtime:/etc/localtime:ro
       #  Map Telegraf configuration file
-      - ${PWD}/telegraf_prediction.toml:/etc/telegraf/telegraf.conf:ro
+      - ./telegraf_prediction.toml:/etc/telegraf/telegraf.conf:ro
       #  Map /tmp to permanent storage  (this includes /tmp/metrics.out)
-      - ${PWD}/telegraf_prediction:/tmp:rw
+      - ./telegraf_prediction:/tmp:rw
     restart: unless-stopped
     depends_on:
       - influxdb
@@ -222,9 +222,9 @@ services:
       #  Sync timezone with host
       - /etc/localtime:/etc/localtime:ro
       #  Map Telegraf configuration file
-      - ${PWD}/telegraf_metric.toml:/etc/telegraf/telegraf.conf:ro
+      - ./telegraf_metric.toml:/etc/telegraf/telegraf.conf:ro
       #  Map /tmp to permanent storage  (this includes /tmp/metrics.out)
-      - ${PWD}/telegraf_metric:/tmp:rw
+      - ./telegraf_metric:/tmp:rw
     restart: unless-stopped
     depends_on:
       - influxdb 

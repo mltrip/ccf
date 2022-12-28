@@ -23,7 +23,7 @@ import numpy as np
 # from pyspark.sql import functions as F
 # from pyspark.sql import types as T
 
-from ccf.utils import expand_columns, loop
+from ccf.utils import expand_columns, wait_first_future
 from ccf import agents as ccf_agents
 
 
@@ -51,13 +51,13 @@ def extract_features(agents, consumer=None, producer=None, quant=None, executor=
       agent()
   else:
     e = ThreadPoolExecutor(**executor)
-    f2c = {}
+    futures = []
     for name, agent in agents.items():
       print(name)
       future_kwargs = {}
       future = e.submit(agent, **future_kwargs)
-      f2c[future] = [agent, future_kwargs]
-    loop(e, f2c)
+      futures.append(future)
+    wait_first_future(e, futures)
 
   
 @hydra.main(version_base=None)

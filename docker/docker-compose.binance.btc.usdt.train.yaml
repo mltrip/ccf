@@ -16,7 +16,8 @@ services:
     environment:
       PYTHONPATH: /app/src
     volumes:
-      - binance_btc_usdt:/app/work
+      # - binance_btc_usdt:/app/work
+      - ../work:/app/work
     restart: always
     # deploy:
     #   restart_policy:
@@ -35,5 +36,5 @@ networks:
   db:
     driver: bridge
     
-volumes:
-  binance_btc_usdt:
+# volumes:
+#   binance_btc_usdt:

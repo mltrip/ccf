@@ -2,4 +2,6 @@ hydra-core
 pandas
 # SQLAlchemy
 torch
-pytorch-forecasting
+protobuf<=3.20.1  # tensorboardx 2.5.1
+psutil
+pytorch-forecasting==0.10.3

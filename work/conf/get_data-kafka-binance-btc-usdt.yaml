@@ -14,6 +14,7 @@ agents:
     topic: lob
     keys: [ binance-btc-usdt ]
     delay: 1
+    timeout: 60
     depth: 5
     verbose: true
     producer:
@@ -29,6 +30,7 @@ agents:
     topic: trade
     keys: [ binance-btc-usdt ]
     delay: 1
+    timeout: 60
     verbose: true
     producer:
       bootstrap_servers: "kafka:9092"
@@ -44,7 +46,8 @@ agents:
     feeds: {}
     delay: ~
     start: -3600
-    feeds_per_group: 150
+    timeout: 5
+    feeds_per_group: ~
     verbose: 2
     producer:
       bootstrap_servers: "kafka:9092"

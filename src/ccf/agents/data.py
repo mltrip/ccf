@@ -9,6 +9,7 @@ import concurrent.futures
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import json
+import socket
 import time
 from pprint import pprint
 
@@ -18,6 +19,7 @@ import websocket
 
 from ccf.agents.base import Agent
 from ccf import partitioners as ccf_partitioners
+from ccf.utils import wait_first_future
 
   
 class Lob(Agent):
@@ -25,7 +27,7 @@ class Lob(Agent):
                partitioner=None, producer=None, 
                app=None, run=None, 
                executor=None,
-               depth=None, delay=None, verbose=False):
+               depth=None, delay=None, timeout=None, verbose=False):
     super().__init__()
     self.topic = topic
     self.keys = keys
@@ -38,14 +40,33 @@ class Lob(Agent):
     self.executor = executor
     self.depth = depth
     self.delay = delay
+    self.timeout = timeout
     self.verbose = verbose
     
-  class OnError:
-    def __init__(self):
-      pass
+  class OnOpen:
+    def __init__(self, topic, key):
+      self.topic = topic
+      self.key = key
     
-    def __call__(self, wc, error, *args, **kwargs):
-      raise error
+    def __call__(self, ws, *args, **kwargs):
+      print(f'Open Lob {self.topic} {self.key}')  
+    
+  class OnClose:
+    def __init__(self, topic, key):
+      self.topic = topic
+      self.key = key
+    
+    def __call__(self, ws, close_status_code, close_msg, *args, **kwargs):
+      print(f'Close Lob {self.topic} {self.key}: {close_status_code} {close_msg}')
+ 
+  class OnError:
+    def __init__(self, topic, key):
+      self.topic = topic
+      self.key = key
+    
+    def __call__(self, ws, error, *args, **kwargs):
+      print(f'Error Lob {self.topic} {self.key}: {error}')
+      raise error      
     
   class OnMessage:
     def __init__(self, topic, key, partitioner, producer,
@@ -60,7 +81,7 @@ class Lob(Agent):
       self.verbose = verbose
       self._producer = None  # Lazy init see __call__
     
-    def __call__(self, wc, message):
+    def __call__(self, ws, message):
       d = {'timestamp': time.time_ns(),
            'exchange': self.exchange,
            'base': self.base,
@@ -106,6 +127,8 @@ class Lob(Agent):
 
   def __call__(self):
     websocket.enableTrace(True if self.verbose > 1 else False)
+    if self.timeout is not None:
+      websocket.setdefaulttimeout(self.timeout)
     executor = deepcopy(self.executor)
     executor_class = executor.pop('class')
     executor = getattr(concurrent.futures, executor_class)(**executor)
@@ -125,7 +148,6 @@ class Lob(Agent):
         url = f'wss://stream.binance.com:9443/ws/{suffix}'
       else:
         raise NotImplementedError(exchange)
-      print(url)
       on_message = {
         'topic': self.topic,
         'key': key,
@@ -136,12 +158,14 @@ class Lob(Agent):
         'quote': quote,
         'verbose': self.verbose}
       app['on_message'] = self.OnMessage(**on_message)
-      app['on_error'] = self.OnError()
+      app['on_open'] = self.OnOpen(topic=self.topic, key=key)
+      app['on_close'] = self.OnClose(topic=self.topic, key=key)
+      app['on_error'] = self.OnError(topic=self.topic, key=key)
       app['url'] = url
       app = websocket.WebSocketApp(**app)
       future = executor.submit(app.run_forever, **run)
       futures.append(future)
-    concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
+    wait_first_future(executor, futures)
 
     
 class Trade(Agent):
@@ -149,7 +173,7 @@ class Trade(Agent):
                partitioner=None, producer=None, 
                app=None, run=None, 
                executor=None,
-               delay=None, verbose=False):
+               delay=None, timeout=None, verbose=False):
     super().__init__()
     self.topic = topic
     self.keys = keys
@@ -161,14 +185,33 @@ class Trade(Agent):
       executor = {'class': 'ThreadPoolExecutor'}
     self.executor = executor
     self.delay = delay
+    self.timeout = timeout
     self.verbose = verbose
     
-  class OnError:
-    def __init__(self):
-      pass
+  class OnOpen:
+    def __init__(self, topic, key):
+      self.topic = topic
+      self.key = key
     
-    def __call__(self, wc, error, *args, **kwargs):
-      raise error
+    def __call__(self, ws, *args, **kwargs):
+      print(f'Open Lob {self.topic} {self.key}')  
+    
+  class OnClose:
+    def __init__(self, topic, key):
+      self.topic = topic
+      self.key = key
+    
+    def __call__(self, ws, close_status_code, close_msg, *args, **kwargs):
+      print(f'Close Lob {self.topic} {self.key}: {close_status_code} {close_msg}')
+ 
+  class OnError:
+    def __init__(self, topic, key):
+      self.topic = topic
+      self.key = key
+    
+    def __call__(self, ws, error, *args, **kwargs):
+      print(f'Error Lob {self.topic} {self.key}: {error}')
+      raise error      
     
   class OnMessage:
     def __init__(self, topic, key, partitioner, producer,
@@ -185,7 +228,7 @@ class Trade(Agent):
       self._producer = None  # Lazy init see __call__
       self.t = time.time()
     
-    def __call__(self, wc, message):
+    def __call__(self, ws, message):
       if self.delay is not None:
         if time.time() - self.t < self.delay:
           return
@@ -221,6 +264,8 @@ class Trade(Agent):
 
   def __call__(self):
     websocket.enableTrace(True if self.verbose > 1 else False)
+    if self.timeout is not None:
+      websocket.setdefaulttimeout(self.timeout)
     executor = deepcopy(self.executor)
     executor_class = executor.pop('class')
     executor = getattr(concurrent.futures, executor_class)(**executor)
@@ -236,7 +281,6 @@ class Trade(Agent):
         url = f'wss://stream.binance.com:9443/ws/{base}{quote}@trade'
       else:
         raise NotImplementedError(exchange)
-      print(url)
       on_message = {
         'topic': self.topic,
         'key': key,
@@ -248,23 +292,26 @@ class Trade(Agent):
         'delay': self.delay,
         'verbose': self.verbose}
       app['on_message'] = self.OnMessage(**on_message)
-      app['on_error'] = self.OnError()
+      app['on_open'] = self.OnOpen(topic=self.topic, key=key)
+      app['on_close'] = self.OnClose(topic=self.topic, key=key)
+      app['on_error'] = self.OnError(topic=self.topic, key=key)
       app['url'] = url
       app = websocket.WebSocketApp(**app)
       future = executor.submit(app.run_forever, **run)
       futures.append(future)
-    concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)    
+    wait_first_future(executor, futures)
     
      
 class Feed(Agent):
   def __init__(self, topic, feeds, 
                partitioner=None, producer=None, executor=None, 
-               start=0, delay=None, feeds_per_group=1, max_cache=1e5, verbose=False):
+               start=0, delay=None, timeout=None, feeds_per_group=1, max_cache=1e5,  verbose=False):
     super().__init__()
     self.topic = topic
     self.feeds = feeds
     self.delay = delay
     self.start = start
+    self.timeout = timeout
     self.delay = delay
     self.feeds_per_group = feeds_per_group 
     self.max_cache = int(max_cache)
@@ -355,10 +402,15 @@ class Feed(Agent):
           time.sleep(wt)
       
   def __call__(self):
+    if self.timeout is not None:
+      socket.setdefaulttimeout(self.timeout)
     feeds = [x for x, y in self.feeds.items() if y]
     print(f'Number of feeds: {len(feeds)}')
-    groups = [feeds[i:i+self.feeds_per_group] 
-              for i in range(0, len(feeds), self.feeds_per_group)]
+    if self.feeds_per_group is not None:
+      groups = [feeds[i:i+self.feeds_per_group] 
+                for i in range(0, len(feeds), self.feeds_per_group)]
+    else:
+      groups = [feeds]
     print(f'Number of groups of feeds: {len(groups)} {[len(x) for x in groups]}')
     executor = deepcopy(self.executor)
     executor_class = executor.pop('class')
@@ -377,6 +429,5 @@ class Feed(Agent):
       on_feed = self.OnFeed(**on_feed)
       future = executor.submit(on_feed)
       futures.append(future)
-    # print(futures)
-    concurrent.futures.wait(futures, return_when=concurrent.futures.FIRST_COMPLETED)
+    wait_first_future(executor, futures)
       
