@@ -1,0 +1,21 @@
+defaults:
+ - ./@train_kwargs: train-mid-tft-lograt-kafka
+ - partitioner@agents.a_1.producers.p_1.partitioners.prediction: prediction
+ 
+model_path: mid-tft-lograt-kafka.ckpt
+verbose: false
+size: 10
+watermark: 2e9
+horizons: [ 1, 5 ]
+predict_kwargs:
+  return_index: true
+  mode: quantiles  # prediction or quantiles
+data_kwargs: {}
+agents:
+  a_1:
+    class: Kafka
+    producers:
+      p_1:
+        bootstrap_servers: "kafka:9092"
+        topic_keys:
+          prediction: [ binance-btc-usdt, binance-eth-usdt, binance-eth-btc  ]

@@ -1,0 +1,6 @@
+-r requirements_data.txt
+-r requirements_features.txt
+-r requirements_metrics.txt
+-r requirements_ml.txt
+-r requirements_predictions.txt
+-r requirements_ui.txt

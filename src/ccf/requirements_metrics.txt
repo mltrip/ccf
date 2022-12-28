@@ -1,6 +1,7 @@
 evidently
 hydra-core
-numpy
+numpy<1.24  # https://stackoverflow.com/questions/74844262/how-to-solve-error-numpy-has-no-attribute-float-in-python
 pandas
-scikit-learn
-SQLAlchemy
+psutil
+scikit-learn<1.2  # pytorch-forecasting
+# SQLAlchemy

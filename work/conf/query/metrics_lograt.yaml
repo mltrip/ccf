@@ -1,8 +1,0 @@
-metric:
-  engine_kwargs:
-    url: sqlite:///metric_lograt.db
-  read_kwargs:
-    name: data
-  write_kwargs:
-   name: data
-   if_exists: append

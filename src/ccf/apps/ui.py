@@ -62,31 +62,18 @@ def make_metrics_box(data):
       # print(n, nn)
       # print(df.describe(include='all'))
       # ['horizon', 'group', 'metric', 'label', 'value', 'model', 'prediction', 'kind', 'target']
-      # for (label, group, horizon), dff in df.groupby(['label', 'group', 'horizon']):
-      # for (label, group, kind), dff in df.groupby(['label', 'group', 'kind']):
       for (label, group), dff in df.groupby(['label', 'group']):
         dff['time'] = dff.index
-        # dff['color'] = dff['model'] + ' ' + dff['target']
-        # lines = (
-        #   alt.Chart(dff, title=f'{n} {label} {group} {horizon}')
-        #   .mark_line()
-        #   .encode(
-        #       x='time',
-        #       y=alt.Y('value', 
-        #               scale=alt.Scale(
-        #               zero=False,
-        #               ),
-        #              ),
-        #       color=alt.Color('color', scale=alt.Scale(scheme='category20')),
-        #   )
-        # )
-        chart = alt.Chart(dff, title=f'{n} {label} {group} {len(dff)}').mark_boxplot().encode(
+        chart = alt.Chart(dff, title=f'{n} {label} {group} ({len(dff)} samples)').mark_boxplot(
+          # extent='min-max').encode(
+          extent=1.5).encode(
           x='model:N',
-          y='value:Q',
+          y=alt.Y('value:Q',scale=alt.Scale(zero=False)),
           row='kind:N',
           column='horizon:O',
           # color=alt.Color('model:N', scale=alt.Scale(scheme='category20'))
-          color='model:N').properties(
+          color=alt.Color('model:N', legend=None)
+        ).properties(
           width=100,
           height=100).resolve_scale(y='independent')
         charts.append(chart)
@@ -104,7 +91,7 @@ def make_metrics_heatmap(data):
         #   mean_value='mean(value)',
         #   count_value='count(value)',
         #   groupby=['horizon', 'name']
-        base = alt.Chart(dff, title=f'{n} {group} {label} {kind} {len(dff)}').transform_aggregate(
+        base = alt.Chart(dff, title=f'{n} {group} {label} {kind} ({len(dff)} samples)').transform_aggregate(
           mean_value='mean(value)',
           groupby=['horizon', 'name']
         ).encode(

@@ -1,0 +1,9 @@
+defaults:
+  - ./@mapping: mapping
+  - _self_
+
+class: Partitioner
+topic: metric
+admin_kwargs:
+  bootstrap_servers: "kafka:9092"
+verbose: false

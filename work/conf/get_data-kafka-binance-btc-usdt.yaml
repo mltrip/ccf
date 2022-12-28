@@ -1,0 +1,57 @@
+defaults:
+ - _self_
+ - partitioner@agents.lob.partitioner: lob
+ - partitioner@agents.trade.partitioner: trade
+ - partitioner@agents.news.partitioner: news
+ - feeds@agents.news.feeds: all
+
+executor:
+  class: ProcessPoolExecutor
+  max_workers: 3
+agents:
+  lob:
+    class: Lob
+    topic: lob
+    keys: [ binance-btc-usdt ]
+    delay: 1
+    timeout: 60
+    depth: 5
+    verbose: true
+    producer:
+      bootstrap_servers: "kafka:9092"
+    partitioner: ~
+    app: ~
+    run: ~
+    executor:
+      class: ProcessPoolExecutor
+      max_workers: 1
+  trade:
+    class: Trade
+    topic: trade
+    keys: [ binance-btc-usdt ]
+    delay: 1
+    timeout: 60
+    verbose: true
+    producer:
+      bootstrap_servers: "kafka:9092"
+    partitioner: ~
+    app: ~
+    run: ~
+    executor:
+      class: ProcessPoolExecutor
+      max_workers: 1
+  news:
+    class: Feed
+    topic: news
+    feeds: {}
+    delay: ~
+    start: -3600
+    timeout: 5
+    feeds_per_group: ~
+    verbose: 2
+    producer:
+      bootstrap_servers: "kafka:9092"
+    partitioner: ~
+    executor:
+      class: ProcessPoolExecutor
+      max_workers: 1

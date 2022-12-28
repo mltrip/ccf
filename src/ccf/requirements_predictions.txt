@@ -1,5 +1,6 @@
 hydra-core
 pandas
-SQLAlchemy
+# SQLAlchemy
 torch
-pytorch-forecasting
+psutil
+pytorch-forecasting==0.10.3

@@ -1,0 +1,54 @@
+version: '3.3'
+
+services:
+  data:
+    image: ccf
+    container_name: data_binance_btc_usdt
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    networks:
+      - db
+    working_dir: /app/work
+    entrypoint: [ python ]
+    command: [ ../src/ccf/get_data.py, -cd, conf, -cn, get_data-kafka-binance-btc-usdt ]
+    environment:
+      PYTHONPATH: /app/src
+    restart: always
+      
+  feature:
+    image: ccf
+    container_name: feature_binance_btc_usdt
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    networks:
+      - db
+    working_dir: /app/work
+    entrypoint: [ python ]
+    command: [ ../src/ccf/extract_features.py, -cd, conf, -cn, extract_features-kafka-binance-btc-usdt ]
+    environment:
+      PYTHONPATH: /app/src
+    restart: always
+  
+  metric:
+    image: ccf
+    container_name: metric_binance_btc_usdt
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    networks:
+      - db
+    working_dir: /app/work
+    entrypoint: [ python ]
+    command: [ ../src/ccf/collect_metrics.py, -cd, conf, -cn, collect_metrics-kafka-binance-btc-usdt ]
+    environment:
+      PYTHONPATH: /app/src
+    restart: always
+      
+networks:
+  db:
+    driver: bridge
+    
+# volumes:
+#   binance_btc_usdt:

@@ -1,0 +1,25 @@
+defaults:
+  - partitioner@consumer.partitioners.lob: lob
+  - partitioner@consumer.partitioners.trade: trade
+  - partitioner@producer.partitioners.feature: feature
+  - _self_
+
+quant: 3.0e+9
+consumer:
+  bootstrap_servers: "kafka:9092"
+producer:
+  bootstrap_servers: "kafka:9092"
+agents:
+  a_1:
+    class: Delta
+    verbose: true
+    consumers:
+      c_1:
+        topic_keys:
+          lob: [ binance-btc-usdt ]
+          trade: [ binance-btc-usdt ]
+    producers:
+      p_1:
+        topic_keys:
+          feature: [ binance-btc-usdt ]
+  
