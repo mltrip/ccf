@@ -1,0 +1,147 @@
+version: '3.8'
+
+services:
+  minio_mlflow:
+    container_name: minio_mlflow
+    hostname: minio-mlflow  # https://github.com/minio/minio/issues/13025
+    image: quay.io/minio/minio:RELEASE.2022-06-25T15-50-16Z
+    command: server --console-address ":9001" /data/
+    expose:
+      - "9000"
+      - "9001"
+    # ports:
+    #    - "9001:9001"
+    networks:
+      - mlflow
+    env_file:
+      - .env.secret.mlflow
+    environment:
+      MINIO_ROOT_USER: ccf
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 20s
+      retries: 3
+    volumes:
+      - minio_mlflow:/data
+  
+  nginx_minio:
+    container_name: nginx_minio
+    hostname: nginx-minio
+    image: nginx:1.19.2-alpine
+    volumes:
+      - ./minio/nginx.conf:/etc/nginx/nginx.conf:ro
+    # expose:
+      # - "9000"
+      # - "9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - mlflow
+    depends_on:
+      - minio_mlflow
+    restart: always
+  
+  minio_mlflow_mc:
+    container_name: minio_mlflow_mc
+    image: quay.io/minio/mc
+    env_file:
+      - .env.secret.mlflow
+    networks:
+      - mlflow
+    depends_on:
+      - minio_mlflow
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc config host add ccf http://minio-mlflow:9000 $${MINIO_ACCESS_KEY} $${MINIO_SECRET_KEY}) do echo '...waiting...' && sleep 1; done;
+      /usr/bin/mc mb ccf/mlflow;
+      /usr/bin/mc policy set public ccf/mlflow;
+      exit 0;
+      "
+
+  postgres_mlflow:
+    container_name: postgres_mlflow
+    image: postgres
+    env_file:
+      - .env.secret.mlflow
+    environment:
+      POSTGRES_USER: ccf
+      POSTGRES_DB: mlflow
+    volumes:
+       - postgres_mlflow:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    networks:
+      - mlflow
+    restart: always
+      
+  pgadmin:
+    container_name: pgadmin
+    image: dpage/pgadmin4
+    restart: always
+    env_file:
+      - .env.secret.mlflow
+    environment:
+      # PGADMIN_LISTEN_ADDRESS: 0.0.0.0
+      PGADMIN_LISTEN_PORT: 5050
+      PGADMIN_DEFAULT_EMAIL: ccf@example.com
+    volumes:
+       - pgadmin:/var/lib/pgadmin
+    ports:
+      - "5050:5050"
+    networks:
+      - mlflow
+      
+  mlflow:
+    container_name: mlflow
+    restart: always
+    build: ./mlflow
+    image: mlflow
+    expose:
+      - "5000"
+    # ports:
+    #   - "5000:5000"
+    networks:
+      - mlflow
+    env_file:
+      - .env.secret.mlflow
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: "http://nginx-minio:9000"
+    depends_on:
+      - minio_mlflow_mc
+      - postgres_mlflow
+    # postgresql://user:password@host:port/db
+    command: >
+      /bin/sh -c "
+      AWS_ACCESS_KEY_ID=$${MINIO_ACCESS_KEY}
+      AWS_SECRET_ACCESS_KEY=$${MINIO_SECRET_KEY}
+      mlflow server 
+      --backend-store-uri postgresql://ccf:$${POSTGRES_PASSWORD}@postgres_mlflow:5432/mlflow
+      --artifacts-destination s3://mlflow 
+      --serve-artifacts 
+      --host 0.0.0.0"
+
+  nginx_mlflow:
+    image: nginx:1.19.2-alpine
+    container_name: nginx_mlflow
+    volumes:
+      - ./mlflow/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./.htpasswd:/etc/nginx/.htpasswd
+    ports:
+       - "5000:5000"
+    networks:
+      - mlflow
+    depends_on:
+      - mlflow
+    restart: always
+    
+networks:
+  mlflow:
+    driver: bridge
+
+volumes:
+  minio_mlflow:
+  postgres_mlflow:
+  pgadmin:
+  
