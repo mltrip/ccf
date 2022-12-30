@@ -11,7 +11,7 @@ services:
       POSTGRES_USER: ccf
       POSTGRES_DB: optuna
     volumes:
-      - optuna:/var/lib/postgresql/data
+      - postgres_optuna:/var/lib/postgresql/data
     ports:
       - "5432:5433"
     networks:
