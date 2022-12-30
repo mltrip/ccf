@@ -1,4 +1,5 @@
 hydra-core
+mlflow
 pandas
 # SQLAlchemy
 torch

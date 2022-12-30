@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  postgres_optuna:
+    container_name: postgres_optuna
+    image: postgres
+    restart: always
+    env_file:
+      - .env.secret.optuna
+    environment:
+      POSTGRES_USER: ccf
+      POSTGRES_DB: optuna
+    volumes:
+      - optuna:/var/lib/postgresql/data
+    ports:
+      - "5432:5433"
+    networks:
+      - optuna
+
+networks:
+  optuna:
+    driver: bridge
+
+volumes:
+  postgres_optuna:
