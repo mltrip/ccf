@@ -1,7 +1,7 @@
 # CCF
 Crypto Currency Forecasting App for [ML System Design Course on ODS.ai](https://ods.ai/tracks/ml-system-design-22)
 
-## Architecture (TODO implement it!)
+## Architecture
 ![architecture](docs/architecture.png)
 
 App consists of 6 main parts
@@ -18,12 +18,12 @@ This part is for making `predictions` based on `models` from `models registry` a
 There are metrics collectors and monitors with techincal information about `raw data`, `features`, training/tuning, `models`, `predictions`, etc
 ### $$\textcolor{#eeeeee}{\text{UI}}$$
 We show `users`: `predictions`, performance `metrics`, `raw data`, etc. This part uses some information from METRICS part
-## Process (TODO implement it!)
+## Process
 ![architecture](docs/process.png)
 
 ## INSTALL
 ### Python 3.9
-### All
+### $$\textcolor{#ffffff}{\text{ALL}}$$ 
 ```sh
 pip install -r requirements.txt
 ```
@@ -58,15 +58,19 @@ cd docker
 ```
 ### Generate self-signed certificate for InfluxDB
 ```sh
-sudo openssl req -x509 -nodes -newkey rsa:2048 -keyout influxdb-selfsigned.key -out influxdb-selfsigned.crt -days <NUMBER_OF_DAYS>
+sudo openssl req -x509 -nodes -newkey rsa:2048 -keyout influxdb-selfsigned.key -out influxdb-selfsigned.crt -days 365
 ```
-### Set sensitive environment values
+### Set sensitive environment variables for InfluxDB
 ```sh
-cp .env.secret.example .env.secret
+cp .env.secret.db.example .env.secret.db
 ```
-### Run docker compose with infrastructure (Kafka and InfluxDB)
+### Run docker compose with Kafka
 ```sh
-cp docker compose up -d
+cp docker compose up -f docker-compose.kafka.yaml up -d
+```
+### Run docker compose with InfluxDB
+```sh
+cp docker compose up -f docker-compose.db.yaml up -d
 ```
 ### Build CCF Image
 ```sh
@@ -84,7 +88,7 @@ cp docker compose -f docker-compose.binance.btc.usdt.train.yaml up -d
 ```sh
 cp docker compose -f docker-compose.binance.btc.usdt.train.yaml up -d
 ```
-### Monitor data with InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret)
+### Monitor data with InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret.db)
 ## RUN MANUAL
 ```sh
 cd work

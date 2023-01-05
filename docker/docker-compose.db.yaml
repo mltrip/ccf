@@ -1,53 +1,6 @@
 version: '3.3'
 
 services:
-
-  zookeeper:
-    container_name: zookeeper
-    networks:
-      - db
-    image: quay.io/strimzi/kafka:0.28.0-kafka-3.1.0
-    command:
-      - "sh"
-      - "-c"
-      - "bin/zookeeper-server-start.sh config/zookeeper.properties"
-    ports:
-      - "2181:2181"
-    environment:
-      LOG_DIR: /tmp/logs
-
-  kafka:
-    container_name: kafka
-    networks:
-      - db
-    image: quay.io/strimzi/kafka:0.28.0-kafka-3.1.0
-    command:
-      - "sh"
-      - "-c"
-      - >-
-        bin/kafka-server-start.sh config/server.properties 
-        --override listeners=$${KAFKA_LISTENERS}
-        --override advertised.listeners=$${KAFKA_ADVERTISED_LISTENERS}
-        --override zookeeper.connect=$${KAFKA_ZOOKEEPER_CONNECT} 
-        --override listener.security.protocol.map=$${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP} 
-        --override inter.broker.listener.name=$${KAFKA_INTER_BROKER_LISTENER_NAME} 
-        --override log.retention.ms=$${KAFKA_LOG_RETENTION_MS} 
-        --override log.retention.check.interval.ms=$${KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS}
-    depends_on:
-      - zookeeper
-    ports:
-      - "9094:9094"
-    environment:
-      LOG_DIR: "/tmp/logs"
-      KAFKA_HEAP_OPTS: "-Xmx256M -Xms256M"
-      KAFKA_LISTENERS: INTERNAL://kafka:9092,OUTSIDE://kafka:9094
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,OUTSIDE://localhost:9094
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,OUTSIDE:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_LOG_RETENTION_MS: 3600000
-      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 1800000
-
   influxdb:
     container_name: influxdb
     image: influxdb:latest
@@ -61,7 +14,7 @@ services:
       - ./influxdb-selfsigned.crt:/etc/ssl/influxdb-selfsigned.crt:rw
       - ./influxdb-selfsigned.key:/etc/ssl/influxdb-selfsigned.key:rw
     env_file:
-      - .env.secret
+      - .env.secret.db
     environment:
       # - DOCKER_INFLUXDB_INIT_MODE=upgrade
       - DOCKER_INFLUXDB_INIT_MODE=setup
@@ -85,7 +38,7 @@ services:
     networks:
       - db
     env_file:
-      - .env.secret
+      - .env.secret.db
     environment: 
       - INFLUX_HOST=https://influxdb:8086
       # - INFLUX_TOKEN=token
@@ -103,14 +56,13 @@ services:
     restart: unless-stopped
     depends_on:
       - influxdb
-      - kafka
       
   telegraf_trade:
     image: telegraf:latest
     networks:
       - db
     env_file:
-      - .env.secret
+      - .env.secret.db
     environment: 
       - INFLUX_HOST=https://influxdb:8086
       # - INFLUX_TOKEN=token
@@ -128,14 +80,13 @@ services:
     restart: unless-stopped
     depends_on:
       - influxdb
-      - kafka
       
   telegraf_news:
     image: telegraf:latest
     networks:
       - db
     env_file:
-      - .env.secret
+      - .env.secret.db
     environment: 
       - INFLUX_HOST=https://influxdb:8086
       # - INFLUX_TOKEN=token
@@ -153,14 +104,13 @@ services:
     restart: unless-stopped
     depends_on:
       - influxdb
-      - kafka
       
   telegraf_feature:
     image: telegraf:latest
     networks:
       - db
     env_file:
-      - .env.secret
+      - .env.secret.db
     environment: 
       - INFLUX_HOST=https://influxdb:8086
       # - INFLUX_TOKEN=token
@@ -178,14 +128,13 @@ services:
     restart: unless-stopped
     depends_on:
       - influxdb
-      - kafka
       
   telegraf_prediction:
     image: telegraf:latest
     networks:
       - db
     env_file:
-      - .env.secret
+      - .env.secret.db
     environment: 
       - INFLUX_HOST=https://influxdb:8086
       # - INFLUX_TOKEN=token
@@ -203,14 +152,13 @@ services:
     restart: unless-stopped
     depends_on:
       - influxdb
-      - kafka
  
   telegraf_metric:
     image: telegraf:latest
     networks:
       - db
     env_file:
-      - .env.secret
+      - .env.secret.db
     environment: 
       - INFLUX_HOST=https://influxdb:8086
       # - INFLUX_TOKEN=token
@@ -228,7 +176,6 @@ services:
     restart: unless-stopped
     depends_on:
       - influxdb 
-      - kafka
  
 volumes:
   influxdb2:

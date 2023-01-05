@@ -36,7 +36,7 @@ def delta2value(deltas, kind, initial_value=1):
   return deltas * initial_value
 
 
-def kill_child_processes(parent_pid, sig=signal.SIGTERM):
+def kill_child_processes(parent_pid, sig=signal.SIGTERM, kill_parent=True):
   try:
     parent = psutil.Process(parent_pid)
   except psutil.NoSuchProcess:
@@ -44,6 +44,8 @@ def kill_child_processes(parent_pid, sig=signal.SIGTERM):
   children = parent.children(recursive=True)
   for process in children:
     process.send_signal(sig)
+  if kill_parent:
+    parent.send_signal(sig)
 
     
 def wait_first_future(executor, futures):
@@ -54,6 +56,6 @@ def wait_first_future(executor, futures):
       print(f'Exception of {f}: {e}')
     else:
       print(f'Result of {f}: {r}')
-    finally:  # Shutodown pool with all futures and kill all children processes
+    finally:  # Shutdown pool with all futures and kill all children processes
       executor.shutdown(wait=False, cancel_futures=True)
       kill_child_processes(os.getpid())
