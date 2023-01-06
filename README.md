@@ -14,9 +14,9 @@ Here are continiuos feature extracting from `raw data` database/stream and savin
 Here we create `datasets`, train/tune `models` and add/update them in the `models registry`
 ### $$\textcolor{#ffab40}{\text{PREDICTIONS}}$$
 This part is for making `predictions` based on `models` from `models registry` and `datasets`
-### $$\textcolor{#adadad}{\text{METRICS}}$$
+### $$\textcolor{#eeeeee}{\text{METRICS}}$$
 There are metrics collectors and monitors with techincal information about `raw data`, `features`, training/tuning, `models`, `predictions`, etc
-### $$\textcolor{#eeeeee}{\text{UI}}$$
+### $$\textcolor{#adadad}{\text{UI}}$$
 We show `users`: `predictions`, performance `metrics`, `raw data`, etc. This part uses some information from METRICS part
 ## Process
 ![architecture](docs/process.png)
@@ -43,16 +43,68 @@ pip install -r src/ccf/requirements_ml.txt
 ```sh
 pip install -r src/ccf/requirements_predictions.txt
 ```
-### $$\textcolor{#adadad}{\text{METRICS}}$$
+### $$\textcolor{#eeeeee}{\text{METRICS}}$$
 ```sh
 pip install -r src/ccf/requirements_metrics.txt
 ```
-### $$\textcolor{#eeeeee}{\text{UI}}$$
+### $$\textcolor{#adadad}{\text{UI}}$$
 ```sh
 pip install -r src/ccf/requirements_ui.txt
 ```
 ## RUN DOCKER
-### DOCKER
+### DOCKER WITH MLFLOW
+```sh
+cd docker
+```
+### Generate self-signed certificate for InfluxDB
+```sh
+sudo openssl req -x509 -nodes -newkey rsa:2048 -keyout influxdb-selfsigned.key -out influxdb-selfsigned.crt -days 365
+```
+### Set sensitive environment variables for InfluxDB
+```sh
+cp .env.secret.db.example .env.secret.db
+```
+### Run docker compose with Kafka
+```sh
+cp docker compose up -f docker-compose.kafka.yaml up -d
+```
+### Run docker compose with InfluxDB
+```sh
+cp docker compose up -f docker-compose.db.yaml up -d
+```
+### Build CCF Image
+```sh
+cp docker compose -f docker-compose.binance.btc.usdt.yaml build
+```
+### Run docker compose with get_data, extract_features and collect_metrics
+```sh
+cp docker compose -f docker-compose.binance.btc.usdt.yaml up -d
+```
+### Set sensitive environment variables for MLflow
+```sh
+cp .env.secret.mlflow.example .env.secret.mlflow
+```
+### Generate password for user "ccf" for NGINX proxy of MLflow
+```sh
+htpasswd -c .htpasswd ccf
+```
+### Run docker compose with MLflow
+```sh
+cp docker compose up -f docker-compose.mlflow.yaml up -d
+```
+### Set sensitive environment variables for models (password from previous step)
+```sh
+cp .env.secret.model.example .env.secret.model
+```
+### Run docker compose with train model
+```sh
+cp docker compose -f docker-compose.binance.btc.usdt.train.mlflow.yaml up -d
+```
+### Run docker compose with predict model
+```sh
+cp docker compose -f docker-compose.binance.btc.usdt.train.mlflow.yaml up -d
+```
+### DOCKER WITHOUT MLFLOW
 ```sh
 cd docker
 ```

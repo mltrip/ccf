@@ -1,0 +1,34 @@
+version: '3.3'
+
+services:
+  predict:
+    image: ccf
+    container_name: predict_mlflow_binance_btc_usdt
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    networks:
+      - db
+      - mlflow
+    working_dir: /app/work
+    entrypoint: [ python ]
+    command: [ ../src/ccf/predict_mlflow.py, -cd, conf, -cn, predict-mlflow-mid-lograt-tft-kafka-binance-btc-usdt ]
+    env_file:
+      - .env.secret.model
+    environment:
+      PYTHONPATH: /app/src
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_TRACKING_USERNAME: ccf
+    # volumes:
+    #   # - binance_btc_usdt:/app/work
+    #   - ../work:/app/work
+    restart: always
+      
+networks:
+  db:
+    driver: bridge
+  mlflow:
+    driver: bridge
+    
+# volumes:
+#   binance_btc_usdt:

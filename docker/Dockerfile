@@ -17,5 +17,4 @@ RUN pip install --no-cache-dir -r src/ccf/requirements.txt
 # RUN pip install --no-cache-dir -r src/ccf/requirements_metrics.txt
 # RUN pip install --no-cache-dir -r src/ccf/requirements_ui.txt
 
-ARG UPDATE_CONF=0
 COPY work/conf work/conf

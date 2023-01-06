@@ -1,0 +1,22 @@
+defaults:
+ - partitioner@agents.a_1.producers.p_1.partitioners.prediction: prediction
+ 
+kind: auto_update
+model_name: mid-lograt-tft-kafka-binance-btc-usdt
+model_version: ~
+model_stage: ~
+verbose: false
+size: 20
+watermark: 6e9
+horizons: [ 5, 10, 15, 20 ]
+predict_kwargs:
+  return_index: true
+  mode: prediction  # prediction or quantiles
+agents:
+  a_1:
+    class: Kafka
+    producers:
+      p_1:
+        bootstrap_servers: "kafka:9092"
+        topic_keys:
+          prediction: [ binance-btc-usdt ]
