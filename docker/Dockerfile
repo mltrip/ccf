@@ -8,7 +8,7 @@ FROM python:3.9
 #     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY src/ src/
+COPY src/ccf/requirements* src/ccf/
 RUN pip install --no-cache-dir -r src/ccf/requirements.txt
 # RUN pip install --no-cache-dir -r src/ccf/requirements_data.txt
 # RUN pip install --no-cache-dir -r src/ccf/requirements_features.txt
@@ -16,5 +16,5 @@ RUN pip install --no-cache-dir -r src/ccf/requirements.txt
 # RUN pip install --no-cache-dir -r src/ccf/requirements_predictions.txt
 # RUN pip install --no-cache-dir -r src/ccf/requirements_metrics.txt
 # RUN pip install --no-cache-dir -r src/ccf/requirements_ui.txt
-
+COPY src/ src/
 COPY work/conf work/conf
