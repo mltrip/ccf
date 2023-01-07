@@ -66,19 +66,19 @@ cp .env.secret.db.example .env.secret.db
 ```
 ### Run docker compose with Kafka
 ```sh
-cp docker compose up -f docker-compose.kafka.yaml up -d
+docker compose -f docker-compose.kafka.yaml up -d
 ```
 ### Run docker compose with InfluxDB
 ```sh
-cp docker compose up -f docker-compose.db.yaml up -d
+docker compose -f docker-compose.db.yaml up -d
 ```
 ### Build CCF Image
 ```sh
-cp docker compose -f docker-compose.binance.btc.usdt.yaml build
+docker compose -f docker-compose.binance.btc.usdt.yaml build
 ```
 ### Run docker compose with get_data, extract_features and collect_metrics
 ```sh
-cp docker compose -f docker-compose.binance.btc.usdt.yaml up -d
+docker compose -f docker-compose.binance.btc.usdt.yaml up -d
 ```
 ### Set sensitive environment variables for MLflow
 ```sh
@@ -90,7 +90,7 @@ htpasswd -c .htpasswd ccf
 ```
 ### Run docker compose with MLflow
 ```sh
-cp docker compose up -f docker-compose.mlflow.yaml up -d
+docker compose -f docker-compose.mlflow.yaml up -d
 ```
 ### Set sensitive environment variables for models (password from previous step)
 ```sh
@@ -98,12 +98,17 @@ cp .env.secret.model.example .env.secret.model
 ```
 ### Run docker compose with train model
 ```sh
-cp docker compose -f docker-compose.binance.btc.usdt.train.mlflow.yaml up -d
+docker compose -f docker-compose.binance.btc.usdt.train.mlflow.yaml up -d
 ```
 ### Run docker compose with predict model
 ```sh
-cp docker compose -f docker-compose.binance.btc.usdt.train.mlflow.yaml up -d
+docker compose -f docker-compose.binance.btc.usdt.train.mlflow.yaml up -d
 ```
+### Run docker compose with Streamlit UI (localhost:8501)
+```sh
+docker compose -f docker-compose.binance.btc.usdt.ui.yaml up -d
+```
+### Monitor data with InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret.db)
 ### DOCKER WITHOUT MLFLOW
 ```sh
 cd docker
@@ -118,27 +123,31 @@ cp .env.secret.db.example .env.secret.db
 ```
 ### Run docker compose with Kafka
 ```sh
-cp docker compose up -f docker-compose.kafka.yaml up -d
+docker compose -f docker-compose.kafka.yaml up -d
 ```
 ### Run docker compose with InfluxDB
 ```sh
-cp docker compose up -f docker-compose.db.yaml up -d
+docker compose -f docker-compose.db.yaml up -d
 ```
 ### Build CCF Image
 ```sh
-cp docker compose -f docker-compose.binance.btc.usdt.yaml build
+docker compose -f docker-compose.binance.btc.usdt.yaml build
 ```
 ### Run docker compose with get_data, extract_features and collect_metrics
 ```sh
-cp docker compose -f docker-compose.binance.btc.usdt.yaml up -d
+docker compose -f docker-compose.binance.btc.usdt.yaml up -d
 ```
 ### Run docker compose with train model
 ```sh
-cp docker compose -f docker-compose.binance.btc.usdt.train.yaml up -d
+docker compose -f docker-compose.binance.btc.usdt.train.yaml up -d
 ```
 ### Run docker compose with predict model (periodically restart this compose to update model)
 ```sh
-cp docker compose -f docker-compose.binance.btc.usdt.train.yaml up -d
+docker compose -f docker-compose.binance.btc.usdt.train.yaml up -d
+```
+### Run docker compose with Streamlit UI (host: localhost:8501)
+```sh
+docker compose -f docker-compose.binance.btc.usdt.ui.yaml up -d
 ```
 ### Monitor data with InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret.db)
 ## RUN MANUAL
@@ -182,218 +191,167 @@ PYTHONPATH=../src/ python ../src/ccf/collect_metrics.py -cd conf -cn collect_met
 tensorboard --logdir tensorboard/ --host 0.0.0.0 --port 6007
 ```
 ### $$\textcolor{#eeeeee}{\text{RUN UI}}$$
-* TODO
+* Streamlit (localhost:8501)
 ```sh
-PYTHONPATH=../src/ streamlit run ../src/ccf/apps/ui.py conf/ui-mid-lograt-tft-kafka-binance-btc-usdt
+PYTHONPATH=../src/ streamlit run ../src/ccf/apps/ui.py conf/ui-mid-lograt-tft-kafka-binance-btc-usdt.yaml
 ```
 ## CONFIGS EXAMPLES
 ### $$\textcolor{#4dd0e1}{\text{GET DATA}}$$
-`work/conf/get_data_multi.yaml`
+`work/conf/get_data-kafka-binance-btc-usdt.yaml`
 ```yaml
 defaults:
- - feeds: all
- - markets: three
- - streams: 1000_d5_t
- - run_kwargs: none
+ - _self_
+ - partitioner@agents.lob.partitioner: lob
+ - partitioner@agents.trade.partitioner: trade
+ - partitioner@agents.news.partitioner: news
+ - feeds@agents.news.feeds: all
 
-executor_kwargs:
-  max_workers: 7
-market_kwargs:
-  verbose: false
-feeds_kwargs:
-  split: 1
-  delay: 3
-  before: 3600
-  verbose: false
+executor:
+  class: ProcessPoolExecutor
+  max_workers: 3
+agents:
+  lob:
+    class: Lob
+    topic: lob
+    keys: [ binance-btc-usdt ]
+    delay: 1
+    timeout: 60
+    depth: 5
+    verbose: true
+    producer:
+      bootstrap_servers: "kafka:9092"
+    partitioner: ~
+    app: ~
+    run: ~
+    executor:
+      class: ProcessPoolExecutor
+      max_workers: 1
+  trade:
+    class: Trade
+    topic: trade
+    keys: [ binance-btc-usdt ]
+    delay: 1
+    timeout: 60
+    verbose: true
+    producer:
+      bootstrap_servers: "kafka:9092"
+    partitioner: ~
+    app: ~
+    run: ~
+    executor:
+      class: ProcessPoolExecutor
+      max_workers: 1
+  news:
+    class: Feed
+    topic: news
+    feeds: {}
+    delay: ~
+    start: -3600
+    timeout: 5
+    feeds_per_group: ~
+    verbose: 2
+    producer:
+      bootstrap_servers: "kafka:9092"
+    partitioner: ~
+    executor:
+      class: ProcessPoolExecutor
+      max_workers: 1
 ```
 ### $$\textcolor{#a2fca2}{\text{EXTRACT FEATURES}}$$
-`work/conf/extract_features.yaml`
+`work/conf/extract_features-kafka-binance-btc-usdt.yaml`
 ```yaml
-verbose: true
-delay: 1
-remove_pre_features: false
-pre_features:
-- feature: m_p
-  depth: ~
-- feature: get
-  columns: [ a_p_*, b_p_* ]
-post_features:
-- feature: relative
-  kind: rat
-  shift: 1
-- feature: relative
-  shift: 0
-  kind: rat
-  columns: [ "o_m_p_[1-9]*", "o_a_p_[1-9]*", "o_b_p_[1-9]*" ]
-  column: o_m_p_0
-- feature: relative
-  shift: 0
-  kind: rat
-  columns: [ "o_a_p_[1-9]*" ]
-  column: o_a_p_0
-- feature: relative
-  shift: 0
-  kind: rat
-  columns: [ "o_b_p_[1-9]*" ]
-  column: o_b_p_0
-resample_kwargs:
-  rule: 1S
-aggregate_kwargs:
-  func: last
-interpolate_kwargs:
-  func: pad
-feature_data_kwargs:
-  start: -5
-  end: ~
-  concat: false
-  query:
-    feature:
-      btcusdt:
-        engine_kwargs:
-          url: sqlite:///btcusdt@feature.db
-        read_kwargs:
-          name: data
-          columns: ~
-        write_kwargs:
-          name: data
-          if_exists: append
-      ethusdt:
-        engine_kwargs:
-          url: sqlite:///ethusdt@feature.db
-        read_kwargs:
-          name: data
-          columns: ~
-        write_kwargs:
-          name: data
-          if_exists: append
-      ethbtc:
-        engine_kwargs:
-          url: sqlite:///ethbtc@feature.db
-        read_kwargs:
-          name: data
-          columns: ~
-        write_kwargs:
-          name: data
-          if_exists: append
-raw_data_kwargs:
-  start: -5
-  end: ~
-  concat: False
-  query:
-    btcusdt:
-      o:
-        engine_kwargs:
-          url: sqlite:///btcusdt@depth5@1000ms.db
-        read_kwargs:
-          name: data
-          columns: ~
-    ethusdt:
-      o:
-        engine_kwargs:
-          url: sqlite:///ethusdt@depth5@1000ms.db
-        read_kwargs:
-          name: data
-          columns: ~
-    ethbtc:
-      o:
-        engine_kwargs:
-          url: sqlite:///ethbtc@depth5@1000ms.db
-        read_kwargs:
-          name: data
-          columns: ~
+defaults:
+  - partitioner@consumer.partitioners.lob: lob
+  - partitioner@consumer.partitioners.trade: trade
+  - partitioner@producer.partitioners.feature: feature
+  - _self_
+
+quant: 3.0e+9
+consumer:
+  bootstrap_servers: "kafka:9092"
+producer:
+  bootstrap_servers: "kafka:9092"
+agents:
+  a_1:
+    class: Delta
+    verbose: true
+    consumers:
+      c_1:
+        topic_keys:
+          lob: [ binance-btc-usdt ]
+          trade: [ binance-btc-usdt ]
+    producers:
+      p_1:
+        topic_keys:
+          feature: [ binance-btc-usdt ]
 ```
-### $$\textcolor{#eeff41}{\text{TRAIN/TUNE MULTI TARGET TFT}}$$ 
-`work/conf/train_multi_tgt_tft.yaml`
+### $$\textcolor{#eeff41}{\text{TRAIN/TUNE}}$$ 
+`work/conf/train-mlflow-mid-lograt-tft-kafka-binance-btc-usdt.yaml`
 ```yaml
-model_path: multi_tgt_tft.ckpt
-tune: true
+defaults:
+ - _self_
+ - partitioner@create_dataset_kwargs.agents.a_1.consumer.partitioners.feature: feature
+ - dataset@create_dataset_kwargs.dataset_kwargs: mid-lograt-kafka-binance-btc-usdt
+
+kind: occasional
+parent_name: ~
+parent_version: ~
+parent_stage: ~
+model_name: mid-lograt-tft-kafka-binance-btc-usdt
 create_dataset_kwargs:
+  verbose: false
+  quant: 3.0e+9
+  size: 1200
+  replace_nan: 0.0
+  agents:
+    a_1: 
+      class: KafkaDataset
+      verbose: true
+      topics: [ feature ]
+      executor_kwargs:
+        class: ProcessPoolExecutor
+        max_workers: 1
+      feature_keys:
+        Delta-default-lograt: [ binance-btc-usdt ]
+      consumer:
+        bootstrap_servers: "kafka:9092"
   split: 0.8
-  feature_data_kwargs:
-    start: -360
-    end: ~
-    concat: false
-    query:
-      feature:
-        btcusdt:
-          engine_kwargs:
-            url: sqlite:///btcusdt@feature.db
-          read_kwargs:
-            name: data
-            columns: ~
-          write_kwargs:
-            name: data
-            if_exists: append
-        ethusdt:
-          engine_kwargs:
-            url: sqlite:///ethusdt@feature.db
-          read_kwargs:
-            name: data
-            columns: ~
-          write_kwargs:
-            name: data
-            if_exists: append
-        ethbtc:
-          engine_kwargs:
-            url: sqlite:///ethbtc@feature.db
-          read_kwargs:
-            name: data
-            columns: ~
-          write_kwargs:
-            name: data
-            if_exists: append
-  dataset_kwargs:
-    time_idx: time_idx
-    allow_missing_timesteps: true
-    add_relative_time_idx: true
-    target: [o_a_p_0, o_b_p_0]
-    group_ids:
-    - group
-    static_categoricals:
-    - group
-    max_encoder_length: 10
-    max_prediction_length: 5
-    time_varying_unknown_reals:
-    - o_a_p_0
-    - o_b_p_0
-    target_normalizer:
-      class: GroupNormalizer
-      groups: [ group ]
-    scalers:
-      class: GroupNormalizer
-      groups: [ group ]
 dataloader_kwargs:
   train:
     train: true
-    num_workers: 2
-    batch_size: 32
+    num_workers: 0
+    batch_size: 8
   val:
     train: false
-    num_workers: 2
-    batch_size: 32
+    num_workers: 0
+    batch_size: 8
 model_kwargs:
   class: TemporalFusionTransformer
-  learning_rate: 0.003
-  hidden_size: 32
+  learning_rate: 0.0078125
+  hidden_size: 8
   attention_head_size: 1
-  dropout: 0.1
-  hidden_continuous_size: 16
+  dropout: 0
+  hidden_continuous_size: 8
+  lstm_layers: 1
   # output_size: 7  # Inferred from loss
   loss:
     class: QuantileLoss
   log_interval: 0
   reduce_on_plateau_patience: 2
+  reduce_on_plateau_reduction: 2
+  reduce_on_plateau_min_lr: 1.0e-10
+  weight_decay: 0
 trainer_kwargs:
-  max_epochs: 32
+  max_epochs: 8
   accelerator: cpu  # gpu
-  # devices: [ 0 ]
-  gradient_clip_val: 0.1
-  log_every_n_steps: 50
-  # limit_train_batches: 10
+  devices: ~
+  gradient_clip_val: 0
+  log_every_n_steps: 100
+  limit_train_batches: ~
   logger:
   - class: TensorBoardLogger
     save_dir: tensorboard
-    name: multi_tgt_tft
+    name: mid-lograt-tft-kafka-binance-btc-usdt
   callbacks:
   - class: LearningRateMonitor
     logging_interval: step
@@ -409,241 +367,45 @@ trainer_kwargs:
     verbose: false
     mode: min
 ```
-### $$\textcolor{#ffab40}{\text{MAKE PREDICTIONS WITH MULTI TARGET TFT}}$$
-`work/conf/predict_multi_tgt_tft.yaml`
+### $$\textcolor{#ffab40}{\text{MAKE PREDICTIONS}}$$
+`work/conf/predict-mlflow-mid-lograt-tft-kafka-binance-btc-usdt.yaml`
 ```yaml 
 defaults:
- - ./@train_kwargs: train_multi_tgt_tft
-
-model_path: multi_tgt_tft.ckpt
-verbose: true
-past: 360
-rule: 1S
+ - partitioner@agents.a_1.producers.p_1.partitioners.prediction: prediction
+ 
+kind: auto_update
+model_name: mid-lograt-tft-kafka-binance-btc-usdt
+model_version: ~
+model_stage: ~
+verbose: false
+size: 20
+watermark: 6e9
+horizons: [ 5, 10, 15, 20 ]
 predict_kwargs:
   return_index: true
   mode: prediction  # prediction or quantiles
-engine_kwargs:
-  url: sqlite:///multi_tgt_tft@prediction.db
-write_kwargs:
-  name: data
-  if_exists: append
+agents:
+  a_1:
+    class: Kafka
+    producers:
+      p_1:
+        bootstrap_servers: "kafka:9092"
+        topic_keys:
+          prediction: [ binance-btc-usdt ]
 ```
-### $$\textcolor{#adadad}{\text{MONITOR RAW DATA METRICS}}$$
-`conf/work/monitor_raw.yaml`
+### $$\textcolor{#eeff41}{\text{TRAIN/TUNE}}$$
+Use InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret.db)
+### $$\textcolor{#eeeeee}{\text{RUN UI}}$$
+`conf/work/ui-mid-lograt-tft-kafka-binance-btc-usdt.yaml`
 ```yaml 
-delay: 600
-log_dir: monitor/raw
-report_kwargs:
-  metrics: 
-  - class: DataDriftPreset
-  - class: DataQualityPreset
-test_kwargs:
-  tests:
-  - class: DataQualityTestPreset
-  - class: DataStabilityTestPreset
-column_mapping_kwargs:
-  datetime: time
-read_data_kwargs:
-  start: -600
-  end: ~
-  query:
-    btcusdt_orderbook:
-      o:
-        engine_kwargs:
-          url: sqlite:///btcusdt@depth5@1000ms.db
-        read_kwargs:
-          name: data
-    ethusdt_orderbook:
-      o:
-        engine_kwargs:
-          url: sqlite:///ethusdt@depth5@1000ms.db
-        read_kwargs:
-          name: data
-    ethbtc_orderbook:
-      o:
-        engine_kwargs:
-          url: sqlite:///ethbtc@depth5@1000ms.db
-        read_kwargs:
-          name: data
-    btcusdt_trades:
-      t:
-        engine_kwargs:
-          url: sqlite:///btcusdt@trade.db
-        read_kwargs:
-          name: data
-    ethusdt_trades:
-      t:
-        engine_kwargs:
-          url: sqlite:///ethusdt@trade.db
-        read_kwargs:
-          name: data
-    ethbtc_trades:
-      t:
-        engine_kwargs:
-          url: sqlite:///ethbtc@trade.db
-        read_kwargs:
-          name: data
-    news:
-      n:
-        engine_kwargs:
-          url: sqlite:///news.db
-        read_kwargs:
-          name: data
-```
-### $$\textcolor{#adadad}{\text{MONITOR FEATURES METRICS}}$$
-`conf/work/monitor_reatures.yaml`
-```yaml 
-delay: 600
-log_dir: monitor/features
-report_kwargs:
-  metrics: 
-  - class: DataDriftPreset
-  - class: DataQualityPreset
-test_kwargs:
-  tests:
-  - class: DataQualityTestPreset
-  - class: DataStabilityTestPreset
-column_mapping_kwargs:
-  datetime: time
-read_data_kwargs:
-  start: -600
-  end: ~
-  concat: false
-  query:
-    feature:
-      btcusdt:
-        engine_kwargs:
-          url: sqlite:///btcusdt@feature.db
-        read_kwargs:
-          name: data
-          columns: ~
-        write_kwargs:
-          name: data
-          if_exists: append
-      ethusdt:
-        engine_kwargs:
-          url: sqlite:///ethusdt@feature.db
-        read_kwargs:
-          name: data
-          columns: ~
-        write_kwargs:
-          name: data
-          if_exists: append
-      ethbtc:
-        engine_kwargs:
-          url: sqlite:///ethbtc@feature.db
-        read_kwargs:
-          name: data
-          columns: ~
-        write_kwargs:
-          name: data
-          if_exists: append
-```
-### $$\textcolor{#eeeeee}{\text{RUN MULTI TARGET TFT UI}}$$
-`conf/work/ui_multi_tgt_tft.yaml`
-```yaml 
-delay: 1
-read_data_kwargs:
-  start: -30
-  end: ~
-  query:
-    btcusdt:
-      target:
-        engine_kwargs:
-          url: sqlite:///btcusdt@feature.db
-        read_kwargs:
-          name: data
-          columns: [ time, o_a_p_0, o_b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-      tft:
-        engine_kwargs:
-          url: sqlite:///multi_tgt_tft@prediction.db
-        read_kwargs:
-          name: data
-          group: btcusdt
-          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-      naive:
-        engine_kwargs:
-          url: sqlite:///multi_tgt_tft_naive@prediction.db
-        read_kwargs:
-          name: data
-          group: btcusdt
-          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-    ethusdt:
-      target:
-        engine_kwargs:
-          url: sqlite:///ethusdt@feature.db
-        read_kwargs:
-          name: data
-          columns: [ time, o_a_p_0, o_b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-      tft:
-        engine_kwargs:
-          url: sqlite:///multi_tgt_tft@prediction.db
-        read_kwargs:
-          name: data
-          group: ethusdt
-          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-      naive:
-        engine_kwargs:
-          url: sqlite:///multi_tgt_tft_naive@prediction.db
-        read_kwargs:
-          name: data
-          group: ethusdt
-          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-    ethbtc:
-      target:
-        engine_kwargs:
-          url: sqlite:///ethbtc@feature.db
-        read_kwargs:
-          name: data
-          columns: [ time, o_a_p_0, o_b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-      tft:
-        engine_kwargs:
-          url: sqlite:///multi_tgt_tft@prediction.db
-        read_kwargs:
-          name: data
-          group: ethbtc
-          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
-      naive:
-        engine_kwargs:
-          url: sqlite:///multi_tgt_tft_naive@prediction.db
-        read_kwargs:
-          name: data
-          group: ethbtc
-          columns: [ time, pred-o_a_p_0, pred-o_b_p_0 ]
-          resample_kwargs:
-            rule: 1S
-          aggregate_kwargs:
-            func: last
+defaults:
+  - partitioner@partitioner: prediction
+  - _self_
+
+consumer:
+  bootstrap_servers: "kafka:9092"
+topics: [ prediction ]
+keys: [ binance-btc-usdt ]
+maxsize: 40
+horizon: 20
 ```

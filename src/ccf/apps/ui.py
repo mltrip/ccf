@@ -2,6 +2,10 @@ import sys
 import time
 from datetime import datetime, timedelta
 from copy import deepcopy
+from pathlib import Path
+from pprint import pprint
+import json
+from collections import deque
 
 import numpy as np
 import pandas as pd
@@ -10,156 +14,81 @@ import plotly.express as px
 from sqlalchemy import create_engine
 import streamlit as st
 import yaml
-
-from ccf.read_data import read_data
-from ccf.utils import rat2val
-
-
-def make_time_charts(data, accumulate=False):
-  charts = []
-  for name, df in data.items():
-    value_vars = df.columns
-    if accumulate:
-      now = datetime.utcnow()
-      future_mask = df.index > now
-      past_mask = ~future_mask
-      for c in df:
-        parts = []
-        if past_mask.sum():
-          past = rat2val(df[c][past_mask])
-          parts.append(past)
-        if future_mask.sum():
-          future = rat2val(df[c][future_mask])
-          parts.append(future)
-        if len(parts) > 0:
-          df[c] = pd.concat(parts)
-    df['time'] = df.index
-    df = df.melt(id_vars=['time'], 
-                 value_vars=value_vars, 
-                 var_name='variable', 
-                 value_name='value')
-    lines = (
-      alt.Chart(df, title=f'{name}')
-      .mark_line()
-      .encode(
-          x='time',
-          y=alt.Y('value', 
-                  scale=alt.Scale(
-                    zero=False,
-                  ),
-                 ),
-          color=alt.Color('variable', scale=alt.Scale(scheme='category20')),
-      )
-    )
-    charts.append(lines)
-  return charts
+from hydra import compose, initialize_config_dir
+from hydra.core.global_hydra import GlobalHydra
+from omegaconf import OmegaConf
+from kafka import KafkaConsumer, KafkaProducer, TopicPartition
+from ccf import partitioners as ccf_partitioners
 
 
-def make_metrics_box(data):
-  charts = []
-  for n, d in data.items():
-    for nn, df in d.items():
-      # print(n, nn)
-      # print(df.describe(include='all'))
-      # ['horizon', 'group', 'metric', 'label', 'value', 'model', 'prediction', 'kind', 'target']
-      for (label, group), dff in df.groupby(['label', 'group']):
-        dff['time'] = dff.index
-        chart = alt.Chart(dff, title=f'{n} {label} {group} ({len(dff)} samples)').mark_boxplot(
-          # extent='min-max').encode(
-          extent=1.5).encode(
-          x='model:N',
-          y=alt.Y('value:Q',scale=alt.Scale(zero=False)),
-          row='kind:N',
-          column='horizon:O',
-          # color=alt.Color('model:N', scale=alt.Scale(scheme='category20'))
-          color=alt.Color('model:N', legend=None)
-        ).properties(
-          width=100,
-          height=100).resolve_scale(y='independent')
-        charts.append(chart)
-  return charts
-
-
-def make_metrics_heatmap(data):
-  charts = []
-  for n, d in data.items():
-    for nn, df in d.items():
-      # ['horizon', 'group', 'metric', 'label', 'value', 'model', 'prediction', 'kind', 'target']
-      for (kind, group, label), dff in df.groupby(['kind', 'group', 'label']):
-        dff['name'] = dff['model']
-        # base = alt.Chart(dff, title=f'{n} {group} {label} {kind} {len(dff)}').transform_joinaggregate(
-        #   mean_value='mean(value)',
-        #   count_value='count(value)',
-        #   groupby=['horizon', 'name']
-        base = alt.Chart(dff, title=f'{n} {group} {label} {kind} ({len(dff)} samples)').transform_aggregate(
-          mean_value='mean(value)',
-          groupby=['horizon', 'name']
-        ).encode(
-          alt.X('horizon:O', scale=alt.Scale(paddingInner=0)),
-          alt.Y('name:N', scale=alt.Scale(paddingInner=0)),
-        )
-        heatmap = base.mark_rect().encode(
-          color=alt.Color('mean_value:Q',
-            scale=alt.Scale(scheme='redyellowgreen', reverse=True),
-            legend=alt.Legend(direction='vertical')
-          )
-        )
-        text = base.mark_text(baseline='middle').encode(
-          text='mean_value:Q',
-        )
-        # heatmap2 = base.mark_rect().encode(
-        #   color=alt.Color('count_value:Q',
-        #     scale=alt.Scale(scheme='redyellowgreen', reverse=True),
-        #     legend=alt.Legend(direction='vertical')
-        #   )
-        # )
-        # text2 = base.mark_text(baseline='middle').encode(
-        #   text='count_value:O',
-        # )
-        c1 = (heatmap + text).properties(width=800, height=400)
-        # c2 = (heatmap2 + text2).properties(width=400, height=400)
-        # chart = c1 | c2
-        charts.append(c1)
-  return charts
-
-
-def ui(read_data_kwargs=None, read_metrics_kwargs=None, 
-       delay=0, accumulate=False, metrics_kind='heatmap'):
+def main(partitioner, consumer, topics, keys, maxsize, horizon):
   st.set_page_config(
-    page_title="CryptoCurrency Forecasting",
+    page_title="Crypto Currency Forecasting",
     page_icon="₿",
     layout="wide")
-  st.title("CryptoCurrency Forecasting")
+  partitioner_class = partitioner.pop('class')
+  partitioner = getattr(ccf_partitioners, partitioner_class)(**partitioner)
+  partitioner.update()
+  consumer['key_deserializer'] = partitioner.deserialize_key
+  consumer['value_deserializer'] = partitioner.deserialize_value
+  consumer = KafkaConsumer(**consumer)
+  partitions = list(set([y for x in keys for y in partitioner[x]]))
+  topic_partitions = [TopicPartition(x, y) for x in topics for y in partitions]
+  consumer.assign(topic_partitions)
+  threshold = 0.01*st.number_input('Decision threshold, %', min_value=0., value=0., format='%.4f')
   placeholder = st.empty()
-  while True:
-    print(datetime.utcnow())
-    t0 = time.time()
-    # placeholder.empty()
-    if read_data_kwargs is not None:
-      data = read_data(**read_data_kwargs)
-      charts = make_time_charts(data, accumulate)
+  data = deque()
+  for message in consumer:
+    value = message.value
+    if message.topic == 'prediction' and value.get('horizon', None) == horizon:
+      value['prediction'] = value['value']
+      value['actual'] = None
+      if len(data) >= horizon:
+        data[-horizon]['actual'] = value['last']
+      data.append(value)  
+      df = pd.DataFrame(data)
+      df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ns')
+      df = df.set_index('timestamp', drop=False)
       with placeholder.container():
-          for chart in charts:
-            st.altair_chart(chart, use_container_width=True)
-    if read_metrics_kwargs is not None:
-      metrics_data = read_data(**read_metrics_kwargs)
-      if metrics_kind == 'box':
-        metrics_charts = make_metrics_box(metrics_data)
-      elif metrics_kind == 'heatmap':
-        metrics_charts = make_metrics_heatmap(metrics_data)
-      else:
-        raise NotImplementedError(metrics_kind)
-      with placeholder.container():
-        for chart in metrics_charts:
-          st.altair_chart(chart, use_container_width=False)
-    dt = time.time() - t0
-    wt = max(0, delay - dt)
-    print(f'dt: {dt:.3f}, wt: {wt:.3f}')
-    time.sleep(wt)
-  
+        # st.json(json.dumps(value))
+        # st.dataframe(df)
+        # https://www.w3.org/wiki/CSS/Properties/color/keywords
+        change = value['prediction'] / value['last'] - 1
+        if change > threshold:
+          st.success('BUY')
+        elif change < -threshold:
+          st.error('SELL')
+        else:
+          st.warning('HOLD')
+        df_melt = df.melt(value_name='price', var_name='type', 
+                          id_vars=['timestamp'], value_vars=['last', 'prediction', 'actual'])
+        time_horizon = timedelta(seconds=horizon*value['quant']/1e9)
+        col_last, col_prediction = st.columns(2)
+        col_last.metric(f'{value["exchange"]}-{value["base"]}-{value["quote"]} last', 
+                        value=f'{value["last"]:.4f}',
+                        delta=None)
+        col_prediction.metric(f'{value["exchange"]}-{value["base"]}-{value["quote"]} with horizon {time_horizon}', 
+                              value=f'{value["prediction"]:.4f}',
+                              delta=f'{change*100:.4f}%')
+        fig = px.line(df_melt, x='timestamp', y='price', 
+                      color='type', template='plotly_dark')        
+        st.plotly_chart(fig, use_container_width=True,
+                        sharing="streamlit", theme="streamlit")
+      if len(df) == maxsize:
+        data.popleft()
+
   
 if __name__ == "__main__":
-  cfg = sys.argv[1] if len(sys.argv) > 1 else 'ui.yaml'
-  with open(cfg) as f:
-    kwargs = yaml.safe_load(f)
-  ui(**kwargs)
+  config_path = sys.argv[1] if len(sys.argv) > 1 else 'conf/ui.yaml'
+  #   with open(config_path) as f:
+  #     config = yaml.safe_load(f)
+  config_path = Path(config_path)
+  config_name = config_path.stem
+  config_dir = Path(config_path.parts[0]).resolve()
+  print(f'config_name: {config_name}\nconfig_dir: {config_dir}')
+  # GlobalHydra.instance().clear()
+  with initialize_config_dir(config_dir=str(config_dir)):
+    config = compose(config_name=config_name)
+  kwargs = OmegaConf.to_object(config)
+  pprint(kwargs)
+  main(**kwargs)

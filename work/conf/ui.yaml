@@ -1,0 +1,10 @@
+defaults:
+  - partitioner@partitioner: prediction
+  - _self_
+
+consumer:
+  bootstrap_servers: "kafka:9092"
+topics: [ prediction ]
+keys: [ binance-btc-usdt ]
+maxsize: 40
+horizon: 20
