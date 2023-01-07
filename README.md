@@ -108,7 +108,8 @@ docker compose -f docker-compose.binance.btc.usdt.train.mlflow.yaml up -d
 ```sh
 docker compose -f docker-compose.binance.btc.usdt.ui.yaml up -d
 ```
-### Monitor data with InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret.db)
+### Monitor InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret.db)
+### Monitor MLflow (host: localhost:5000, user: ccf, password: see .env.secret.model)
 ### DOCKER WITHOUT MLFLOW
 ```sh
 cd docker
@@ -149,7 +150,8 @@ docker compose -f docker-compose.binance.btc.usdt.train.yaml up -d
 ```sh
 docker compose -f docker-compose.binance.btc.usdt.ui.yaml up -d
 ```
-### Monitor data with InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret.db)
+### Monitor InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret.db)
+### Monitor MLflow (host: localhost:5000, user: ccf, password: see .env.secret.model)
 ## RUN MANUAL
 ```sh
 cd work
@@ -184,13 +186,15 @@ PYTHONPATH=../src/ python ../src/ccf/predict.py -cd conf -cn predict-mid-lograt-
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/collect_metrics.py -cd conf -cn collect_metrics-kafka-binance-btc-usdt
 ```
-### $$\textcolor{#adadad}{\text{MONITOR METRICS}}$$ 
-* Monitor data with InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret)
+### $$\textcolor{#eeeeee}{\text{MONITOR METRICS}}$$ 
+* Monitor metrics with InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret.db)
+* Monitor metrics with MLflow (host: localhost:5000, user: ccf, password: see .env.secret.model)
 * Tensorboard (localhost:6007)
 ```sh
+cd work
 tensorboard --logdir tensorboard/ --host 0.0.0.0 --port 6007
 ```
-### $$\textcolor{#eeeeee}{\text{RUN UI}}$$
+### $$\textcolor{#adadad}{\text{RUN UI}}$$
 * Streamlit (localhost:8501)
 ```sh
 PYTHONPATH=../src/ streamlit run ../src/ccf/apps/ui.py conf/ui-mid-lograt-tft-kafka-binance-btc-usdt.yaml
@@ -393,9 +397,10 @@ agents:
         topic_keys:
           prediction: [ binance-btc-usdt ]
 ```
-### $$\textcolor{#eeff41}{\text{TRAIN/TUNE}}$$
-Use InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret.db)
-### $$\textcolor{#eeeeee}{\text{RUN UI}}$$
+### $$\textcolor{#eeeeee}{\text{MONITOR METRICS}}$$ 
+* Use InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret.db)
+* Use MLflow (host: localhost:5000, user: ccf, password: see .env.secret.model)
+### $$\textcolor{#adadad}{\text{RUN UI}}$$
 `conf/work/ui-mid-lograt-tft-kafka-binance-btc-usdt.yaml`
 ```yaml 
 defaults:
