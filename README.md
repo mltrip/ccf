@@ -19,7 +19,9 @@ There are metrics collectors and monitors with techincal information about `raw 
 ### $$\textcolor{#adadad}{\text{UI}}$$
 We show `users`: `predictions`, performance `metrics`, `raw data`, etc. This part uses some information from METRICS part
 ## Process
-![architecture](docs/process.png)
+![process](docs/process.png)
+## Deployment
+![process](docs/deployment.png)
 
 ## INSTALL
 ### Python 3.9
