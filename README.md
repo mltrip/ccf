@@ -104,7 +104,7 @@ docker compose -f docker-compose.binance.btc.usdt.train.mlflow.yaml up -d
 ```
 ### Run docker compose with predict model
 ```sh
-docker compose -f docker-compose.binance.btc.usdt.train.mlflow.yaml up -d
+docker compose -f docker-compose.binance.btc.usdt.predict.mlflow.yaml up -d
 ```
 ### Run docker compose with Streamlit UI (localhost:8501)
 ```sh
@@ -146,7 +146,7 @@ docker compose -f docker-compose.binance.btc.usdt.train.yaml up -d
 ```
 ### Run docker compose with predict model (periodically restart this compose to update model)
 ```sh
-docker compose -f docker-compose.binance.btc.usdt.train.yaml up -d
+docker compose -f docker-compose.binance.btc.usdt.predict.yaml up -d
 ```
 ### Run docker compose with Streamlit UI (host: localhost:8501)
 ```sh
