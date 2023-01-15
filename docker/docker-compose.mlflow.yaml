@@ -48,13 +48,15 @@ services:
     image: quay.io/minio/mc
     env_file:
       - .env.secret.mlflow
+    environment:
+      MINIO_ROOT_USER: ccf
     networks:
       - mlflow
     depends_on:
       - minio_mlflow
     entrypoint: >
       /bin/sh -c "
-      until (/usr/bin/mc config host add ccf http://minio-mlflow:9000 $${MINIO_ACCESS_KEY} $${MINIO_SECRET_KEY}) do echo '...waiting...' && sleep 1; done;
+      until (/usr/bin/mc config host add ccf http://minio-mlflow:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD}) do echo '...waiting...' && sleep 1; done;
       /usr/bin/mc mb ccf/mlflow;
       /usr/bin/mc policy set public ccf/mlflow;
       exit 0;
@@ -108,14 +110,15 @@ services:
       - .env.secret.mlflow
     environment:
       MLFLOW_S3_ENDPOINT_URL: "http://nginx-minio:9000"
+      MINIO_ROOT_USER: ccf
     depends_on:
       - minio_mlflow_mc
       - postgres_mlflow
     # postgresql://user:password@host:port/db
     command: >
       /bin/sh -c "
-      AWS_ACCESS_KEY_ID=$${MINIO_ACCESS_KEY}
-      AWS_SECRET_ACCESS_KEY=$${MINIO_SECRET_KEY}
+      AWS_ACCESS_KEY_ID=$${MINIO_ROOT_USER}
+      AWS_SECRET_ACCESS_KEY=$${MINIO_ROOT_PASSWORD}
       mlflow server 
       --backend-store-uri postgresql://ccf:$${POSTGRES_PASSWORD}@postgres_mlflow:5432/mlflow
       --artifacts-destination s3://mlflow 
