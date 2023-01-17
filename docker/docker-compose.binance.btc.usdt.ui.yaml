@@ -13,7 +13,7 @@ services:
     entrypoint: [ streamlit ]
     ports:
       - "8501:8501"
-    command: [ run, ../src/ccf/apps/ui.py, conf/ui.yaml ]
+    command: [ run, ../src/ccf/apps/ui.py, conf/ui-mid-lograt-tft-kafka-binance-btc-usdt.yaml ]
     environment:
       PYTHONPATH: /app/src
     # volumes:
