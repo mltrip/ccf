@@ -21,38 +21,8 @@ We show `users`: `predictions`, performance `metrics`, `raw data`, etc. This par
 ## Process
 ![process](docs/process.png)
 ## Deployment
-![process](docs/deployment.png)
+![deployment](docs/deployment.png)
 
-## INSTALL
-### Python 3.9
-### $$\textcolor{#ffffff}{\text{ALL}}$$ 
-```sh
-pip install -r requirements.txt
-```
-### $$\textcolor{#4dd0e1}{\text{DATA}}$$ 
-```sh
-pip install -r src/ccf/requirements_data.txt
-```
-### $$\textcolor{#a2fca2}{\text{FEATURES}}$$
-```sh
-pip install -r src/ccf/requirements_features.txt
-``` 
-### $$\textcolor{#eeff41}{\text{ML}}$$ 
-```sh
-pip install -r src/ccf/requirements_ml.txt
-```
-### $$\textcolor{#ffab40}{\text{PREDICTIONS}}$$ 
-```sh
-pip install -r src/ccf/requirements_predictions.txt
-```
-### $$\textcolor{#eeeeee}{\text{METRICS}}$$
-```sh
-pip install -r src/ccf/requirements_metrics.txt
-```
-### $$\textcolor{#adadad}{\text{UI}}$$
-```sh
-pip install -r src/ccf/requirements_ui.txt
-```
 ## RUN DOCKER
 ### DOCKER WITH MLFLOW
 ```sh
@@ -110,9 +80,14 @@ docker compose -f docker-compose.binance.btc.usdt.predict.mlflow.yaml up -d
 ```sh
 docker compose -f docker-compose.binance.btc.usdt.ui.yaml up -d
 ```
+### Monitor Streamlit (host: localhost:8501)
+![streamlit](docs/streamlit.png)
 ### Monitor InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret.db)
+![influxdb](docs/influxdb.png)
 ### Monitor MLflow (host: localhost:5000, user: ccf, password: see .env.secret.model)
-### DOCKER WITHOUT MLFLOW
+![mlflow](docs/mlflow.png)
+
+## DOCKER WITHOUT MLFLOW
 ```sh
 cd docker
 ```
@@ -152,13 +127,45 @@ docker compose -f docker-compose.binance.btc.usdt.predict.yaml up -d
 ```sh
 docker compose -f docker-compose.binance.btc.usdt.ui.yaml up -d
 ```
+### Monitor Streamlit (host: localhost:8501)
 ### Monitor InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret.db)
-### Monitor MLflow (host: localhost:5000, user: ccf, password: see .env.secret.model)
+
 ## RUN MANUAL
+### INSTALL
+#### Python 3.9
+#### $$\textcolor{#ffffff}{\text{ALL}}$$ 
+```sh
+pip install -r requirements.txt
+```
+#### $$\textcolor{#4dd0e1}{\text{DATA}}$$ 
+```sh
+pip install -r src/ccf/requirements_data.txt
+```
+#### $$\textcolor{#a2fca2}{\text{FEATURES}}$$
+```sh
+pip install -r src/ccf/requirements_features.txt
+``` 
+#### $$\textcolor{#eeff41}{\text{ML}}$$ 
+```sh
+pip install -r src/ccf/requirements_ml.txt
+```
+#### $$\textcolor{#ffab40}{\text{PREDICTIONS}}$$ 
+```sh
+pip install -r src/ccf/requirements_predictions.txt
+```
+#### $$\textcolor{#eeeeee}{\text{METRICS}}$$
+```sh
+pip install -r src/ccf/requirements_metrics.txt
+```
+#### $$\textcolor{#adadad}{\text{UI}}$$
+```sh
+pip install -r src/ccf/requirements_ui.txt
+```
+### RUN
 ```sh
 cd work
 ```
-### $$\textcolor{#4dd0e1}{\text{GET DATA}}$$ 
+#### $$\textcolor{#4dd0e1}{\text{GET DATA}}$$ 
 * Linux (by default)
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/get_data.py -cd conf -cn get_data-kafka-binance-btc-usdt
@@ -167,11 +174,11 @@ PYTHONPATH=../src/ python ../src/ccf/get_data.py -cd conf -cn get_data-kafka-bin
 ```sh
 cmd /C  "set PYTHONPATH=../src && python ../src/ccf/get_data.py -cd conf -cn get_data-kafka-binance-btc-usdt"
 ```
-### $$\textcolor{#a2fca2}{\text{EXTRACT FEATURES}}$$
+#### $$\textcolor{#a2fca2}{\text{EXTRACT FEATURES}}$$
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/extract_features.py -cd conf -cn extract_features-kafka-binance-btc-usdt
 ```
-### $$\textcolor{#eeff41}{\text{TRAIN/TUNE MODEL}}$$ 
+#### $$\textcolor{#eeff41}{\text{TRAIN/TUNE MODEL}}$$ 
 * Train once
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn  train-mid-lograt-tft-kafka-binance-btc-usdt
@@ -180,15 +187,15 @@ PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn  train-mid-lograt-tft
 ```sh
 while true; do PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn train-mid-lograt-tft-kafka-binance-btc-usdt; sleep 3600; done
 ```
-### $$\textcolor{#ffab40}{\text{MAKE PREDICTIONS}}$$
+#### $$\textcolor{#ffab40}{\text{MAKE PREDICTIONS}}$$
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/predict.py -cd conf -cn predict-mid-lograt-tft-kafka-binance-btc-usdt
 ```
-### $$\textcolor{#ffab40}{\text{COLLECT PREDICTIONS METRICS}}$$
+#### $$\textcolor{#ffab40}{\text{COLLECT PREDICTIONS METRICS}}$$
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/collect_metrics.py -cd conf -cn collect_metrics-kafka-binance-btc-usdt
 ```
-### $$\textcolor{#eeeeee}{\text{MONITOR METRICS}}$$ 
+#### $$\textcolor{#eeeeee}{\text{MONITOR METRICS}}$$ 
 * Monitor metrics with InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret.db)
 * Monitor metrics with MLflow (host: localhost:5000, user: ccf, password: see .env.secret.model)
 * Tensorboard (localhost:6007)
@@ -196,7 +203,7 @@ PYTHONPATH=../src/ python ../src/ccf/collect_metrics.py -cd conf -cn collect_met
 cd work
 tensorboard --logdir tensorboard/ --host 0.0.0.0 --port 6007
 ```
-### $$\textcolor{#adadad}{\text{RUN UI}}$$
+#### $$\textcolor{#adadad}{\text{RUN UI}}$$
 * Streamlit (localhost:8501)
 ```sh
 PYTHONPATH=../src/ streamlit run ../src/ccf/apps/ui.py conf/ui-mid-lograt-tft-kafka-binance-btc-usdt.yaml
