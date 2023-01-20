@@ -1,0 +1,24 @@
+time_idx: time_idx
+allow_missing_timesteps: true
+add_relative_time_idx: true
+target: lograt_1-m_p-m_p
+group_ids:
+# - exchange  # Embedding error if only one https://github.com/jdb78/pytorch-forecasting/issues/1154
+- base
+- quote
+static_categoricals:
+# - exchange  # Embedding error if only one https://github.com/jdb78/pytorch-forecasting/issues/1154
+- base
+- quote
+max_encoder_length: 20
+max_prediction_length: 20
+time_varying_unknown_reals:
+- lograt_0.*
+- lograt_1.*
+target_normalizer:
+  class: EncoderNormalizer
+scalers:
+  class: EncoderNormalizer
+categorical_encoders:
+  class: NaNLabelEncoder
+  add_nan: true

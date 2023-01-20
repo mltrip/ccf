@@ -2,7 +2,7 @@ defaults:
  - partitioner@agents.a_1.producers.p_1.partitioners.prediction: prediction
  
 kind: auto_update
-model_name: mid-lograt-tft-kafka-binance-btc-usdt
+model_name: mid-lograt-mel_20-mpl_20-tft-kafka-binance-btc-usdt-q_3-1h
 model_version: ~
 model_stage: ~
 verbose: false

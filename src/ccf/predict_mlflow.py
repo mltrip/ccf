@@ -24,8 +24,8 @@ from ccf.utils import delta2value
 from ccf.model_mlflow import load_model
 
 
-def predict(model_name, predict_kwargs, 
-            size, agents, verbose=False, horizons=None, executor=None,
+def predict(model_name, predict_kwargs, create_dataset_kwargs,
+            agents, verbose=False, horizons=None, executor=None,
             watermark=None, kind=None,
             model_version=None, model_stage=None,
             prediction_prefix='pred', dataloader_kwargs=None, delay=0):
@@ -37,13 +37,7 @@ def predict(model_name, predict_kwargs,
   # Initialize model
   model, last_version, last_stage = load_model(model_name, model_version, model_stage)
   # Initialize dataset
-  dks = model.unwrap_python_model().config['create_dataset_kwargs']
-  dks['split'] = None
-  dks['size'] = size
-  dks['watermark'] = watermark
-  quant = dks.get('quant', None)
-  dks['dataset_kwargs']['predict_mode'] = True
-  dataset = Dataset(**deepcopy(dks))
+  dataset = Dataset(**deepcopy(create_dataset_kwargs))
   # Initialize exectutor
   executor = ThreadPoolExecutor(**executor)  # TODO async
   # Predict in infinite loop
@@ -123,7 +117,7 @@ def predict(model_name, predict_kwargs,
                 'exchange': horizon_row['exchange'],
                 'base': horizon_row['base'],
                 'quote': horizon_row['quote'],
-                'quant': int(quant),
+                'quant': dataset.quant,
                 'feature': horizon_row['feature'],
                 'model': model_name,
                 'version': last_version,
@@ -147,7 +141,7 @@ def predict(model_name, predict_kwargs,
               'exchange': horizon_row['exchange'],
               'base': horizon_row['base'],
               'quote': horizon_row['quote'],
-              'quant': int(quant),
+              'quant': dataset.quant,
               'feature': horizon_row['feature'],
               'model': model_name,
               'version': last_version,

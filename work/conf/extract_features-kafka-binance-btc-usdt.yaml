@@ -13,6 +13,7 @@ agents:
   a_1:
     class: Delta
     verbose: true
+    replace_nan: 0.0
     consumers:
       c_1:
         topic_keys:

@@ -1,0 +1,44 @@
+version: '3.3'
+
+services:
+  train_mlflow_influxdb:
+    image: ccf
+    # container_name: train_mlflow_influxdb
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    networks:
+      - db
+      - mlflow
+    working_dir: /app/work
+    entrypoint: [ python ]
+    command: [ ../src/ccf/train_mlflow.py, -cd, conf, -cn, train-mlflow-influxdb-mid-lograt-tft-binance-btc-usdt ]
+    env_file:
+      - .env.secret.model
+    environment:
+      PYTHONPATH: /app/src
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_TRACKING_USERNAME: ccf
+      INFLUXDB_V2_URL: https://influxdb:8086
+      INFLUXDB_V2_ORG: mltrip
+      INFLUXDB_V2_BUCKET: ccf
+      INFLUXDB_V2_VERIFY_SSL: "False"
+      INFLUXDB_V2_TIMEOUT: 100000
+      CCF_DATASET_START: -500
+      # CCF_DATASET_STOP: 0
+      CCF_DATASET_SIZE: 80
+      CCF_DATASET_QUANT: 3.0e+9
+      CCF_DATASET_SPLIT: 0.8
+    volumes:
+      # - binance_btc_usdt:/app/work
+      - ../work:/app/work
+    # restart: always
+      
+networks:
+  db:
+    driver: bridge
+  mlflow:
+    driver: bridge
+    
+# volumes:
+#   binance_btc_usdt:

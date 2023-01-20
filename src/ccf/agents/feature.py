@@ -15,7 +15,7 @@ from ccf.utils import expand_columns
 
 
 class Delta(Kafka):
-  def __init__(self, quant, consumers, producers, verbose=False,
+  def __init__(self, quant, consumers, producers, verbose=False, replace_nan=None,
                feature=None, minsize=5, maxsize=5, delay=0, kind='lograt'):
     super().__init__(consumers, producers, verbose)
     self.quant = quant
@@ -27,6 +27,7 @@ class Delta(Kafka):
     self.delay = 0
     self.kind = kind
     self.data = deque()
+    self.replace_nan = replace_nan
     
   def __call__(self):
     if len(self.consumers) > 1:  # TODO implement with aiostream, asyncio or concurrent.futures
@@ -87,7 +88,7 @@ class Delta(Kafka):
       dfs8 = delta(df2, kind=self.kind, column='b_v', columns=['b_v_.*', 't_v_.*'], shift=0)
       df3 = pd.concat(dfs1 + dfs2 + dfs3 + dfs4 + dfs5 + dfs6 + dfs7 + dfs8, axis=1)
       df3['m_p'] = df['m_p']
-      df = df3.replace([np.inf, -np.inf], np.nan).replace({np.nan: None})
+      df = df3.replace([np.inf, -np.inf], np.nan).replace({np.nan: self.replace_nan})
       last_row = df.iloc[-1]
       new_last_datetime = last_row.name
       # pprint(sorted(list(df3.columns)))

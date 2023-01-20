@@ -1,9 +1,9 @@
 version: '3.3'
 
 services:
-  train:
+  train_mlflow_kafka:
     image: ccf
-    container_name: train_mlflow_binance_btc_usdt
+    # container_name: train_mlflow_kafka
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -12,7 +12,7 @@ services:
       - mlflow
     working_dir: /app/work
     entrypoint: [ python ]
-    command: [ ../src/ccf/train_mlflow.py, -cd, conf, -cn, train-mlflow-mid-lograt-tft-kafka-binance-btc-usdt ]
+    command: [ ../src/ccf/train_mlflow.py, -cd, conf, -cn, train-mlflow-kafka-mid-lograt-tft-binance-btc-usdt ]
     env_file:
       - .env.secret.model
     environment:

@@ -207,8 +207,11 @@ def MASE(y_true, y_pred, y_last):
     return None
 
 
-def ROR(y_true, y_pred, y_last, kind, threshold, fees):
-  dy_pred = y_pred / y_last - 1.0
+def ROR(y_true, y_pred, y_last, kind, threshold, fees, random_guess=None):
+  if random_guess is None:
+    dy_pred = y_pred / y_last - 1.0
+  else:
+    dy_pred = random.uniform(-random_guess, random_guess)
   dy_true = y_true / y_last - 1.0
   if kind == 'all':
     if abs(dy_pred) > threshold:

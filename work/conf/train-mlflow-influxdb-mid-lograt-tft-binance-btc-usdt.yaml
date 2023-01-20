@@ -1,28 +1,36 @@
 defaults:
- - _self_
- - partitioner@create_dataset_kwargs.agents.a_1.consumer.partitioners.feature: feature
  - dataset@create_dataset_kwargs.dataset_kwargs: mid-lograt-kafka-binance-btc-usdt
-
-model_path: mid-lograt-tft-kafka-binance-btc-usdt.ckpt
-tune: true
+ - _self_
+ 
+kind: occasional
+parent_name: ~
+parent_version: ~
+parent_stage: ~
+model_name: influxdb-mid-lograt-tft-binance-btc-usdt
 create_dataset_kwargs:
   verbose: false
   quant: 3.0e+9
-  size: 600
+  size: 1200
+  start: -1200
   replace_nan: 0.0
+  split: 0.8
   agents:
     a_1: 
-      class: KafkaDataset
-      verbose: true
+      class: InfluxdbDataset
+      verbose: false
       topics: [ feature ]
-      executor_kwargs:
+      executor:
         class: ProcessPoolExecutor
         max_workers: 1
       feature_keys:
         Delta-default-lograt: [ binance-btc-usdt ]
-      consumer:
-        bootstrap_servers: "kafka:9092"
-  split: 0.8
+      from_env_properties: false  # See https://github.com/influxdata/influxdb-client-python#via-environment-properties
+      bucket: ccf
+      client:
+        url: "https://influxdb:8086"
+        org: mltrip
+        timeout: 100000
+        verify_ssl: false
 dataloader_kwargs:
   train:
     train: true
@@ -49,19 +57,21 @@ model_kwargs:
   reduce_on_plateau_min_lr: 1.0e-10
   weight_decay: 0
 trainer_kwargs:
-  max_epochs: 2
+  max_epochs: 8
   accelerator: cpu  # gpu
   devices: ~
   gradient_clip_val: 0
-  log_every_n_steps: 100
+  log_every_n_steps: 50
   limit_train_batches: ~
   logger:
-  - class: TensorBoardLogger
-    save_dir: tensorboard
-    name: mid-lograt-tft-kafka-binance-btc-usdt
+  - class: MLFlowLogger
+    experiment_name: ~  # default to model_name
   callbacks:
+  - class: DeviceStatsMonitor
+    cpu_stats: true
   - class: LearningRateMonitor
-    logging_interval: step
+    logging_interval: ~
+    log_momentum: true
   - class: ModelCheckpoint
     monitor: val_loss
     filename: '{epoch}-{step}-{val_loss:.3f}'
