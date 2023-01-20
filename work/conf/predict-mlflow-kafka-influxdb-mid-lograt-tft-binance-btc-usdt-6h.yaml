@@ -1,0 +1,44 @@
+defaults:
+ - partitioner@agents.a_1.producers.p_1.partitioners.prediction: prediction
+ - partitioner@create_dataset_kwargs.agents.a_1.consumer.partitioners.feature: feature
+ - dataset@create_dataset_kwargs.dataset_kwargs: mid-lograt-kafka-binance-btc-usdt
+ - _self_
+ 
+kind: auto_update
+model_name: influxdb-mid-lograt-tft-binance-btc-usdt-6h
+model_version: ~
+model_stage: ~
+verbose: false
+horizons: [ 5, 10, 15, 20 ]
+predict_kwargs:
+  return_index: true
+  mode: prediction  # prediction or quantiles
+agents:
+  a_1:
+    class: Kafka
+    producers:
+      p_1:
+        bootstrap_servers: "kafka:9092"
+        topic_keys:
+          prediction: [ binance-btc-usdt ]
+create_dataset_kwargs:
+  verbose: false
+  quant: 3.0e+9
+  size: 20
+  watermark: 6e9
+  replace_nan: 0.0
+  split: ~
+  dataset_kwargs: 
+    predict_mode: true
+  agents:
+    a_1: 
+      class: KafkaDataset
+      verbose: false
+      topics: [ feature ]
+      executor:
+        class: ProcessPoolExecutor
+        max_workers: 1
+      feature_keys:
+        Delta-default-lograt: [ binance-btc-usdt ]
+      consumer:
+        bootstrap_servers: "kafka:9092"

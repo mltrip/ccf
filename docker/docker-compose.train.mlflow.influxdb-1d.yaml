@@ -1,7 +1,7 @@
 version: '3.3'
 
 services:
-  train_mlflow_influxdb:
+  train_mlflow_influxdb_1d:
     image: ccf
     # container_name: train_mlflow_influxdb
     build:
@@ -12,7 +12,7 @@ services:
       - mlflow
     working_dir: /app/work
     entrypoint: [ python ]
-    command: [ ../src/ccf/train_mlflow.py, -cd, conf, -cn, train-mlflow-influxdb-mid-lograt-tft-binance-btc-usdt ]
+    command: [ ../src/ccf/train_mlflow.py, -cd, conf, -cn, train-mlflow-influxdb-mid-lograt-tft-binance-btc-usdt-1d ]
     env_file:
       - .env.secret.model
     environment:
