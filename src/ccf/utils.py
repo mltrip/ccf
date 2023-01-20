@@ -1,4 +1,6 @@
 import concurrent.futures
+from datetime import datetime, timedelta
+import time
 import os
 import psutil
 import re
@@ -59,3 +61,52 @@ def wait_first_future(executor, futures):
     finally:  # Shutdown pool with all futures and kill all children processes
       executor.shutdown(wait=False, cancel_futures=True)
       kill_child_processes(os.getpid())
+
+      
+def initialize_time(start, stop, size, quant):
+  if start is not None:
+    if isinstance(start, str):
+      try:
+        start = datetime.fromisoformat(start)
+      except Exception:
+        try:
+          start = int(start)
+        except Exception:
+          raise NotImplementedError(start)
+  if stop is not None:
+    if isinstance(stop, str):
+      try:
+        stop = datetime.fromisoformat(stop)
+      except Exception:
+        try:
+          stop = int(stop)
+        except Exception:
+          raise NotImplementedError(stop)
+  if size is not None:
+    if isinstance(start, str):
+      size = int(size)
+    size = int(size)
+  if quant is not None:
+    if isinstance(quant, str):
+      quant = int(float(quant))
+    quant = int(quant)
+  if start is not None and stop is None and size is not None and quant is not None:
+    if isinstance(start, int):
+      start = time.time_ns() + start*quant
+      stop = start + size*quant
+    elif isinstance(start, datetime):
+      start = int(start.timestamp())*int(10**9)
+      stop = start + size*quant
+  elif start is not None and stop is None and size is None and quant is not None:
+    if isinstance(start, int):
+      start = time.time_ns() + start*quant
+    elif isinstance(start, datetime):
+      start = int(start.timestamp())*int(10**9)
+  elif start is not None and stop is None and size is None and quant is None:
+    if isinstance(start, int):
+      start = time.time_ns() + start
+    elif isinstance(start, datetime):
+      start = int(start.timestamp())*int(10**9)
+  # else:
+  #   raise NotImplementedError(start, stop, size, quant)
+  return start, stop, size, quant

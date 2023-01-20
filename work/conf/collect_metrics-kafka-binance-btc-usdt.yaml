@@ -11,7 +11,7 @@ agents:
     class: Metric
     executor:
       class: ProcessPoolExecutor
-      max_workers: 2
+      max_workers: 3
     verbose: true
     watermark: 300e9
     consumer:
@@ -29,3 +29,9 @@ agents:
         kind: all
         threshold: 0
         fees: 0
+      - class: ROR
+        name: ROR-all-0-0-1
+        kind: all
+        threshold: 0
+        fees: 0
+        random_guess: 1.0

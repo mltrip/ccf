@@ -1,9 +1,9 @@
 version: '3.3'
 
 services:
-  predict:
+  predict_local_kafka_influxdb:
     image: ccf
-    container_name: predict_binance_btc_usdt
+    # container_name: predict_kafka
     build:
       context: ..
       dockerfile: docker/Dockerfile

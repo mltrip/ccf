@@ -126,7 +126,16 @@ celerybeat.pid
 *.sage.py
 
 # Environments
+*.crt
+*.key
+*.err
+*.out
+.htpasswd
 .env
+.env.secret.db
+.env.secret.mlflow
+.env.secret.model
+.env.secret.optuna
 .venv
 env/
 venv/

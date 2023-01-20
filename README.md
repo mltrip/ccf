@@ -23,8 +23,8 @@ We show `users`: `predictions`, performance `metrics`, `raw data`, etc. This par
 ## Deployment
 ![deployment](docs/deployment.png)
 
-## RUN DOCKER
-### DOCKER WITH MLFLOW
+## RUN DOCKER WITH MLFLOW
+### Go to docker directory
 ```sh
 cd docker
 ```
@@ -36,21 +36,21 @@ sudo openssl req -x509 -nodes -newkey rsa:2048 -keyout influxdb-selfsigned.key -
 ```sh
 cp .env.secret.db.example .env.secret.db
 ```
-### Run docker compose with Kafka
+### Run Kafka
 ```sh
 docker compose -f docker-compose.kafka.yaml up -d
 ```
-### Run docker compose with InfluxDB
+### Run InfluxDB
 ```sh
 docker compose -f docker-compose.db.yaml up -d
 ```
 ### Build CCF Image
 ```sh
-docker compose -f docker-compose.binance.btc.usdt.yaml build
+docker compose -f docker-compose.data.feature.metric.yaml build
 ```
-### Run docker compose with get_data, extract_features and collect_metrics
+### Run get_data, extract_features and collect_metrics
 ```sh
-docker compose -f docker-compose.binance.btc.usdt.yaml up -d
+docker compose -f docker-compose.data.feature.metric.yaml up -d
 ```
 ### Set sensitive environment variables for MLflow
 ```sh
@@ -60,25 +60,29 @@ cp .env.secret.mlflow.example .env.secret.mlflow
 ```sh
 htpasswd -c .htpasswd ccf
 ```
-### Run docker compose with MLflow
+### Run MLflow
 ```sh
 docker compose -f docker-compose.mlflow.yaml up -d
 ```
-### Set sensitive environment variables for models (password from previous step)
+### Set sensitive environment variables for models (password from .htpasswd, influxdb token from .env.secret.db)
 ```sh
 cp .env.secret.model.example .env.secret.model
 ```
-### Run docker compose with train model
+### Train model from influxdb
 ```sh
-docker compose -f docker-compose.binance.btc.usdt.train.mlflow.yaml up -d
+docker compose -f docker-compose.train.mlflow.influxdb.yaml up -d
 ```
-### Run docker compose with predict model
+### Predict model to kafka
 ```sh
-docker compose -f docker-compose.binance.btc.usdt.predict.mlflow.yaml up -d
+docker compose -f docker-compose.predict.mlflow.kafka.influxdb up -d
 ```
-### Run docker compose with Streamlit UI (localhost:8501)
+### Run Streamlit UI (localhost:8501)
 ```sh
-docker compose -f docker-compose.binance.btc.usdt.ui.yaml up -d
+docker compose -f docker-compose.ui.yaml up -d
+```
+### Optionally collect system metrics to indluxdb
+```sh
+docker compose -f docker-compose.system.yaml up -d
 ```
 ### Monitor Streamlit (host: localhost:8501)
 ![streamlit](docs/streamlit.png)
@@ -87,7 +91,8 @@ docker compose -f docker-compose.binance.btc.usdt.ui.yaml up -d
 ### Monitor MLflow (host: localhost:5000, user: ccf, password: see .env.secret.model)
 ![mlflow](docs/mlflow.png)
 
-## DOCKER WITHOUT MLFLOW
+## RUN DOCKER WITHOUT MLFLOW
+### Go to docker directory
 ```sh
 cd docker
 ```
@@ -99,73 +104,72 @@ sudo openssl req -x509 -nodes -newkey rsa:2048 -keyout influxdb-selfsigned.key -
 ```sh
 cp .env.secret.db.example .env.secret.db
 ```
-### Run docker compose with Kafka
+### Run Kafka
 ```sh
 docker compose -f docker-compose.kafka.yaml up -d
 ```
-### Run docker compose with InfluxDB
+### Run InfluxDB
 ```sh
 docker compose -f docker-compose.db.yaml up -d
 ```
 ### Build CCF Image
 ```sh
-docker compose -f docker-compose.binance.btc.usdt.yaml build
+docker compose -f docker-compose.data.feature.metric.yaml build
 ```
-### Run docker compose with get_data, extract_features and collect_metrics
+### Run get_data, extract_features and collect_metrics
 ```sh
-docker compose -f docker-compose.binance.btc.usdt.yaml up -d
+docker compose -f docker-compose.data.feature.metric.yaml up -d
 ```
-### Run docker compose with train model
+### Train model from influxdb
 ```sh
-docker compose -f docker-compose.binance.btc.usdt.train.yaml up -d
+docker compose -f docker-compose.train.local.influxdb.yaml up -d
 ```
-### Run docker compose with predict model (periodically restart this compose to update model)
+### Predict model to kafka
 ```sh
-docker compose -f docker-compose.binance.btc.usdt.predict.yaml up -d
+docker compose -f docker-compose.predict.local.kafka.influxdb up -d
 ```
-### Run docker compose with Streamlit UI (host: localhost:8501)
+### Run Streamlit UI (host: localhost:8501)
 ```sh
-docker compose -f docker-compose.binance.btc.usdt.ui.yaml up -d
+docker compose -f docker-compose.ui.yaml up -d
 ```
 ### Monitor Streamlit (host: localhost:8501)
 ### Monitor InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret.db)
 
-## RUN MANUAL
-### INSTALL
-#### Python 3.9
-#### $$\textcolor{#ffffff}{\text{ALL}}$$ 
+## RUN MANUALLY
+### Install Python 3.9
+### $$\textcolor{#ffffff}{\text{ALL}}$$ 
 ```sh
 pip install -r requirements.txt
 ```
-#### $$\textcolor{#4dd0e1}{\text{DATA}}$$ 
+### $$\textcolor{#4dd0e1}{\text{DATA}}$$ 
 ```sh
 pip install -r src/ccf/requirements_data.txt
 ```
-#### $$\textcolor{#a2fca2}{\text{FEATURES}}$$
+### $$\textcolor{#a2fca2}{\text{FEATURES}}$$
 ```sh
 pip install -r src/ccf/requirements_features.txt
 ``` 
-#### $$\textcolor{#eeff41}{\text{ML}}$$ 
+### $$\textcolor{#eeff41}{\text{ML}}$$ 
 ```sh
 pip install -r src/ccf/requirements_ml.txt
 ```
-#### $$\textcolor{#ffab40}{\text{PREDICTIONS}}$$ 
+### $$\textcolor{#ffab40}{\text{PREDICTIONS}}$$ 
 ```sh
 pip install -r src/ccf/requirements_predictions.txt
 ```
-#### $$\textcolor{#eeeeee}{\text{METRICS}}$$
+### $$\textcolor{#eeeeee}{\text{METRICS}}$$
 ```sh
 pip install -r src/ccf/requirements_metrics.txt
 ```
-#### $$\textcolor{#adadad}{\text{UI}}$$
+### $$\textcolor{#adadad}{\text{UI}}$$
 ```sh
 pip install -r src/ccf/requirements_ui.txt
 ```
-### RUN
+## RUN
 ```sh
 cd work
 ```
-#### $$\textcolor{#4dd0e1}{\text{GET DATA}}$$ 
+### $$\textcolor{#4dd0e1}{\text{GET DATA}}$$ 
 * Linux (by default)
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/get_data.py -cd conf -cn get_data-kafka-binance-btc-usdt
@@ -174,11 +178,11 @@ PYTHONPATH=../src/ python ../src/ccf/get_data.py -cd conf -cn get_data-kafka-bin
 ```sh
 cmd /C  "set PYTHONPATH=../src && python ../src/ccf/get_data.py -cd conf -cn get_data-kafka-binance-btc-usdt"
 ```
-#### $$\textcolor{#a2fca2}{\text{EXTRACT FEATURES}}$$
+### $$\textcolor{#a2fca2}{\text{EXTRACT FEATURES}}$$
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/extract_features.py -cd conf -cn extract_features-kafka-binance-btc-usdt
 ```
-#### $$\textcolor{#eeff41}{\text{TRAIN/TUNE MODEL}}$$ 
+### $$\textcolor{#eeff41}{\text{TRAIN/TUNE MODEL}}$$ 
 * Train once
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn  train-mid-lograt-tft-kafka-binance-btc-usdt
@@ -187,15 +191,15 @@ PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn  train-mid-lograt-tft
 ```sh
 while true; do PYTHONPATH=../src/ python ../src/ccf/train.py -cd conf -cn train-mid-lograt-tft-kafka-binance-btc-usdt; sleep 3600; done
 ```
-#### $$\textcolor{#ffab40}{\text{MAKE PREDICTIONS}}$$
+### $$\textcolor{#ffab40}{\text{MAKE PREDICTIONS}}$$
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/predict.py -cd conf -cn predict-mid-lograt-tft-kafka-binance-btc-usdt
 ```
-#### $$\textcolor{#ffab40}{\text{COLLECT PREDICTIONS METRICS}}$$
+### $$\textcolor{#ffab40}{\text{COLLECT PREDICTIONS METRICS}}$$
 ```sh
 PYTHONPATH=../src/ python ../src/ccf/collect_metrics.py -cd conf -cn collect_metrics-kafka-binance-btc-usdt
 ```
-#### $$\textcolor{#eeeeee}{\text{MONITOR METRICS}}$$ 
+### $$\textcolor{#eeeeee}{\text{MONITOR METRICS}}$$ 
 * Monitor metrics with InfluxDB (host: localhost:8086, user: ccf, password: see .env.secret.db)
 * Monitor metrics with MLflow (host: localhost:5000, user: ccf, password: see .env.secret.model)
 * Tensorboard (localhost:6007)
@@ -208,7 +212,8 @@ tensorboard --logdir tensorboard/ --host 0.0.0.0 --port 6007
 ```sh
 PYTHONPATH=../src/ streamlit run ../src/ccf/apps/ui.py conf/ui-mid-lograt-tft-kafka-binance-btc-usdt.yaml
 ```
-## CONFIGS EXAMPLES
+
+## CONFIGS
 ### $$\textcolor{#4dd0e1}{\text{GET DATA}}$$
 `work/conf/get_data-kafka-binance-btc-usdt.yaml`
 ```yaml

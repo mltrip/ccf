@@ -24,16 +24,6 @@ from ccf.create_dataset import Dataset
 from ccf.model_mlflow import CCFModel, load_model
 
 
-def print_auto_logged_info(r):
-    tags = {k: v for k, v in r.data.tags.items() if not k.startswith("mlflow.")}
-    artifacts = [f.path for f in MlflowClient().list_artifacts(r.info.run_id, "model")]
-    print("run_id: {}".format(r.info.run_id))
-    print("artifacts: {}".format(artifacts))
-    print("params: {}".format(r.data.params))
-    print("metrics: {}".format(r.data.metrics))
-    print("tags: {}".format(tags))
-
-    
 def main(hydra_config, create_dataset_kwargs, dataloader_kwargs, model_kwargs, 
          trainer_kwargs,
          kind, model_name, parent_name=None, parent_version=None, parent_stage=None):
@@ -88,9 +78,20 @@ def main(hydra_config, create_dataset_kwargs, dataloader_kwargs, model_kwargs,
     trainer_kwargs_['callbacks'] = cs
     ls = trainer_kwargs_.get('logger', [])
     ls = [ls] if not isinstance(ls, list) else ls
+    mlflow_logger = None
     for i, l in enumerate(ls):
-      ll = getattr(pl.loggers, l.pop('class'))
-      ls[i] = ll(**l)
+      logger_class = l.pop('class')
+      ll = getattr(pl.loggers, logger_class)
+      if 'name' in l and l['name'] is None:
+        l['name'] = model_name
+      if 'experiment_name' in l and l['experiment_name'] is None:
+        l['experiment_name'] = model_name
+      if 'artifact_location' in l and l['artifact_location'] is None:
+        l['artifact_location'] = model_name
+      logger_instance = ll(**l)
+      if logger_class == 'MLFlowLogger':
+        mlflow_logger = logger_instance
+      ls[i] = logger_instance
     trainer_kwargs_['logger'] = ls
     trainer = pl.Trainer(**trainer_kwargs_)
     mlflow.pytorch.autolog(log_models=False)
@@ -104,23 +105,35 @@ def main(hydra_config, create_dataset_kwargs, dataloader_kwargs, model_kwargs,
     dl_t = ds_t.to_dataloader(**dataloader_kwargs['train'])
     dl_v= ds_v.to_dataloader(**dataloader_kwargs['val'])
     # Fit and Log
-    with mlflow.start_run() as run:
+    if mlflow_logger is not None:
       trainer.fit(model, train_dataloaders=dl_t, val_dataloaders=dl_v)
       best_path = Path(trainer.checkpoint_callback.best_model_path)
       cwd = Path(hydra_config.runtime.cwd)
       conf_path = cwd / 'conf'
       config_name = hydra_config.job.config_name
       model_path = best_path.rename('model.ckpt')
-      # model_path = cwd / 'model.ckpt'
-      # model_path.symlink_to(best_path)
-      # shutil.copyfile(best_path, model_path)
       mlflow_model = CCFModel(config_name=config_name)
-      model_info = mlflow.pyfunc.log_model(artifact_path=model_name, 
-                                           registered_model_name=model_name,
-                                           python_model=mlflow_model,
-                                           artifacts={'conf': str(conf_path), 
-                                                      'model': str(model_path)})
-    print_auto_logged_info(mlflow.get_run(run_id=run.info.run_id))
+      with mlflow.start_run(run_id=mlflow_logger.run_id) as run:
+        model_info = mlflow.pyfunc.log_model(artifact_path=model_name, 
+                                             registered_model_name=model_name,
+                                             python_model=mlflow_model,
+                                             artifacts={'conf': str(conf_path), 
+                                                        'model': str(model_path)})
+    else:  # Auto MLflow logger
+      experiment_id = mlflow.create_experiment(model_name)
+      with mlflow.start_run(experiment_id=experiment_id) as run:
+        trainer.fit(model, train_dataloaders=dl_t, val_dataloaders=dl_v)
+        best_path = Path(trainer.checkpoint_callback.best_model_path)
+        cwd = Path(hydra_config.runtime.cwd)
+        conf_path = cwd / 'conf'
+        config_name = hydra_config.job.config_name
+        model_path = best_path.rename('model.ckpt')
+        mlflow_model = CCFModel(config_name=config_name)
+        model_info = mlflow.pyfunc.log_model(artifact_path=model_name, 
+                                             registered_model_name=model_name,
+                                             python_model=mlflow_model,
+                                             artifacts={'conf': str(conf_path), 
+                                                        'model': str(model_path)})
     
   
 @hydra.main()

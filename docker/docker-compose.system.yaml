@@ -1,0 +1,28 @@
+version: '3.3'
+
+services:
+  telegraf_system:
+    image: telegraf:latest
+    networks:
+      - db
+    env_file:
+      - .env.secret.db
+    environment: 
+      - INFLUX_HOST=https://influxdb:8086
+      # - INFLUX_TOKEN=token
+      - INFLUX_ORG=mltrip
+      - INFLUX_BUCKET=ccf
+    volumes:
+      #  Sync timezone with host
+      - /etc/localtime:/etc/localtime:ro
+      #  Map Telegraf configuration file
+      - ./telegraf_system.toml:/etc/telegraf/telegraf.conf:ro
+      #  Map /tmp to permanent storage  (this includes /tmp/metrics.out)
+      - ./telegraf_system:/tmp:rw
+    restart: unless-stopped
+    # depends_on:
+    #   - influxdb
+
+networks:
+  db:
+    driver: bridge

@@ -5,6 +5,7 @@ from pathlib import Path
 import gc
 from copy import deepcopy
 from pprint import pprint
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from collections import deque
 
@@ -17,24 +18,39 @@ import pytorch_forecasting as pf
 from sqlalchemy import create_engine
 import yaml
 
-from ccf.utils import expand_columns
+from ccf.utils import expand_columns, initialize_time
 from ccf import agents as ccf_agents
 
 
 class Dataset:
-  def __init__(self, quant, size, agents, dataset_kwargs, executor=None, replace_nan=None,
+  def __init__(self, agents, dataset_kwargs, quant=None, size=None, 
+               start=None, stop=None, executor=None, replace_nan=None,
                split=None, target_prefix='tgt', df_only=False, watermark=None, verbose=False):
-    self.quant = int(quant) if quant is not None else quant
+    start = os.getenv('CCF_DATASET_START', None) if start is None else start
+    stop = os.getenv('CCF_DATASET_STOP', None) if stop is None else stop
+    size = os.getenv('CCF_DATASET_SIZE', None) if size is None else size
+    quant = os.getenv('CCF_DATASET_QUANT', None) if quant is None else quant
+    start, stop, size, quant = initialize_time(start, stop, size, quant)
+    self.start = start
+    self.stop = stop
     self.size = size
+    self.quant = quant
     for name, kwargs in agents.items():
-      if quant is not None:
-        kwargs['quant'] = quant
-      if size is not None:
-        kwargs['size'] = size
+      if 'quant' not in kwargs and self.quant is not None:
+        kwargs['quant'] = self.quant
+      if 'size' not in kwargs and self.size is not None:
+        kwargs['size'] = self.size
+      if 'start' not in kwargs and self.start is not None:
+        kwargs['start'] = self.start
+      if 'stop' not in kwargs and self.stop is not None:
+        kwargs['stop'] = self.stop
     self.agents = agents
     self.dataset_kwargs = dataset_kwargs
     self.executor = {} if executor is None else executor
     self.replace_nan = replace_nan
+    if split is None:
+      split = os.getenv('CCF_DATASET_SPLIT', None)
+      split = float(split) if isinstance(split, str) else split
     self.split = split
     self.target_prefix = target_prefix
     self.df_only = df_only
@@ -256,6 +272,9 @@ class Dataset:
       df2 = df2.set_index('timestamp')
     else:
       df, df2 = all_df, None
+    if self.verbose:
+      print(df)
+      print(df2)
     if not self.df_only:
       dataset_kwargs['data'] = df.reset_index()
       try:
@@ -269,6 +288,7 @@ class Dataset:
         ds2 = None
       if self.verbose:
         print(ds)
+        print(ds2)
       print(f'dt dataset: {time.time() - t0:.3f}')
       return ds, ds2, df, df2
     else:
