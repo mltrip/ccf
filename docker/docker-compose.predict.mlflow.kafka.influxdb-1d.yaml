@@ -1,9 +1,9 @@
 version: '3.3'
 
 services:
-  train_mlflow_influxdb:
+  predict_mlflow_kafka_influxdb_1d:
     image: ccf
-    # container_name: train_mlflow_influxdb
+    # container_name: predict_mlflow_kafka_kafka_influxdb
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -12,7 +12,7 @@ services:
       - mlflow
     working_dir: /app/work
     entrypoint: [ python ]
-    command: [ ../src/ccf/train_mlflow.py, -cd, conf, -cn, train-mlflow-influxdb-mid-lograt-tft-binance-btc-usdt ]
+    command: [ ../src/ccf/predict_mlflow.py, -cd, conf, -cn, predict-mlflow-kafka-influxdb-mid-lograt-tft-binance-btc-usdt-1d ]
     env_file:
       - .env.secret.model
     environment:
@@ -22,7 +22,7 @@ services:
     volumes:
       # - binance_btc_usdt:/app/work
       - ../work:/app/work
-    # restart: always
+    restart: always
       
 networks:
   db:
