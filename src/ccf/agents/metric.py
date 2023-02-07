@@ -220,18 +220,18 @@ def ROR(y_true, y_pred, y_last, kind, threshold, fees, random_guess=None):
       elif dy_pred < 0:
         return -dy_true - fees
       else:
-        return None
+        return 0
     else:
-      return None
+      return 0
   elif kind == 'long':
     if dy_pred > threshold:
       return dy_true - fees
     else:
-      return None
+      return 0
   elif kind == 'short':
     if -dy_pred > threshold:
       return -dy_true - fees
     else:
-      return None
+      return 0
   else:
     raise NotImplementedError(kind)
