@@ -11,7 +11,7 @@ agents:
     class: Metric
     executor:
       class: ProcessPoolExecutor
-      max_workers: 3
+      max_workers: 7
     verbose: true
     watermark: 300e9
     consumer:
@@ -22,8 +22,8 @@ agents:
     metrics:
       # - class: sklearn.metrics.mean_absolute_error
       #   name: MAE
-      - class: MASE
-        name: MASE
+      # - class: MASE
+      #   name: MASE
       - class: ROR
         name: ROR-all-0-0
         kind: all
@@ -35,3 +35,28 @@ agents:
         threshold: 0
         fees: 0
         random_guess: 1.0
+      - class: ROR
+        name: ROR-all-0.002-0
+        kind: all
+        threshold: 0.002
+        fees: 0
+      - class: ROR
+        name: ROR-all-0.0015-0
+        kind: all
+        threshold: 0.0015
+        fees: 0
+      - class: ROR
+        name: ROR-all-0.0001-0
+        kind: all
+        threshold: 0.0001
+        fees: 0
+      - class: ROR
+        name: ROR-all-0.002-0.002
+        kind: all
+        threshold: 0.002
+        fees: 0.002
+      - class: ROR
+        name: ROR-all-0.0015-0.0015
+        kind: all
+        threshold: 0.0015
+        fees: 0.0015
