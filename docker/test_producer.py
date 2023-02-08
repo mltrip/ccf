@@ -115,6 +115,7 @@ def get_metric():
   data['target'] = random.choice(['m_p', 'a_p_0', 'b_p_0'])
   data['prediction'] = random.choice(['quantile_0.25', 'quantile_0.5', 'quantile_0.75', 'value'])
   data['horizon'] = random.randint(1, 60)
+  data['metric'] = random.choice(['group_1', 'group_2', 'group_3'])
   data['timestamp'] = time.time_ns()
   return key, data
 

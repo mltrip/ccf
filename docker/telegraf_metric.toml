@@ -270,5 +270,5 @@
       [[inputs.kafka_consumer.json_v2.object]]
             path = "@this"
             tags = ["exchange", "base", "quote", "quant", "feature", 
-                    "model", "version", "target", "horizon", "prediction"]
+                    "model", "version", "target", "horizon", "prediction", "metric"]
             excluded_keys = ["timestamp"]
