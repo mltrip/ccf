@@ -99,7 +99,6 @@ class Metric(Agent):
       if 'sklearn' in self._metric_class:
         self._metric = getattr(sklearn.metrics, 
                                self._metric_class.replace('sklearn.metrics.', ''))
-        
       elif self._metric_class in globals():
         self._metric = globals()[self._metric_class]
       else:
@@ -118,12 +117,13 @@ class Metric(Agent):
       for name, value in prediction_values.items():
         message = deepcopy(base_message)
         message['prediction'] = name
-        
         if 'sklearn' in self._metric_class:
           metric = self._metric(y_true=[target_value], y_pred=[value], **self._metric_kwargs)
+          message['metric'] = 'sklearn'
         elif self._metric_class in globals():
           metric = self._metric(y_true=target_value, y_pred=value, y_last=last_value,
                                 **self._metric_kwargs)
+          message['metric'] = 'ccf'
         else:
           raise NotImplementedError(self._metric_class)
         message[self._metric_name] = metric
