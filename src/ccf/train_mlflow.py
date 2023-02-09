@@ -28,7 +28,6 @@ def main(hydra_config, create_dataset_kwargs, dataloader_kwargs, model_kwargs,
          trainer_kwargs,
          kind, model_name, parent_name=None, parent_version=None, parent_stage=None):
   # Initialize parameters
-  parent_name = model_name if parent_name is None else parent_name
   # Train
   if 'continual' in kind:
     max_cnt = None

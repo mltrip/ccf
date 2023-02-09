@@ -17,13 +17,13 @@ time_varying_unknown_reals:
 - lograt_1.*
 target_normalizer:
   class: EncoderNormalizer  # TorchNormalizer issue https://github.com/jdb78/pytorch-forecasting/issues/947
-  method: identity
+  method: standard
   center: false  # https://github.com/jdb78/pytorch-forecasting/issues/613 TLDR use a smaller learning rate, clip gradients
   transformation: ~
 scalers:
   class: EncoderNormalizer  # TorchNormalizer issue https://github.com/jdb78/pytorch-forecasting/issues/947
-  method: identity
-  center: false  # https://github.com/jdb78/pytorch-forecasting/issues/613 TLDR use a smaller learning rate, clip gradients
+  method: standard
+  center: false  # https://github.com/jdb78/pytorch-forecasting/issues/613 TLDR a smaller learning rate, clip gradients
   transformation: ~
 categorical_encoders:
   class: NaNLabelEncoder
