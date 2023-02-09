@@ -1,0 +1,82 @@
+defaults:
+ - dataset@create_dataset_kwargs.dataset_kwargs: mid-lograt-lob_vba-mel_20-mpl_20
+ - _self_
+ 
+kind: occasional
+parent_name: ~
+parent_version: ~
+parent_stage: ~
+model_name: influxdb-mid-lograt-lob_vba-mel_20-mpl_20-lr_5-bs_5-1w-2023_5
+create_dataset_kwargs:
+  verbose: true
+  quant: 3.0e+9
+  start: "2023-01-30T00:00:00+00:00"
+  stop: "2023-02-06T00:00:00+00:00"
+  replace_nan: 0.0
+  split: 0.8
+  agents:
+    influxdb: 
+      class: InfluxdbDataset
+      verbose: false
+      topics: [ feature ]
+      executor:
+        class: ProcessPoolExecutor
+        max_workers: 1
+      feature_keys:
+        Delta-default-lograt: [ binance-btc-usdt ]
+      client:
+        timeout: 100000
+        verify_ssl: false
+dataloader_kwargs:
+  train:
+    train: true
+    num_workers: 16
+    batch_size: 32
+  val:
+    train: false
+    num_workers: 16
+    batch_size: 32
+model_kwargs:
+  class: TemporalFusionTransformer
+  learning_rate: 0.03125  # 1/32
+  hidden_size: 8
+  attention_head_size: 1
+  dropout: 0
+  hidden_continuous_size: 8
+  lstm_layers: 1
+  # output_size: 7  # Inferred from loss
+  loss:
+    class: QuantileLoss
+  log_interval: 0
+  reduce_on_plateau_patience: 2
+  reduce_on_plateau_reduction: 2
+  reduce_on_plateau_min_lr: 1.0e-10
+  weight_decay: 0
+trainer_kwargs:
+  max_epochs: 256
+  accelerator: gpu  # cpu
+  devices: [ 0 ]
+  gradient_clip_val: 0
+  gradient_clip_algorithm: norm  # norm or value
+  log_every_n_steps: 600
+  limit_train_batches: ~
+  logger:
+  - class: MLFlowLogger
+    experiment_name: ~  # default to model_name
+  callbacks:
+  # - class: DeviceStatsMonitor
+  #   cpu_stats: true
+  - class: LearningRateMonitor
+    logging_interval: ~
+    log_momentum: true
+  - class: ModelCheckpoint
+    monitor: val_loss
+    filename: '{epoch}-{step}-{val_loss:.3f}'
+    save_last: true
+    save_top_k: 1
+  - class: EarlyStopping
+    monitor: val_loss
+    min_delta: 0
+    patience: 5
+    verbose: false
+    mode: min

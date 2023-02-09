@@ -13,17 +13,19 @@ static_categoricals:
 max_encoder_length: 20
 max_prediction_length: 20
 time_varying_unknown_reals:
-- lograt_0.*
-- lograt_1.*
+- lograt_0-a.*
+- lograt_0-b.*
+- lograt_1-a.*
+- lograt_1-b.*
 target_normalizer:
   class: EncoderNormalizer  # TorchNormalizer issue https://github.com/jdb78/pytorch-forecasting/issues/947
-  method: identity
-  center: false  # https://github.com/jdb78/pytorch-forecasting/issues/613 TLDR use a smaller learning rate, clip gradients
+  method: standard
+  center: true  # https://github.com/jdb78/pytorch-forecasting/issues/613 TLDR use a smaller learning rate, clip gradients
   transformation: ~
 scalers:
   class: EncoderNormalizer  # TorchNormalizer issue https://github.com/jdb78/pytorch-forecasting/issues/947
-  method: identity
-  center: false  # https://github.com/jdb78/pytorch-forecasting/issues/613 TLDR use a smaller learning rate, clip gradients
+  method: standard
+  center: true  # https://github.com/jdb78/pytorch-forecasting/issues/613 TLDR a smaller learning rate, clip gradients
   transformation: ~
 categorical_encoders:
   class: NaNLabelEncoder
