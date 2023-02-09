@@ -155,6 +155,12 @@ class InfluxdbDataset(Agent):
     self.interpolate = interpolate
     self.client = {} if client is None else client
     self.client.setdefault('token', os.getenv('INFLUXDB_V2_TOKEN', None))
+    self.client.setdefault('url', os.getenv('INFLUXDB_V2_URL', 'https://influxdb:8086'))
+    self.client.setdefault('org', os.getenv('INFLUXDB_V2_ORG', 'mltrip'))
+    self.client.setdefault('timeout', os.getenv('INFLUXDB_V2_TIMEOUT', None))
+    self.client.setdefault('verify_ssl', os.getenv(
+      'INFLUXDB_V2_VERIFY_SSL', 'true').lower() in ['yes', 'true', '1'])
+    self.client.setdefault('proxy', os.getenv('INFLUXDB_V2_PROXY', None))
     self.bucket = os.getenv('INFLUXDB_V2_BUCKET', 'ccf') if bucket is None else bucket
     self.futures = None
     self.from_env_properties = from_env_properties
