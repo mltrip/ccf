@@ -241,6 +241,26 @@ class Dataset:
         c = target_scaler.pop('class')
         target_scaler = getattr(pf.data.encoders, c)(**target_scaler)
     dataset_kwargs['target_normalizer'] = target_scaler
+    # Workaround of pytorch forecasting "column names must not contain '.' characters" -> Replace '.' to ',' 
+    old2new = {x: x.replace('.', ',') for x in df.columns}
+    for key in ['target',
+                'group_ids', 
+                'time_varying_unknown_reals',
+                'time_varying_unknown_categoricals',
+                'time_varying_known_reals',
+                'time_varying_known_categoricals',
+                'static_reals',
+                'static_categoricals']:
+      cs = dataset_kwargs.get(key, [])
+      cs = [cs] if isinstance(cs, str) else cs
+      new_cs = [old2new[x] for x in cs]
+      dataset_kwargs[key] = new_cs if len(new_cs) != 1 else new_cs[0]
+    encoders = dataset_kwargs.get('categorical_encoders')
+    dataset_kwargs['categorical_encoders'] = {old2new[k]: v for k, v in encoders.items()}
+    scalers = dataset_kwargs.get('scalers', {})
+    dataset_kwargs['scalers'] = {old2new[k]: v for k, v in scalers.items()}
+    columns = [old2new[x] for x in columns]
+    df = df.rename(columns=old2new)
     # Filter
     all_df = df
     df = df[list(columns)]
@@ -303,4 +323,3 @@ def app(cfg: DictConfig) -> None:
   
 if __name__ == "__main__":
   app()
-

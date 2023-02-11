@@ -172,7 +172,7 @@ def predict(model_name, predict_kwargs, create_dataset_kwargs,
                 'feature': horizon_row['feature'],
                 'model': model_name,
                 'version': last_version,
-                'target': base_tgt,
+                'target': base_tgt.replace(',', '.'),  # Workaround of pytorch forecasting "column names must not contain '.' characters" -> Replace '.' to ','
                 'horizon': horizon,
                 'timestamp': int(horizon_row.name.timestamp()*1e9)}
               message_key = '-'.join([horizon_row['exchange'], horizon_row['base'], horizon_row['quote']])
@@ -188,7 +188,7 @@ def predict(model_name, predict_kwargs, create_dataset_kwargs,
                     'feature': horizon_row['feature'],
                     'model': model_name,
                     'version': last_version,
-                    'target': base_tgt,
+                    'target': base_tgt.replace(',', '.'),  # Workaround of pytorch forecasting "column names must not contain '.' characters" -> Replace '.' to ','
                     'horizon': horizon,
                     'prediction': 'quantile',
                     'metric': 'attention',
@@ -212,13 +212,14 @@ def predict(model_name, predict_kwargs, create_dataset_kwargs,
                     'feature': horizon_row['feature'],
                     'model': model_name,
                     'version': last_version,
-                    'target': base_tgt,
+                    'target': base_tgt.replace(',', '.'),  # Workaround of pytorch forecasting "column names must not contain '.' characters" -> Replace '.' to ','
                     'horizon': '-1',
                     'prediction': 'quantile',
                     'metric': importance2metric[k],
                     'timestamp': int(last_row.name.timestamp()*1e9)}
                   features = getattr(model.unwrap_python_model().model, k)
                   for f_i, f in enumerate(features):
+                    f = f.replace(',', '.')  # Workaround of pytorch forecasting "column names must not contain '.' characters" -> Replace '.' to ','
                     if not f in importance_message:
                       importance_message[f] = v[tgt_i][index][f_i].item()
                     else:
@@ -243,7 +244,7 @@ def predict(model_name, predict_kwargs, create_dataset_kwargs,
               'feature': horizon_row['feature'],
               'model': model_name,
               'version': last_version,
-              'target': base_tgt,
+              'target': base_tgt.replace(',', '.'),  # Workaround of pytorch forecasting "column names must not contain '.' characters" -> Replace '.' to ',',
               'horizon': horizon,
               'timestamp': int(horizon_row.name.timestamp()*1e9)}
             message_key = '-'.join([horizon_row['exchange'], horizon_row['base'], horizon_row['quote']])
@@ -259,7 +260,7 @@ def predict(model_name, predict_kwargs, create_dataset_kwargs,
                   'feature': horizon_row['feature'],
                   'model': model_name,
                   'version': last_version,
-                  'target': base_tgt,
+                  'target': base_tgt.replace(',', '.'),  # Workaround of pytorch forecasting "column names must not contain '.' characters" -> Replace '.' to ','
                   'horizon': horizon,
                   'prediction': 'value',
                   'metric': 'attention',
@@ -283,13 +284,14 @@ def predict(model_name, predict_kwargs, create_dataset_kwargs,
                   'feature': horizon_row['feature'],
                   'model': model_name,
                   'version': last_version,
-                  'target': base_tgt,
+                  'target': base_tgt.replace(',', '.'),  # Workaround of pytorch forecasting "column names must not contain '.' characters" -> Replace '.' to ','
                   'horizon': '-1',
                   'prediction': 'value',
                   'metric': importance2metric[k],
                   'timestamp': int(last_row.name.timestamp()*1e9)}
                 features = getattr(model.unwrap_python_model().model, k)
                 for f_i, f in enumerate(features):
+                  f = f.replace(',', '.')  # Workaround of pytorch forecasting "column names must not contain '.' characters" -> Replace '.' to ','
                   if not f in importance_message:
                     importance_message[f] = v[tgt_i][index][f_i].item()
                   else:
