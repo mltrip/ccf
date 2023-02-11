@@ -5,6 +5,7 @@ from copy import deepcopy
 import time
 import random
 from pprint import pprint
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
@@ -16,7 +17,9 @@ from ccf.utils import expand_columns
 
 class Delta(Kafka):
   def __init__(self, quant, consumers, producers, verbose=False, replace_nan=None,
-               feature=None, minsize=5, maxsize=5, delay=0, kind='lograt'):
+               feature=None, minsize=5, maxsize=5, delay=0, kind='rat',
+               ema_keys=None, ema_alphas=None, vwaps=None, deltas=None, qv=None,
+               resample=None, aggregate=None, interpolate=None):
     super().__init__(consumers, producers, verbose)
     self.quant = quant
     if feature is None:
@@ -24,10 +27,18 @@ class Delta(Kafka):
     self.feature = feature
     self.minsize = minsize
     self.maxsize = maxsize
-    self.delay = 0
+    self.delay = delay
     self.kind = kind
     self.data = deque()
     self.replace_nan = replace_nan
+    self.ema_keys = [] if ema_keys is None else ema_keys
+    self.ema_alphas = [] if ema_alphas is None else ema_alphas
+    self.vwaps = [] if vwaps is None else vwaps
+    self.deltas = [] if deltas is None else deltas
+    self.qv = {} if qv is None else qv
+    self.resample = {} if resample is None else resample
+    self.aggregate = {'func': {'.*': 'last'}} if aggregate is None else aggregate
+    self.interpolate = {'method': 'pad'} if interpolate is None else interpolate
     
   def __call__(self):
     if len(self.consumers) > 1:  # TODO implement with aiostream, asyncio or concurrent.futures
@@ -40,61 +51,74 @@ class Delta(Kafka):
       name = list(self.producers.keys())[0]
       producer = self.producers[name]
       producer_topic_keys = self.producers_topic_keys[name]
-    aggregate_kwargs = {'func': {'.*': 'last', '.*_q.*': 'sum', '.*_p.*': 'mean'}}
     last_datetime = None
+    topic_old_values = {}
     for message in consumer:
       t = time.time()
-      print(message.key, message.topic)
+      if self.verbose:
+        print(message.key, message.topic)
       topic = message.topic
       value = message.value
+      if topic in topic_old_values:
+        old_values = topic_old_values[topic][-1]
+      else:
+        old_values = None
       if topic == 'trade':
-        if value['t_s']:  # taker sell
-          value['t_p_s'] = value['t_p']
-          value['t_q_s'] = value['t_q']
-          value['t_v_s'] = value['t_p']*value['t_q']
-          value['t_p_b'] = None
-          value['t_q_b'] = None
-          value['t_v_b'] = None
-        else:  # taker buy
-          value['t_p_s'] = None
-          value['t_q_s'] = None
-          value['t_v_s'] = None
-          value['t_p_b'] = value['t_p']
-          value['t_q_b'] = value['t_q']
-          value['t_v_b'] = value['t_p']*value['t_q']
-        value.pop('t_s')
-        value.pop('t_p')
-        value.pop('t_q')
+        value = unwrap_trade(value)
+      elif topic == 'lob':
+        value.update(evaluate_qv(values=value, **self.qv))
+        for v in self.vwaps:
+          vwap_ask = vwap(value, side='ask', **v)
+          vwap_bid = vwap(value, side='bid', **v)
+          vwap_mid = {}
+          for (ask_key, ask_value), (bid_key, bid_value) in zip(vwap_ask.items(), vwap_bid.items()):
+            mid_key = ask_key.replace('ask', 'mid')
+            mid_value = 0.5*(ask_value + bid_value)
+            vwap_mid[mid_key] = mid_value
+          value.update(vwap_ask)
+          value.update(vwap_bid)
+          value.update(vwap_mid)
+      expanded_ema_keys = expand_columns(value.keys(), self.ema_keys)
+      for ema_key in expanded_ema_keys:
+        for ema_alpha in self.ema_alphas:
+          if ema_key in value:
+            value.update(ema(value, ema_key, ema_alpha, old_values))
+      topic_old_values.setdefault(topic, deque()).append(value)
+      if self.maxsize is not None and len(topic_old_values[topic]) > self.maxsize:
+        topic_old_values[topic].popleft()
+      # pprint(value)
       self.data.append(value)
+      # Create DataFrame
       df = pd.DataFrame(self.data)
       df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ns')
       df = df.set_index('timestamp')
-      ak = deepcopy(aggregate_kwargs)
-      ak['func'] = {kk: v for k, v in ak['func'].items() for kk in expand_columns(df.columns, [k])}
-      df = df.resample(pd.Timedelta(self.quant, unit='ns')).aggregate(**ak)
-      df = df.interpolate('pad')
+      if self.verbose:
+        print(df)
+      # Resample, aggregate, interpolate DataFrame
+      resample = deepcopy(self.resample)
+      resample['rule'] = pd.Timedelta(self.quant, unit='ns')
+      aggregate = deepcopy(self.aggregate)
+      aggregate['func'] = {kk: v for k, v in aggregate['func'].items() 
+                           for kk in expand_columns(df.columns, [k])}
+      interpolate = deepcopy(self.interpolate)
+      df = df.resample(**resample).aggregate(**aggregate).interpolate(**interpolate)
+      if self.verbose:
+        print(df)
       if len(df) < self.minsize:
         continue
-      # print(df[expand_columns(df.columns, ['t_.*'])])
-      dfs = qv(df)
-      df2 = pd.concat([df] + dfs, axis=1)
-      dfs1 = delta(df2, kind=self.kind, shift=1)
-      dfs2 = delta(df2, kind=self.kind, column='m_p', columns=['a_p_.*', 'b_p_.*', 't_p_.*'], shift=0)
-      dfs3 = delta(df2, kind=self.kind, column='a_q', columns=['^b_q$'], shift=0)
-      dfs4 = delta(df2, kind=self.kind, column='a_q', columns=['a_q_.*', 't_q_.*'], shift=0)
-      dfs5 = delta(df2, kind=self.kind, column='b_q', columns=['b_q_.*', 't_q_.*'], shift=0)
-      dfs6 = delta(df2, kind=self.kind, column='a_v', columns=['^b_v$'], shift=0)
-      dfs7 = delta(df2, kind=self.kind, column='a_v', columns=['a_v_.*', 't_v_.*'], shift=0)
-      dfs8 = delta(df2, kind=self.kind, column='b_v', columns=['b_v_.*', 't_v_.*'], shift=0)
-      df3 = pd.concat(dfs1 + dfs2 + dfs3 + dfs4 + dfs5 + dfs6 + dfs7 + dfs8, axis=1)
-      df3['m_p'] = df['m_p']
-      df = df3.replace([np.inf, -np.inf], np.nan).replace({np.nan: self.replace_nan})
+      # Evaluate deltas of DataFrame
+      dfs = []
+      for d in self.deltas:
+        dfs.append(delta(df, kind=self.kind, **d))
+      df2 = pd.concat(dfs, axis=1)
+      df2['m_p'] = df['m_p']
+      df = df2.replace([np.inf, -np.inf], np.nan).replace({np.nan: self.replace_nan})
       last_row = df.iloc[-1]
       new_last_datetime = last_row.name
-      # pprint(sorted(list(df3.columns)))
-      # print(df[expand_columns(df.columns, ['lograt_0-t_.*'])])
+      if self.verbose:
+        print(df)
       if last_datetime is None or new_last_datetime > last_datetime:
-        print(f'New: {last_datetime} -> {new_last_datetime}')
+        print(f'New feature: {last_datetime} -> {new_last_datetime}')
         last_dict = last_row.to_dict()
         last_dict['exchange'] = value['exchange']
         last_dict['base'] = value['base']
@@ -103,28 +127,28 @@ class Delta(Kafka):
         last_dict['feature'] = self.feature
         last_dict['quant'] = self.quant
         last_datetime = new_last_datetime
+        if self.verbose:
+          pprint(last_dict)
         for producer_topic, producer_keys in producer_topic_keys.items():
           print(producer_topic, producer_keys)
           if producer_keys is None:
             producer.send(self.topic, value=last_dict)
           else:
             for producer_key in producer_keys:
-              # last_dict = {k: v for k, v in last_dict.items() if v is not None}
-              # pprint(last_dict)
               producer.send(producer_topic, key=producer_key, value=last_dict)
       if self.maxsize is not None and len(df) >= self.maxsize:
         self.data.popleft()
       dt = time.time() - t
       wt = max(0, self.delay - dt)
-      print(f'dt: {dt:.3f}, wt: {wt:.3f}, rows: {len(df)}, cols: {len(df.columns)}, nans: {df3.iloc[-1].isnull().sum()}')
+      print(f'{datetime.utcnow()}, dt: {dt:.3f}, wt: {wt:.3f}, rows: {len(df)}, cols: {len(df.columns)}')
       time.sleep(wt)
       
-  
+      
 def delta(df, kind='lograt', column=None, columns=None, shift=0):
-  columns = [x for x in df.columns if is_numeric_dtype(df[x])] if columns is None else columns
-  columns = expand_columns(df.columns, columns)
+  columns_ = [x for x in df.columns if is_numeric_dtype(df[x])] if columns is None else columns
+  columns = expand_columns(df.columns, columns_)
   if len(columns) == 0:
-    return []
+    raise ValueError(f'No columns found with patterns: {columns_}')
   a = df[columns]
   prefix = f'{kind}_{str(shift)}'
   if column is not None:
@@ -140,41 +164,103 @@ def delta(df, kind='lograt', column=None, columns=None, shift=0):
   elif kind == 'lograt':
     new_df = np.log(a.div(b, axis=0))
   new_df = new_df.rename(columns=new_columns)
-  return [new_df]
+  return new_df
 
 
-def qv(df):
-  # Columns
-  a_q_cs = [x for x in df if x.startswith('a_q_')]
-  b_q_cs = [x for x in df if x.startswith('b_q_')]
-  a_p_cs = [x for x in df if x.startswith('a_p_')]
-  b_p_cs = [x for x in df if x.startswith('b_p_')]
-  a_v_cs = ['_'.join(['a', 'v', x.split('_')[2]]) for x in a_q_cs]
-  b_v_cs = ['_'.join(['b', 'v', x.split('_')[2]]) for x in b_q_cs]
-  dfs = []
-  # Volumes
-  a_vs = []
-  for a_q_c, a_p_c, a_v_c in zip(a_q_cs, a_p_cs, a_v_cs):
-    df_c = (df[a_q_c]*df[a_p_c]).rename(a_v_c)
-    a_vs.append(df_c)
-  a_vs = pd.concat(a_vs, axis=1)
-  dfs.append(a_vs)
-  b_vs = []
-  for b_q_c, b_p_c, b_v_c in zip(b_q_cs, b_p_cs, b_v_cs):
-    df_c = (df[b_q_c]*df[b_p_c]).rename(b_v_c)
-    b_vs.append(df_c)
-  b_vs = pd.concat(b_vs, axis=1)
-  dfs.append(b_vs)
-  # Sums
-  a_q = df[a_q_cs].sum(axis=1).rename('a_q')
-  b_q = df[b_q_cs].sum(axis=1).rename('b_q')
-  a_v = a_vs.sum(axis=1).rename('a_v')
-  b_v = b_vs.sum(axis=1).rename('b_v')
-  dfs.append(a_q)
-  dfs.append(b_q)
-  dfs.append(a_v)
-  dfs.append(b_v)
-  return dfs
+def unwrap_trade(values):
+  if values['t_s']:  # taker sell
+    values['t_p_s'] = values['t_p']
+    values['t_q_s'] = values['t_q']
+    values['t_v_s'] = values['t_p']*values['t_q']
+    values['t_p_b'] = None
+    values['t_q_b'] = None
+    values['t_v_b'] = None
+  else:  # taker buy
+    values['t_p_s'] = None
+    values['t_q_s'] = None
+    values['t_v_s'] = None
+    values['t_p_b'] = values['t_p']
+    values['t_q_b'] = values['t_q']
+    values['t_v_b'] = values['t_p']*values['t_q']
+  values.pop('t_s')
+  values.pop('t_p')
+  values.pop('t_q')
+  return values
+
+
+def evaluate_qv(values, maxdepth=None):
+  new_values = {}
+  if maxdepth is None:
+    a_q_keys = [x for x in values if x.startswith('a_q_')]
+    b_q_keys = [x for x in values if x.startswith('b_q_')]
+    a_p_keys = [x for x in values if x.startswith('a_p_')]
+    b_p_keys = [x for x in values if x.startswith('b_p_')]
+  else:
+    a_q_keys = [x for x in values if x.startswith('a_q_') and int(x.split('_')[2]) < maxdepth]
+    b_q_keys = [x for x in values if x.startswith('b_q_') and int(x.split('_')[2]) < maxdepth]
+    a_p_keys = [x for x in values if x.startswith('a_p_') and int(x.split('_')[2]) < maxdepth]
+    b_p_keys = [x for x in values if x.startswith('b_p_') and int(x.split('_')[2]) < maxdepth]
+  a_v_keys = ['_'.join(['a', 'v', x.split('_')[2]]) for x in a_q_keys]
+  b_v_keys = ['_'.join(['b', 'v', x.split('_')[2]]) for x in b_q_keys]
+  new_values['a_q'] = 0
+  new_values['b_q'] = 0
+  new_values['a_v'] = 0
+  new_values['b_v'] = 0
+  for a_q_key, a_p_key, a_v_key in zip(a_q_keys, a_p_keys, a_v_keys):
+    p = values[a_p_key] 
+    q = values[a_q_key]
+    v = p*q
+    new_values[a_v_key] = v
+    new_values['a_q'] += q
+    new_values['a_v'] += v
+  for b_q_key, b_p_key, b_v_key in zip(b_q_keys, b_p_keys, b_v_keys):
+    p = values[b_p_key]
+    q = values[b_q_key]
+    v = p*q
+    new_values[b_v_key] = v
+    new_values['b_q'] += q
+    new_values['b_v'] += v
+  return new_values
+
+
+def vwap(values, side, currency='base', quantity=None, maxdepth=None):
+  assert side in ['ask', 'bid']
+  assert currency in ['base', 'quote']
+  p_key = 'a_p' if side == 'ask' else 'b_p'
+  q_key = 'a_q' if side == 'ask' else 'b_q'
+  quantity_str = 'max' if quantity is None else np.format_float_positional(quantity)
+  maxdepth_str = str(maxdepth) if maxdepth is not None else 'max'
+  vwap_key = '_'.join(['vwap', side, currency, quantity_str, maxdepth_str])
+  ps, qs, i, s = [], [], 0, 0  # prices, quantities, index, sum
+  while True:
+    if maxdepth is not None and i == maxdepth:
+      break
+    p = values.get(f'{p_key}_{i}', None)
+    q = values.get(f'{q_key}_{i}', None)
+    if p is None or q is None:
+      break
+    if currency == 'quote': 
+      q *= p
+    ps.append(p)
+    s += q
+    if quantity is None or s <= quantity:
+      qs.append(q)
+    else:
+      dq = s - quantity
+      qs.append(q - dq)
+      break
+    i += 1
+  vwap_value = np.average(ps, weights=qs)
+  return {vwap_key: vwap_value}
+
+
+def ema(new_values, key, alpha, old_values=None):
+  alpha_str = np.format_float_positional(alpha)
+  ema_key = '_'.join(['ema', alpha_str]) + '-' + key
+  new_value = new_values[key]
+  old_ema = old_values[ema_key] if old_values is not None else new_value
+  new_ema = old_ema + alpha*(new_value - old_ema)
+  return {ema_key: new_ema}
 
 
 # def talib(df, function='SMA', function_kwargs=None):

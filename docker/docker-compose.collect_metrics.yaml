@@ -1,0 +1,24 @@
+version: '3.3'
+
+services:
+  collect_metrics:
+    image: ccf
+    # container_name: metric_binance_btc_usdt
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    networks:
+      - db
+    working_dir: /app/work
+    entrypoint: [ python ]
+    command: [ ../src/ccf/collect_metrics.py, -cd, conf, -cn, collect_metrics-kafka-binance-btc-usdt ]
+    environment:
+      PYTHONPATH: /app/src
+    restart: always
+      
+networks:
+  db:
+    driver: bridge
+    
+# volumes:
+#   binance_btc_usdt:

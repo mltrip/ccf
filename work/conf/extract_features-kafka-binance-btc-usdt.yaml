@@ -4,23 +4,47 @@ defaults:
   - partitioner@producer.partitioners.feature: feature
   - _self_
 
-quant: 3.0e+9
-consumer:
-  bootstrap_servers: "kafka:9092"
-producer:
-  bootstrap_servers: "kafka:9092"
 agents:
-  a_1:
+  btc_usdt:
     class: Delta
     verbose: true
+    quant: 3.0e+9
     replace_nan: 0.0
+    kind: lograt
+    qv:
+      maxdepth: 5
+    deltas:
+      - shift: 1
+        columns: ['^m_p$', '^a_(q|v|p)_(0|1|2|3|4)$', '^b_(q|v|p)_(0|1|2|3|4)$', '^t_.*', '^a_q$', '^b_q$', '^a_v$', '^b_v$']
+      - shift: 0 
+        column: m_p
+        columns: [ '^a_p_(0|1|2|3|4)$', '^b_p_(0|1|2|3|4)$', '^t_p_.*' ]
+      - shift: 0 
+        column: a_q
+        columns: [ '^b_q$' ]
+      - shift: 0 
+        column: a_q
+        columns: [ '^a_q_(0|1|2|3|4)$', '^t_q_.*$' ]  
+      - shift: 0 
+        column: b_q
+        columns: [ '^b_q_(0|1|2|3|4)$', '^t_q_.*$' ]     
+      - shift: 0 
+        column: a_v
+        columns: [ '^b_v$' ]  
+      - shift: 0 
+        column: a_v
+        columns: [ '^a_v_(0|1|2|3|4)$', '^t_v_.*' ]
+      - shift: 0 
+        column: b_v
+        columns: [ '^b_v_(0|1|2|3|4)$', '^t_v_.*' ]
     consumers:
-      c_1:
+      lob_trade:
+        bootstrap_servers: "kafka:9092"
         topic_keys:
           lob: [ binance-btc-usdt ]
           trade: [ binance-btc-usdt ]
     producers:
-      p_1:
+      feature:
+        bootstrap_servers: "kafka:9092"
         topic_keys:
           feature: [ binance-btc-usdt ]
-  

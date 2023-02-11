@@ -1,34 +1,15 @@
-import sys
-from datetime import datetime, timedelta, timezone
-import time
-from copy import deepcopy
-import gc
-import json
-from pprint import pprint
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import concurrent.futures
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
-import numpy as np
-import pandas as pd
-# from sqlalchemy import create_engine
-# from pyspark.sql import SparkSession
-# from pyspark.conf import SparkConf
 
-from ccf.read_data import read_data
-from ccf.utils import expand_columns
-# import talib as ta
-# import pandas_ta as ta
-import numpy as np
-# from pyspark.sql import functions as F
-# from pyspark.sql import types as T
-
-from ccf.utils import expand_columns, wait_first_future
 from ccf import agents as ccf_agents
+from ccf.utils import wait_first_future
 
 
 def extract_features(agents, consumer=None, producer=None, quant=None, executor=None):
-  executor = {} if executor is None else executor
+  if executor is None:
+    executor = {'class': 'ThreadPoolExecutor'}
   quant = int(quant) if quant is not None else quant
   # Initialize agents
   for name, kwargs in agents.items():
@@ -40,8 +21,6 @@ def extract_features(agents, consumer=None, producer=None, quant=None, executor=
         kwargs['producers'][p].update(producer)
     if quant is not None:
       kwargs['quant'] = quant
-    print(name)
-    pprint(kwargs)
     class_name = kwargs.pop('class')
     agents[name] = getattr(ccf_agents, class_name)(**kwargs)
   # Run agents
@@ -50,14 +29,15 @@ def extract_features(agents, consumer=None, producer=None, quant=None, executor=
       print(name)
       agent()
   else:
-    e = ThreadPoolExecutor(**executor)
+    executor_class = executor.pop('class')
+    executor = getattr(concurrent.futures, executor_class)(**executor)
     futures = []
     for name, agent in agents.items():
       print(name)
       future_kwargs = {}
-      future = e.submit(agent, **future_kwargs)
+      future = executor.submit(agent, **future_kwargs)
       futures.append(future)
-    wait_first_future(e, futures)
+    wait_first_future(executor, futures)
 
   
 @hydra.main(version_base=None)

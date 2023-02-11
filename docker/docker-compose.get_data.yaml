@@ -1,0 +1,24 @@
+version: '3.3'
+
+services:
+  get_data:
+    image: ccf
+    # container_name: get_data-kafka-binance-btc-usdt-20
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    networks:
+      - db
+    working_dir: /app/work
+    entrypoint: [ python ]
+    command: [ ../src/ccf/get_data.py, -cd, conf, -cn, get_data-kafka-binance-btc-usdt ]
+    environment:
+      PYTHONPATH: /app/src
+    restart: always
+      
+networks:
+  db:
+    driver: bridge
+    
+# volumes:
+#   binance_btc_usdt:

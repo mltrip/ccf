@@ -15,7 +15,7 @@ agents:
     keys: [ binance-btc-usdt ]
     delay: 1
     timeout: 60
-    depth: 5  # valid only: 5, 10, 20 https://github.com/binance/binance-spot-api-docs/blob/master/web-socket-streams.md#partial-book-depth-streams
+    depth: 20
     verbose: true
     producer:
       bootstrap_servers: "kafka:9092"
