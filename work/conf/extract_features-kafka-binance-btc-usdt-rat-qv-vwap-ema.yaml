@@ -1,0 +1,87 @@
+defaults:
+  - partitioner@consumer.partitioners.lob: lob
+  - partitioner@consumer.partitioners.trade: trade
+  - partitioner@producer.partitioners.feature: feature
+  - _self_
+
+agents:
+  btc_usdt:
+    class: Delta
+    feature: rat-qv-vwap-ema
+    verbose: false
+    quant: 3.0e+9
+    replace_nan: 1.0
+    kind: rat
+    ema_keys: [ '^m_p$', '^b_v$', '^a_v$', '^a_q$', '^b_q$', '^vwap.*' ]
+    ema_alphas: [ 0.125, 0.0625, 0.03125, 0.0078125, 0.00390625, 0.0009765625, 0.00048828125, 0.0001220703125, 0.0000152587890625 ]
+    vwaps:
+      - quantity: 0.0001
+        currency: base
+      - quantity: 0.001
+        currency: base
+      - quantity: 0.01
+        currency: base
+      - quantity: 0.1
+        currency: base
+      - quantity: 1
+        currency: base
+      - quantity: 10
+        currency: base
+      - quantity: ~
+        currency: base
+      - quantity: 1
+        currency: quote
+      - quantity: 10
+        currency: quote
+      - quantity: 100
+        currency: quote
+      - quantity: 1000
+        currency: quote
+    deltas:
+      - shift: 1 
+        columns: [ '^m_p$' ]
+      - shift: 0 
+        column: m_p
+        columns: [ '^vwap_.*', '^ema_.*-vwap', '^ema_.*-m_p', '^t_p_.*' ]
+      - shift: 0 
+        column: a_q
+        columns: [ '^b_q$' ]
+      - shift: 0 
+        column: a_q
+        columns: [ '^t_q_.*' ]  
+      - shift: 0 
+        column: b_q
+        columns: [ '^t_q_.*' ]     
+      - shift: 0 
+        column: a_q
+        columns: [ '^ema_.*-a_q' ]       
+      - shift: 0 
+        column: b_q
+        columns: [ '^ema_.*-b_q' ] 
+      - shift: 0 
+        column: a_v
+        columns: [ '^b_v$' ]  
+      - shift: 0 
+        column: a_v
+        columns: [ '^t_v_.*' ]
+      - shift: 0 
+        column: b_v
+        columns: [ '^t_v_.*' ]
+      - shift: 0 
+        column: a_v
+        columns: [ '^ema_.*-a_v' ]
+      - shift: 0 
+        column: b_v
+        columns: [ '^ema_.*-b_v' ]  
+    consumers:
+      lob_trade:
+        bootstrap_servers: "kafka:9092"
+        topic_keys:
+          lob: [ binance-btc-usdt ]
+          trade: [ binance-btc-usdt ]
+    producers:
+      feature:
+        bootstrap_servers: "kafka:9092"
+        topic_keys:
+          feature: [ binance-btc-usdt ]
+  

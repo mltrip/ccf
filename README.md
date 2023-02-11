@@ -46,11 +46,13 @@ docker compose -f docker-compose.db.yaml up -d
 ```
 ### Build CCF Image
 ```sh
-docker compose -f docker-compose.data.feature.metric.yaml build
+docker compose -f docker-compose.get_data.yaml build
 ```
 ### Run get_data, extract_features and collect_metrics
 ```sh
-docker compose -f docker-compose.data.feature.metric.yaml up -d
+docker compose -f docker-compose.get_data.yaml up -d
+docker compose -f docker-compose.extract_features.yaml up -d
+docker compose -f docker-compose.collect_metrics.yaml up -d
 ```
 ### Set sensitive environment variables for MLflow
 ```sh
@@ -118,7 +120,9 @@ docker compose -f docker-compose.data.feature.metric.yaml build
 ```
 ### Run get_data, extract_features and collect_metrics
 ```sh
-docker compose -f docker-compose.data.feature.metric.yaml up -d
+docker compose -f docker-compose.get_data.yaml up -d
+docker compose -f docker-compose.extract_features.yaml up -d
+docker compose -f docker-compose.collect_metrics.yaml up -d
 ```
 ### Train model from influxdb
 ```sh
