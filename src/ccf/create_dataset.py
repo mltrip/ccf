@@ -294,7 +294,9 @@ class Dataset:
       df, df2 = all_df, None
     if self.verbose:
       print(df)
+      print(df.describe(include='all'))
       print(df2)
+      print(df2.describe(include='all'))
     if not self.df_only:
       dataset_kwargs['data'] = df.reset_index()
       try:
