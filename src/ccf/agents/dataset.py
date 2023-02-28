@@ -135,7 +135,7 @@ class InfluxdbDataset(Agent):
   def __init__(self, quant, size=None, start=None, stop=None, client=None, 
                bucket=None, topics=None, feature_keys=None, delay=0,
                executor=None, aggregate=None, interpolate=None, 
-               from_env_properties=False, verbose=False):
+               from_env_properties=False, batch=None, verbose=False):
     self.quant = quant
     self.size = size
     self.start = start
@@ -164,10 +164,12 @@ class InfluxdbDataset(Agent):
     self.bucket = os.getenv('INFLUXDB_V2_BUCKET', 'ccf') if bucket is None else bucket
     self.futures = None
     self.from_env_properties = from_env_properties
+    self.batch = batch
   
   class OnFeature:
     def __init__(self, topic, key, feature, size, start, stop, quant, 
-                 client, bucket, aggregate, interpolate, from_env_properties, verbose):
+                 client, bucket, aggregate, interpolate, from_env_properties, batch, 
+                 verbose):
       self.topic = topic
       self.key = key
       self.feature = feature
@@ -180,8 +182,10 @@ class InfluxdbDataset(Agent):
       self.aggregate = aggregate
       self.interpolate = interpolate
       self.from_env_properties = from_env_properties
+      self.batch = batch
       self.verbose = verbose
       self._client = None
+      
   
     def __call__(self):
       t = time.time()
@@ -192,23 +196,53 @@ class InfluxdbDataset(Agent):
         else:
           self._client = InfluxDBClient(**self.client)
       # Make query
-      exchange, base, quote = self.key.split('-')
-      stop_str = f", stop: {int(self.stop/10**9)}" if self.stop is not None else ''
-      rename_str = '|> rename(columns: {_time: "timestamp"})'
-      query = f'''
-      from(bucket: "{self.bucket}")
-      |> range(start: {int(self.start/10**9)}{stop_str})
-      |> filter(fn:(r) => r._measurement == "{self.topic}")
-      |> filter(fn:(r) => r.exchange == "{exchange}")
-      |> filter(fn:(r) => r.base == "{base}")
-      |> filter(fn:(r) => r.quote == "{quote}")
-      |> filter(fn:(r) => r.feature == "{self.feature}")
-      |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-      |> drop(columns: ["_start", "_stop", "_measurement", "host"])
-      {rename_str}'''
-      if self.verbose:
-        print(query)
-      df = self._client.query_api().query_data_frame(query=query)
+      if self.start is not None and self.stop is not None and self.batch is not None:
+        dfs = []
+        cur_start = self.start
+        while cur_start < self.stop:
+          if cur_start + self.batch < self.stop:
+            cur_stop = cur_start + self.batch
+          else:
+            cur_stop = self.stop
+          exchange, base, quote = self.key.split('-')
+          stop_str = f", stop: {int(cur_stop/10**9)}"
+          rename_str = '|> rename(columns: {_time: "timestamp"})'
+          query = f'''
+          from(bucket: "{self.bucket}")
+          |> range(start: {int(cur_start/10**9)}{stop_str})
+          |> filter(fn:(r) => r._measurement == "{self.topic}")
+          |> filter(fn:(r) => r.exchange == "{exchange}")
+          |> filter(fn:(r) => r.base == "{base}")
+          |> filter(fn:(r) => r.quote == "{quote}")
+          |> filter(fn:(r) => r.feature == "{self.feature}")
+          |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+          |> drop(columns: ["_start", "_stop", "_measurement", "host"])
+          {rename_str}'''
+          if self.verbose:
+            print(query)
+          df = self._client.query_api().query_data_frame(query=query)
+          dfs.append(df)
+          cur_start = cur_stop
+        df = pd.concat(dfs, ignore_index=True, sort=False)
+      else:
+        exchange, base, quote = self.key.split('-')
+        stop_str = f", stop: {int(self.stop/10**9)}" if self.stop is not None else ''
+        rename_str = '|> rename(columns: {_time: "timestamp"})'
+        query = f'''
+        from(bucket: "{self.bucket}")
+        |> range(start: {int(self.start/10**9)}{stop_str})
+        |> filter(fn:(r) => r._measurement == "{self.topic}")
+        |> filter(fn:(r) => r.exchange == "{exchange}")
+        |> filter(fn:(r) => r.base == "{base}")
+        |> filter(fn:(r) => r.quote == "{quote}")
+        |> filter(fn:(r) => r.feature == "{self.feature}")
+        |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+        |> drop(columns: ["_start", "_stop", "_measurement", "host"])
+        {rename_str}'''
+        if self.verbose:
+          print(query)
+        df = self._client.query_api().query_data_frame(query=query)
+      # Raw data
       if self.verbose:
         print(df)
         print(df.columns)
@@ -254,6 +288,7 @@ class InfluxdbDataset(Agent):
             'aggregate': self.aggregate,
             'interpolate': self.interpolate,
             'from_env_properties': self.from_env_properties,
+            'batch': self.batch,
             'verbose': self.verbose}
           on_feature = self.OnFeature(**on_feature_kwargs)
           future = executor.submit(on_feature)
