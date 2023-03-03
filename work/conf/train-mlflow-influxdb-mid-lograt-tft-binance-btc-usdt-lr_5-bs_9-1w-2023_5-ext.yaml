@@ -1,21 +1,21 @@
 defaults:
- - dataset@create_dataset_kwargs.dataset_kwargs: mid-lograt-lob_vba-mel_20-mpl_20-no_norm
+ - dataset@create_dataset_kwargs.dataset_kwargs: mid-lograt-kafka-binance-btc-usdt
  - _self_
-
+ 
 kind: occasional
 parent_name: ~
 parent_version: ~
 parent_stage: ~
-model_name: influxdb-mid-lograt-lob_vba-mel_20-mpl_20-no_norm-lr_5-bs_5-1w-2023_5
+model_name: influxdb-mid-lograt-tft-binance-btc-usdt-lr_5-bs_9-1w-2023_5
 create_dataset_kwargs:
-  verbose: true
+  verbose: false
   quant: 3.0e+9
   start: "2023-01-30T00:00:00+00:00"
   stop: "2023-02-06T00:00:00+00:00"
   replace_nan: 0.0
   split: 0.8
   agents:
-    influxdb: 
+    a_1: 
       class: InfluxdbDataset
       verbose: false
       topics: [ feature ]
@@ -24,24 +24,29 @@ create_dataset_kwargs:
         max_workers: 1
       feature_keys:
         Delta-default-lograt: [ binance-btc-usdt ]
+      from_env_properties: false  # See https://github.com/influxdata/influxdb-client-python#via-environment-properties
+      bucket: ccf
       client:
+        url: "https://158.160.7.203:8086"
+        org: mltrip
         timeout: 100000
         verify_ssl: false
+        proxy: "http://localhost:3128"
 dataloader_kwargs:
   train:
     train: true
     num_workers: 16
-    batch_size: 32
+    batch_size: 512
   val:
     train: false
     num_workers: 16
-    batch_size: 32
+    batch_size: 512
 model_kwargs:
   class: TemporalFusionTransformer
-  learning_rate: 0.03125  # 1/32
+  learning_rate: 0.03125
   hidden_size: 8
   attention_head_size: 1
-  dropout: 0.1
+  dropout: 0
   hidden_continuous_size: 8
   lstm_layers: 1
   # output_size: 7  # Inferred from loss
@@ -53,19 +58,18 @@ model_kwargs:
   reduce_on_plateau_min_lr: 1.0e-10
   weight_decay: 0
 trainer_kwargs:
-  max_epochs: 256
+  max_epochs: 128
   accelerator: gpu  # cpu
   devices: [ 0 ]
   gradient_clip_val: 0
-  gradient_clip_algorithm: norm  # norm or value
-  log_every_n_steps: 600
+  log_every_n_steps: 100
   limit_train_batches: ~
   logger:
   - class: MLFlowLogger
     experiment_name: ~  # default to model_name
   callbacks:
-  # - class: DeviceStatsMonitor
-  #   cpu_stats: true
+  - class: DeviceStatsMonitor
+    cpu_stats: true
   - class: LearningRateMonitor
     logging_interval: ~
     log_momentum: true
@@ -77,6 +81,6 @@ trainer_kwargs:
   - class: EarlyStopping
     monitor: val_loss
     min_delta: 0
-    patience: 17
+    patience: 4
     verbose: false
     mode: min

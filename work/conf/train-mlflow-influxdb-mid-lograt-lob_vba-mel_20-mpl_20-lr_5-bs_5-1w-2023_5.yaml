@@ -77,6 +77,6 @@ trainer_kwargs:
   - class: EarlyStopping
     monitor: val_loss
     min_delta: 0
-    patience: 5
+    patience: 9
     verbose: false
     mode: min

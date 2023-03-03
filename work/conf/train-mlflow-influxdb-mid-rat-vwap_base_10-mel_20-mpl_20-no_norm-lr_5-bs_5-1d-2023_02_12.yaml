@@ -6,14 +6,12 @@ kind: occasional
 parent_name: ~
 parent_version: ~
 parent_stage: ~
-model_name: test_influxdb-mid-rat-vwap_base_10-mel_20-mpl_20-no_norm-lr_5-bs_5-1d-2023_02_12
+model_name: influxdb-mid-rat-vwap_base_10-mel_20-mpl_20-no_norm-lr_5-bs_5-1d-2023_02_12
 create_dataset_kwargs:
   verbose: true
   quant: 3.0e+9
-  start: "2023-02-11T18:30:00+00:00"
-  stop: "2023-02-11T19:30:00+00:00"
-  # start: "2023-02-12T00:00:00+00:00"
-  # stop: "2023-02-13T00:00:00+00:00"
+  start: "2023-02-12T00:00:00+00:00"
+  stop: "2023-02-13T00:00:00+00:00"
   replace_nan: 0.0
   split: 0.8
   agents:
@@ -43,7 +41,7 @@ model_kwargs:
   learning_rate: 0.03125  # 1/32
   hidden_size: 8
   attention_head_size: 1
-  dropout: 0
+  dropout: 0.2
   hidden_continuous_size: 8
   lstm_layers: 1
   # output_size: 7  # Inferred from loss
@@ -79,6 +77,6 @@ trainer_kwargs:
   - class: EarlyStopping
     monitor: val_loss
     min_delta: 0
-    patience: 9
+    patience: 17
     verbose: false
     mode: min
