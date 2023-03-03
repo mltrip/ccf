@@ -1,12 +1,12 @@
 defaults:
- - dataset@create_dataset_kwargs.dataset_kwargs: mid-lograt-lob_vba-mel_20-mpl_20-no_norm
+ - dataset@create_dataset_kwargs.dataset_kwargs: mid-lograt-lob-mel_20-mpl_20-no_norm
  - _self_
-
+ 
 kind: occasional
 parent_name: ~
 parent_version: ~
 parent_stage: ~
-model_name: influxdb-mid-lograt-lob_vba-mel_20-mpl_20-no_norm-lr_5-bs_5-1w-2023_5
+model_name: influxdb-mid-lograt-lob-mel_20-mpl_20-no_norm-lr_5-bs_3-1w-2023_5
 create_dataset_kwargs:
   verbose: true
   quant: 3.0e+9
@@ -31,17 +31,17 @@ dataloader_kwargs:
   train:
     train: true
     num_workers: 16
-    batch_size: 32
+    batch_size: 8
   val:
     train: false
     num_workers: 16
-    batch_size: 32
+    batch_size: 8
 model_kwargs:
   class: TemporalFusionTransformer
   learning_rate: 0.03125  # 1/32
   hidden_size: 8
   attention_head_size: 1
-  dropout: 0.1
+  dropout: 0
   hidden_continuous_size: 8
   lstm_layers: 1
   # output_size: 7  # Inferred from loss
@@ -55,7 +55,7 @@ model_kwargs:
 trainer_kwargs:
   max_epochs: 256
   accelerator: gpu  # cpu
-  devices: [ 0 ]
+  devices: [ 1 ]
   gradient_clip_val: 0
   gradient_clip_algorithm: norm  # norm or value
   log_every_n_steps: 600
@@ -77,6 +77,6 @@ trainer_kwargs:
   - class: EarlyStopping
     monitor: val_loss
     min_delta: 0
-    patience: 17
+    patience: 9
     verbose: false
     mode: min

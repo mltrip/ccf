@@ -6,14 +6,12 @@ kind: occasional
 parent_name: ~
 parent_version: ~
 parent_stage: ~
-model_name: test_influxdb-mid-rat-vwap_base_10-mel_20-mpl_20-lr_5-bs_5-1d-2023_02_12
+model_name: influxdb-mid-rat-vwap_base_10-mel_20-mpl_20-lr_5-bs_5-1d-2023_02_12
 create_dataset_kwargs:
   verbose: true
   quant: 3.0e+9
   start: "2023-02-12T00:00:00+00:00"
-  stop: "2023-02-12T14:00:00+00:00"
-  # start: "2023-02-12T00:00:00+00:00"
-  # stop: "2023-02-13T00:00:00+00:00"
+  stop: "2023-02-13T00:00:00+00:00"
   replace_nan: 0.0
   split: 0.8
   agents:
