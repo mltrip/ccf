@@ -43,11 +43,11 @@ dataloader_kwargs:
 model_kwargs:
   class: TemporalFusionTransformer
   learning_rate: 0.03125  # 1/32
-  hidden_size: 8
-  attention_head_size: 1
-  dropout: 0
-  hidden_continuous_size: 8
-  lstm_layers: 1
+  hidden_size: 128
+  attention_head_size: 4
+  dropout: 0.1
+  hidden_continuous_size: 128
+  lstm_layers: 2
   # output_size: 7  # Inferred from loss
   loss:
     class: QuantileLoss
