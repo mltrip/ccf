@@ -1,0 +1,30 @@
+defaults:
+ - _self_
+
+executor: 
+  class: ProcessPoolExecutor
+  max_workers: 1
+agents:
+  lob:
+    class: InfluxdbCsv
+    verbose: true
+    csv_path: data_binance_api_orderbook_BTCUSDT_100_1_202302.csv.xz
+    topic: lob
+    exchange: binance
+    base: btc
+    quote: usdt
+    client:
+      verify_ssl: false
+      timeout: 3000000
+    write_options:
+      batch_size: 3000
+      flush_interval: 10000
+      # max_close_wait: 300000
+    rename:
+      mapper: cc_lob
+      axis: columns
+    drop:
+      columns:
+        - lastUpdateId
+        
+    
