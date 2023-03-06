@@ -1,17 +1,17 @@
 defaults:
- - dataset@create_dataset_kwargs.dataset_kwargs: mid-rat-vwap_base_1_10-mel_20-mpl_20-no_norm-no_target
+ - dataset@create_dataset_kwargs.dataset_kwargs: mid-rat-vwap_ema_mid-mel_20-mpl_20-no_norm-no_target
  - _self_
  
 kind: occasional
 parent_name: ~
 parent_version: ~
 parent_stage: ~
-model_name: influxdb-mid-rat-vwap_base_1_10-mel_20-mpl_20-no_norm-no_target-2w-2023_7_8
+model_name: influxdb-mid-rat-vwap_ema_mid-mel_20-mpl_20-no_norm-no_target
 create_dataset_kwargs:
   verbose: true
   quant: 3.0e+9
   start: "2023-02-13T00:00:00+00:00"
-  stop: "2023-02-27T00:00:00+00:00"
+  stop: "2023-03-06T00:00:00+00:00"
   replace_nan: 1.0
   split: 0.8
   agents:
@@ -26,7 +26,7 @@ create_dataset_kwargs:
       feature_keys:
         rat-qv-vwap-ema: [ binance-btc-usdt ]
       client:
-        timeout: 100000
+        timeout: 200000
         verify_ssl: false
 dataloader_kwargs:
   train:
@@ -40,11 +40,11 @@ dataloader_kwargs:
 model_kwargs:
   class: TemporalFusionTransformer
   learning_rate: 0.03125  # 1/32
-  hidden_size: 128
-  attention_head_size: 4
-  dropout: 0.1
-  hidden_continuous_size: 128
-  lstm_layers: 2
+  hidden_size: 8
+  attention_head_size: 1
+  dropout: 0
+  hidden_continuous_size: 8
+  lstm_layers: 1
   # output_size: 7  # Inferred from loss
   loss:
     class: QuantileLoss
@@ -56,7 +56,7 @@ model_kwargs:
 trainer_kwargs:
   max_epochs: 256
   accelerator: gpu  # cpu
-  devices: [ 1 ]
+  devices: [ 0 ]
   gradient_clip_val: 0
   gradient_clip_algorithm: norm  # norm or value
   log_every_n_steps: 600
