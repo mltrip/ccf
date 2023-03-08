@@ -9,12 +9,16 @@ import concurrent.futures
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import json
+import os
 import socket
 import time
 from pprint import pprint
 
+from influxdb_client import InfluxDBClient, WriteOptions
+from influxdb_client.client.write_api import SYNCHRONOUS
 import feedparser
 from kafka import KafkaProducer
+import pandas as pd
 import websocket
 
 from ccf.agents.base import Agent
@@ -430,4 +434,126 @@ class Feed(Agent):
       future = executor.submit(on_feed)
       futures.append(future)
     wait_first_future(executor, futures)
-      
+
+    
+class InfluxdbCsv(Agent):
+  def __init__(self, csv_path, exchange, base, quote, topic, 
+               drop=None, rename=None, client=None, 
+               bucket=None, write_options=None, reverse_side=False,
+               verbose=False):
+    super().__init__()
+    self.csv_path = csv_path
+    self.topic = topic
+    self.exchange = exchange
+    self.base = base
+    self.quote = quote
+    self.drop = drop
+    self.rename = rename
+    self.client = {} if client is None else client
+    self.client.setdefault('token', os.getenv('INFLUXDB_V2_TOKEN', None))
+    self.client.setdefault('url', os.getenv('INFLUXDB_V2_URL', 'https://influxdb:8086'))
+    self.client.setdefault('org', os.getenv('INFLUXDB_V2_ORG', 'mltrip'))
+    self.client.setdefault('timeout', os.getenv('INFLUXDB_V2_TIMEOUT', None))
+    self.client.setdefault('verify_ssl', os.getenv(
+      'INFLUXDB_V2_VERIFY_SSL', 'true').lower() in ['yes', 'true', '1'])
+    self.client.setdefault('proxy', os.getenv('INFLUXDB_V2_PROXY', None))
+    self.bucket = os.getenv('INFLUXDB_V2_BUCKET', 'ccf') if bucket is None else bucket
+    self.write_options = write_options
+    self.reverse_side = reverse_side
+    self.verbose = verbose
+  
+  @staticmethod
+  def cc_lob(name):
+    """CC mapper"""
+    if name == 'datetime':
+      return 'timestamp'
+    else:
+      tokens = [x[0] if x.isalpha() else x for x in name.split('_')]
+      tokens[2] = str(int(tokens[2]) - 1)
+      return '_'.join(tokens)
+    
+  @staticmethod
+  def cc_trade(name):
+    """CC mapper"""
+    if name == 'datetime':
+      return 'timestamp'
+    elif name == 'price':
+      return 't_p'
+    elif name == 'quantity':
+      return 't_q'
+    elif name == 'type':
+      return 't_s'
+    else:
+      return name
+    
+  def __call__(self):
+    # Init client and write API
+    client = InfluxDBClient(**self.client)
+    if self.write_options is not None:
+      wo = WriteOptions(**self.write_options)
+    else:
+      wo = SYNCHRONOUS
+    write_api = client.write_api(write_options=wo)
+    # Read
+    print(f'Reading...')
+    t = time.time()
+    df = pd.read_csv(self.csv_path)
+    print(f'Read time: {time.time() - t}')
+    print(df)
+    print(df.columns)
+    # Drop
+    if self.drop is not None:
+      df = df.drop(**self.drop)
+    # Rename
+    if self.rename is not None:
+      if 'mapper' in self.rename:
+        self.rename['mapper'] = getattr(self, self.rename['mapper'])
+      df = df.rename(**self.rename)
+    if self.topic == 'lob':
+      # Add mid price
+      if 'm_p' not in df and 'a_p_0' in df and 'b_p_0' in df:
+        df['m_p'] = 0.5*(df['a_p_0'] + df['b_p_0'])
+      else:
+        df['m_p'] = None
+      print(df['m_p'])
+      # Add tags
+      df['exchange'] = self.exchange
+      df['base'] = self.base
+      df['quote'] = self.quote
+      data_frame_tag_columns = ['exchange', 'base', 'quote']
+      # Set index
+      df = df.set_index('timestamp')
+      df.index = pd.to_datetime(df.index, unit='ns')
+    elif topic == 'trade':
+      # # trade side: 0 - maker_sell/taker_buy or 1 - maker_buy/taker_sell
+      if not self.reverse_side:
+        d['t_s'] = d['t_s'].replace({'sell': 1, 'buy': 0}).astype('int64')
+      else:
+        d['t_s'] = d['t_s'].replace({'sell': 0, 'buy': 1}).astype('int64')
+      # Add tags
+      df['exchange'] = self.exchange
+      df['base'] = self.base
+      df['quote'] = self.quote
+      data_frame_tag_columns = ['exchange', 'base', 'quote']
+      # Set index
+      df = df.set_index('timestamp')
+      df.index = pd.to_datetime(df.index, unit='ns')
+    else:
+      raise NotImplementedError(self.topic)
+    print(df)
+    print(df.columns)
+    print(df.dtypes)
+    # Write
+    print(f'Writing...')
+    t = time.time()
+    write_api.write(bucket=self.bucket, 
+                    record=df,
+                    data_frame_measurement_name=self.topic,
+                    data_frame_tag_columns=data_frame_tag_columns)
+    print(f'Write time: {time.time() - t}')
+    # Close
+    print(f'Closing...')
+    t = time.time()
+    write_api.close()
+    client.close()
+    print(f'Close time: {time.time() - t}')

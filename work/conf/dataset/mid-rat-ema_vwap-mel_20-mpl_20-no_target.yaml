@@ -13,17 +13,17 @@ static_categoricals:
 max_encoder_length: 20
 max_prediction_length: 20
 time_varying_unknown_reals:
-- ^rat_0-ema_.*m_p-
-- rat_1-m_p-m_p
+- ^rat_0-ema_.*vwap
+# - rat_1-m_p-m_p
 target_normalizer:
   class: EncoderNormalizer  # TorchNormalizer issue https://github.com/jdb78/pytorch-forecasting/issues/947
-  method: identity
-  center: false  # standard + false -> https://github.com/jdb78/pytorch-forecasting/issues/613
+  method: standard
+  center: true  # standard + false -> https://github.com/jdb78/pytorch-forecasting/issues/613
   transformation: ~
 scalers:
   class: EncoderNormalizer  # TorchNormalizer issue https://github.com/jdb78/pytorch-forecasting/issues/947
-  method: identity
-  center: false  # https://github.com/jdb78/pytorch-forecasting/issues/613
+  method: standard
+  center: true  # https://github.com/jdb78/pytorch-forecasting/issues/613
   transformation: ~
 categorical_encoders:
   class: NaNLabelEncoder

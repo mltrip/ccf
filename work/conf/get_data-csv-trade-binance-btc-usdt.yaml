@@ -1,0 +1,31 @@
+defaults:
+ - _self_
+
+executor: 
+  class: ProcessPoolExecutor
+  max_workers: 1
+agents:
+  lob:
+    class: InfluxdbCsv
+    verbose: true
+    csv_path: ~
+    topic: trade
+    exchange: binance
+    base: btc
+    quote: usdt
+    reverse_side: true
+    client:
+      verify_ssl: false
+      timeout: 3000000
+    write_options:
+      batch_size: 3000
+      flush_interval: 10000
+      # max_close_wait: 300000
+    rename:
+      mapper: cc_trade
+      axis: columns
+    drop:
+      columns:
+        - id
+        
+    

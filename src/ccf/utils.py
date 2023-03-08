@@ -33,6 +33,8 @@ def delta2value(deltas, kind, initial_value=1):
     deltas = np.cumprod(deltas)
   elif kind == 'rel':
     deltas = np.cumprod(1 + deltas)
+  elif kind == 'value':
+    return deltas
   else:
     raise NotImplementedError(kind)
   return deltas * initial_value
@@ -64,6 +66,7 @@ def wait_first_future(executor, futures):
 
       
 def initialize_time(start, stop, size, quant):
+  """Convert different combinations of start/stop/size/quant to Unix time in nanoseconds"""
   if start is not None:
     if isinstance(start, str):
       try:
