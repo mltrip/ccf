@@ -16,139 +16,122 @@ from ccf.agents.influxdb import InfluxDB
 from ccf.utils import expand_columns, initialize_time
 
 
-class Delta(Kafka):
-  def __init__(self, quant, consumers, producers, verbose=False, replace_nan=None,
-               feature=None, minsize=5, maxsize=5, delay=0, kind='rat',
-               ema_keys=None, ema_alphas=None, vwaps=None, deltas=None, qv=None,
-               resample=None, aggregate=None, interpolate=None):
+class DeltaKafka(Kafka):
+  def __init__(self, consumers, producers, 
+               feature=None, kind='rat', replace_nan=1.0,
+               quant=None, delay=0.0, watermark=None,
+               depth=None, deltas=None, emas=None, 
+               vwaps=None, verbose=False):
     super().__init__(consumers, producers, verbose)
-    self.quant = quant
     if feature is None:
       feature = f'-'.join([self.__class__.__name__, 'default', kind])
     self.feature = feature
-    self.minsize = minsize
-    self.maxsize = maxsize
-    self.delay = delay
     self.kind = kind
-    self.data = deque()
-    self.replace_nan = replace_nan
-    self.ema_keys = [] if ema_keys is None else ema_keys
-    self.ema_alphas = [] if ema_alphas is None else ema_alphas
+    self.quant = quant
+    self.delay = delay
+    self.watermark = watermark if watermark is not None else quant
+    self.depth = depth
+    self.replace_nan = 1.0
+    self.emas = [] if emas is None else emas
     self.vwaps = [] if vwaps is None else vwaps
     self.deltas = [] if deltas is None else deltas
-    self.qv = {} if qv is None else qv
-    self.resample = {} if resample is None else resample
-    self.aggregate = {'func': {'.*': 'last'}} if aggregate is None else aggregate
-    self.interpolate = {'method': 'pad'} if interpolate is None else interpolate
     
   def __call__(self):
+    # Initialize consumers and producers
     if len(self.consumers) > 1:  # TODO implement with aiostream, asyncio or concurrent.futures
       raise NotImplementedError('Many consumers')
     else:
-      consumer = self.consumers[list(self.consumers.keys())[0]]
+      consumer_name = list(self.consumers.keys())[0]
+      consumer = self.consumers[consumer_name]
+      consumer_topic_keys = self.consumers_topic_keys[consumer_name]
     if len(self.producers) > 1:  # TODO implement with aiostream, asyncio or concurrent.futures
       raise NotImplementedError('Many producers')
     else:
-      name = list(self.producers.keys())[0]
-      producer = self.producers[name]
-      producer_topic_keys = self.producers_topic_keys[name]
-    last_datetime = None
-    topic_old_values = {}
-    for message in consumer:
-      t = time.time()
-      if self.verbose:
-        print(message.key, message.topic)
-      topic = message.topic
-      value = message.value
-      if topic in topic_old_values:
-        old_values = topic_old_values[topic][-1]
-      else:
-        old_values = None
-      if topic == 'trade':
-        value = unwrap_trade(value)
-      elif topic == 'lob':
-        value.update(evaluate_qv(values=value, **self.qv))
-        for v in self.vwaps:
-          vwap_ask = vwap(value, side='ask', **v)
-          vwap_bid = vwap(value, side='bid', **v)
-          vwap_mid = {}
-          for (ask_key, ask_value), (bid_key, bid_value) in zip(vwap_ask.items(), vwap_bid.items()):
-            mid_key = ask_key.replace('ask', 'mid')
-            mid_value = 0.5*(ask_value + bid_value)
-            vwap_mid[mid_key] = mid_value
-          value.update(vwap_ask)
-          value.update(vwap_bid)
-          value.update(vwap_mid)
-      expanded_ema_keys = expand_columns(value.keys(), self.ema_keys)
-      for ema_key in expanded_ema_keys:
-        for ema_alpha in self.ema_alphas:
-          if ema_key in value:
-            value.update(ema(value, ema_key, ema_alpha, old_values))
-      topic_old_values.setdefault(topic, deque()).append(value)
-      if self.maxsize is not None and len(topic_old_values[topic]) > self.maxsize:
-        topic_old_values[topic].popleft()
-      # pprint(value)
-      self.data.append(value)
-      # Create DataFrame
-      df = pd.DataFrame(self.data)
-      df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ns')
-      df = df.set_index('timestamp')
-      if self.verbose:
-        print(df)
-      # Resample, aggregate, interpolate DataFrame
-      resample = deepcopy(self.resample)
-      resample['rule'] = pd.Timedelta(self.quant, unit='ns')
-      aggregate = deepcopy(self.aggregate)
-      aggregate['func'] = {kk: v for k, v in aggregate['func'].items() 
-                           for kk in expand_columns(df.columns, [k])}
-      interpolate = deepcopy(self.interpolate)
-      df = df.resample(**resample).aggregate(**aggregate).interpolate(**interpolate)
-      if self.verbose:
-        print(df)
-      if len(df) < self.minsize:
-        continue
-      # Evaluate deltas of DataFrame
-      dfs = []
-      for d in self.deltas:
-        dfs.append(delta(df, kind=self.kind, **d))
-      df2 = pd.concat(dfs, axis=1)
-      df2['m_p'] = df['m_p']
-      df = df2.replace([np.inf, -np.inf], np.nan).replace({np.nan: self.replace_nan})
-      last_row = df.iloc[-1]
-      new_last_datetime = last_row.name
-      if self.verbose:
-        print(df)
-      if last_datetime is None or new_last_datetime > last_datetime:
-        print(f'New feature: {last_datetime} -> {new_last_datetime}')
-        last_dict = last_row.to_dict()
-        last_dict['exchange'] = value['exchange']
-        last_dict['base'] = value['base']
-        last_dict['quote'] = value['quote']
-        last_dict['timestamp'] = int(new_last_datetime.timestamp()*1e9)
-        last_dict['feature'] = self.feature
-        last_dict['quant'] = self.quant
-        last_datetime = new_last_datetime
-        if self.verbose:
-          pprint(last_dict)
-        for producer_topic, producer_keys in producer_topic_keys.items():
-          print(producer_topic, producer_keys)
-          if producer_keys is None:
-            producer.send(self.topic, value=last_dict)
-          else:
-            for producer_key in producer_keys:
-              producer.send(producer_topic, key=producer_key, value=last_dict)
-      if self.maxsize is not None and len(df) >= self.maxsize:
-        self.data.popleft()
-      dt = time.time() - t
-      wt = max(0, self.delay - dt)
-      print(f'{datetime.utcnow()}, dt: {dt:.3f}, wt: {wt:.3f}, rows: {len(df)}, cols: {len(df.columns)}')
-      time.sleep(wt)
+      producer_name = list(self.producers.keys())[0]
+      producer = self.producers[producer_name]
+      producer_topic_keys = self.producers_topic_keys[producer_name]
+    # Update streams
+    # Update buffers
+    cur_t = (time.time_ns() // self.quant)*self.quant
+    start_t = cur_t
+    delay_t = cur_t + self.delay
+    # stop_t = (stop // quant)*quant
+    topic_key_buffers = {}
+    topic_key_dataframes = {}
+    topic_key_features = {}
+    while True:
+      t0 = time.time()
+      next_t = cur_t + self.quant
+      watermark_t = next_t - self.watermark
+      print(f'\nnow:       {datetime.utcnow()}')
+      print(f'start:     {datetime.fromtimestamp(start_t/10**9)}')
+      print(f'delay:     {datetime.fromtimestamp(delay_t/10**9)}')
+      print(f'watermark: {datetime.fromtimestamp(watermark_t/10**9)}')
+      print(f'current:   {datetime.fromtimestamp(cur_t/10**9)}')
+      print(f'next:      {datetime.fromtimestamp(next_t/10**9)}')
+      # print(f'stop {datetime.fromtimestamp(stop_t/10**9)}')
+      # Append to buffer
+      cur_buffer_t = watermark_t
+      while cur_buffer_t < next_t:
+        message = next(consumer)
+        topic, key = message.topic, message.key
+        buffer = topic_key_buffers.setdefault(topic, {}).setdefault(key, deque())
+        value = message.value
+        cur_buffer_t = value['timestamp']
+        buffer.append(value)
+      # Popleft from buffers (timestamp >= watermark_t)
+      for topic, key_buffer in topic_key_buffers.items():
+        for key, buffer in key_buffer.items():
+          if len(buffer) != 0:
+            min_buffer_t = buffer[0]['timestamp']
+            while min_buffer_t < watermark_t:
+              if len(buffer) != 0:
+                min_buffer_t = buffer.popleft()['timestamp']
+              else:
+                break
+      cur_t = next_t
+      # Extract features
+      evaluate_features_delta_ema_qv_vwap(topic_key_buffers, topic_key_dataframes, topic_key_features,
+                                          self.quant, self.depth, next_t, deltas=self.deltas,
+                                          emas=self.emas, vwaps=self.vwaps, kind=self.kind,
+                                          replace_nan=self.replace_nan, verbose=self.verbose)
+      # Write features
+      if next_t >= delay_t:
+        for key, features in topic_key_features.get('feature', {}).items():
+          df = features['delta']
+          exchange, base, quote = key.split('-')
+          df['exchange'] = exchange
+          df['base'] = base
+          df['quote'] = quote
+          df['quant'] = self.quant
+          df['feature'] = self.feature
+          data_frame_tag_columns = ['exchange', 'base', 'quote', 'quant', 'feature']
+          if self.verbose:
+            print(df)
+          if len(df) > 0:        
+            last_row = df.iloc[-1]
+            last_dict = last_row.to_dict()
+            last_dict['timestamp'] = int(last_row.name.timestamp()*1e9)
+            for producer_topic, producer_keys in producer_topic_keys.items():
+              if producer_keys is None:
+                pass
+                producer.send(producer_topic, value=last_dict)
+                print(f'{key} len: {len(last_dict)}')
+              else:
+                for producer_key in producer_keys:
+                  if key == producer_key:
+                    producer.send(producer_topic, key=producer_key, value=last_dict)
+                    print(f'{key}: {len(last_dict)}')
+      dt = time.time() - t0
+      print(f'dt: {dt}')
+      
 
       
 class DeltaInfluxDB(InfluxDB):
   def __init__(self, client=None, bucket=None, query_api=None, write_api=None,
                feature=None, kind='rat', replace_nan=1.0, topic_keys=None, 
                quant=None, start=None, stop=None, size=None, watermark=None,
+               delay=0.0,
                batch_size=86400e9, depth=None, deltas=None, emas=None, 
                vwaps=None, verbose=False):
     super().__init__(client, bucket, query_api, write_api, verbose)
@@ -162,6 +145,7 @@ class DeltaInfluxDB(InfluxDB):
     self.stop = stop
     self.size = size
     self.watermark = watermark if watermark is not None else quant
+    self.delay = delay
     self.batch_size = batch_size
     self.depth = depth
     self.replace_nan = 1.0
@@ -200,19 +184,25 @@ class DeltaInfluxDB(InfluxDB):
         else:
           raise NotImplementedError(topic)
         topic_key_streams.setdefault(topic, {})[key] = stream
+    # Update buffers
     cur_t = (start // quant)*quant
+    start_t = cur_t
+    delay_t = cur_t + self.delay
     stop_t = (stop // quant)*quant
     topic_key_buffers = {}
     topic_key_dataframes = {}
     topic_key_features = {}
     while cur_t < stop_t:
+      t0 = time.time()
       next_t = cur_t + quant
       watermark_t = next_t - self.watermark
-      # print(f'watermark {datetime.fromtimestamp(watermark_t/10**9)}')
-      # print(f'current {datetime.fromtimestamp(cur_t/10**9)}')
-      # print(f'next {datetime.fromtimestamp(next_t/10**9)}')
-      # print(f'stop {datetime.fromtimestamp(stop_t/10**9)}')
-      # Update buffers
+      print(f'\nnow:       {datetime.utcnow()}')
+      print(f'start:     {datetime.fromtimestamp(start_t/10**9)}')
+      print(f'delay:     {datetime.fromtimestamp(delay_t/10**9)}')
+      print(f'watermark: {datetime.fromtimestamp(watermark_t/10**9)}')
+      print(f'current:   {datetime.fromtimestamp(cur_t/10**9)}')
+      print(f'next:      {datetime.fromtimestamp(next_t/10**9)}')
+      print(f'stop:      {datetime.fromtimestamp(stop_t/10**9)}')
       for topic, key_stream in topic_key_streams.items():
         for key, stream in key_stream.items():
           buffer = topic_key_buffers.setdefault(topic, {}).setdefault(key, deque())
@@ -241,24 +231,25 @@ class DeltaInfluxDB(InfluxDB):
                                           emas=self.emas, vwaps=self.vwaps, kind=self.kind,
                                           replace_nan=self.replace_nan, verbose=self.verbose)
       # Write features
-      for key, features in topic_key_features.get('feature', {}).items():
-        df = features['delta']
-        exchange, base, quote = key.split('-')
-        df['exchange'] = exchange
-        df['base'] = base
-        df['quote'] = quote
-        df['quant'] = quant
-        df['feature'] = self.feature
-        data_frame_tag_columns = ['exchange', 'base', 'quote', 'quant', 'feature']
-        print(f'Writing...')
-        t = time.time()
-        print(key)
-        print(df.tail(-1))
-        write_api.write(bucket=self.bucket, 
-                        record=df.tail(-1),  # skip first row because delta shift 1 is 0
-                        data_frame_measurement_name='feature',
-                        data_frame_tag_columns=data_frame_tag_columns)
-        print(f'Write time: {time.time() - t}')
+      if next_t >= delay_t:
+        for key, features in topic_key_features.get('feature', {}).items():
+          df = features['delta']
+          exchange, base, quote = key.split('-')
+          df['exchange'] = exchange
+          df['base'] = base
+          df['quote'] = quote
+          df['quant'] = quant
+          df['feature'] = self.feature
+          data_frame_tag_columns = ['exchange', 'base', 'quote', 'quant', 'feature']
+          if self.verbose:
+            print(df.tail(-1))
+          t00 = time.time()
+          write_api.write(bucket=self.bucket, 
+                          record=df.tail(-1),  # skip first row because delta shift 1 is 0
+                          data_frame_measurement_name='feature',
+                          data_frame_tag_columns=data_frame_tag_columns)
+          print(f'write: {time.time() - t00}')
+      print(f'dt: {dt}')     
     # Close
     print(f'Closing...')
     t = time.time()

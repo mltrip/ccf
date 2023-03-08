@@ -1,0 +1,56 @@
+defaults:
+ - partitioner@agents.prediction.producers.p_1.partitioners.prediction: prediction
+ - partitioner@agents.metric.producers.p_1.partitioners.metric: metric
+ - partitioner@create_dataset_kwargs.agents.a_1.consumer.partitioners.feature: feature
+ - dataset@create_dataset_kwargs.dataset_kwargs: mid-rat-vwap_ema_mid-mel_20-mpl_20-no_target
+ - _self_
+ 
+kind: auto_update  # set ~ to constant model
+model_name: influxdb-mid-rat-vwap_ema_mid-mel_20-mpl_20-no_target
+model_version: ~
+model_stage: ~
+verbose: false
+horizons: [ 5, 10, 15, 20 ]
+predict_kwargs:
+  return_index: true
+  mode: prediction  # prediction or quantiles
+interpret_kwargs:
+  attention_prediction_horizon: 20  # set ~ to interpret all items from horizons field
+interpret_attention: True
+interpret_importance: True
+agents:
+  prediction:
+    class: Kafka
+    producers:
+      p_1:
+        bootstrap_servers: "kafka:9092"
+        topic_keys:
+          prediction: [ binance-btc-usdt ]
+  metric:
+    class: Kafka
+    producers:
+      p_1:
+        bootstrap_servers: "kafka:9092"
+        topic_keys:
+          metric: [ binance-btc-usdt ]
+create_dataset_kwargs:
+  verbose: false
+  quant: 3.0e+9
+  size: 20
+  watermark: 6e9
+  replace_nan: 0.0
+  split: ~
+  dataset_kwargs: 
+    predict_mode: true
+  agents:
+    a_1: 
+      class: KafkaDataset
+      verbose: false
+      topics: [ feature ]
+      executor:
+        class: ProcessPoolExecutor
+        max_workers: 1
+      feature_keys:
+        rat-qv-vwap-ema: [ binance-btc-usdt ]
+      consumer:
+        bootstrap_servers: "kafka:9092"

@@ -1,0 +1,51 @@
+defaults:
+  - partitioner@consumer.partitioners.lob: lob
+  - partitioner@consumer.partitioners.trade: trade
+  - partitioner@producer.partitioners.feature: feature
+  - _self_
+
+agents:
+  btc_usdt:
+    class: DeltaKafka
+    consumers:
+      lob_trade:
+        bootstrap_servers: "kafka:9092"
+        topic_keys:
+          lob: [ binance-btc-usdt ]
+          trade: [ binance-btc-usdt ]
+    producers:
+      feature:
+        bootstrap_servers: "kafka:9092"
+        topic_keys:
+          feature: [ binance-btc-usdt ]
+    feature: rat-ema-qv-vwap_20
+    kind: rat
+    verbose: false
+    quant: 3.0e+9
+    delay: 0.0
+    watermark: 15.0e+9  # min 2*quant
+    depth: 20
+    vwaps:
+      - quantities: [ 0.001, 0.01, 0.1, 1, 10, ~ ]
+        currency: base
+      - quantities: [ 10, 100, 1000 ]
+        currency: quote
+    emas:
+      - columns: [ '^m_p$', '^a_v$', '^b_v$', '^t_p$', '^t_v$', '^t_v_b$', '^t_v_s$', '^vwap.*' ]
+        alphas: [ 1.0, 0.1, 0.01, 1e-3, 1e-4, 1e-5, 1e-6, 1e-7 ]
+    deltas:
+      - shift: 1 
+        columns_up: [ '^m_p$' ]
+        columns_bottom: [ '^m_p$' ]
+      - shift: 0
+        columns_up: [ '^ema_.*m_p$', '^ema_.*t_p$', '^ema_.*-vwap_mid' ]
+        columns_bottom: [ '^ema_.*m_p$' ]
+      - shift: 0
+        columns_up: [ '^ema_.*a_v$' ]
+        columns_bottom: [ '^ema_.*b_v$' ]
+      - shift: 0
+        columns_up: [ '^ema_.*t_v_b$' ]
+        columns_bottom: [ '^ema_.*t_v_s$' ]
+      - shift: 0
+        columns_up: [ '^ema_.*t_v$' ]
+        columns_bottom: [ '^ema_.*t_v$' ]

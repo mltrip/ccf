@@ -1,0 +1,34 @@
+version: '3.3'
+
+services:
+  predict-interpret-mlflow-kafka-influxdb-mid-rat-ema_vwap_ema_mid-mel_20-mpl_20-no_target-group:
+    image: ccf
+    # container_name: predict_mlflow_kafka_influxdb_1d
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    networks:
+      - db
+      - mlflow
+    working_dir: /app/work
+    entrypoint: [ python ]
+    command: [ ../src/ccf/predict_interpret_mlflow.py, -cd, conf, -cn, predict-interpret-mlflow-kafka-influxdb-mid-rat-ema_vwap_ema_mid-mel_20-mpl_20-no_target-group ]
+    env_file:
+      - .env.secret.model
+    environment:
+      PYTHONPATH: /app/src
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_TRACKING_USERNAME: ccf
+    volumes:
+      # - binance_btc_usdt:/app/work
+      - ../work:/app/work
+    restart: always
+      
+networks:
+  db:
+    driver: bridge
+  mlflow:
+    driver: bridge
+    
+# volumes:
+#   binance_btc_usdt:
