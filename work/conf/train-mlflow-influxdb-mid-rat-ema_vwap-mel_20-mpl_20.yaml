@@ -10,8 +10,8 @@ model_name: influxdb-mid-rat-ema_vwap-mel_20-mpl_20
 create_dataset_kwargs:
   verbose: true
   quant: 3.0e+9
-  start: "2022-11-08T11:00:00+00:00"
-  stop: "2022-11-08T12:00:00+00:00"
+  start: "2022-07-01T00:00:00+00:00"
+  stop: "2022-08-01T00:00:00+00:00"
   replace_nan: 1.0
   split: 0.8
   agents:
@@ -32,11 +32,11 @@ dataloader_kwargs:
   train:
     train: true
     num_workers: 16
-    batch_size: 32
+    batch_size: 128
   val:
     train: false
     num_workers: 16
-    batch_size: 32
+    batch_size: 128
 model_kwargs:
   class: TemporalFusionTransformer
   learning_rate: 0.03125  # 1/32
@@ -78,6 +78,6 @@ trainer_kwargs:
   - class: EarlyStopping
     monitor: val_loss
     min_delta: 0
-    patience: 17
+    patience: 9
     verbose: false
     mode: min

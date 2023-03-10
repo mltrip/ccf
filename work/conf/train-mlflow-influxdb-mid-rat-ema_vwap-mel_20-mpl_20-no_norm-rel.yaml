@@ -1,17 +1,17 @@
 defaults:
- - dataset@create_dataset_kwargs.dataset_kwargs: mid-rat-ema_avbv-mel_20-mpl_20
+ - dataset@create_dataset_kwargs.dataset_kwargs: mid-rat-ema_vwap-mel_20-mpl_20-no_norm-rel
  - _self_
  
 kind: occasional
 parent_name: ~
 parent_version: ~
 parent_stage: ~
-model_name: influxdb-mid-rat-ema_avbv-mel_20-mpl_20
+model_name: influxdb-mid-rat-ema_vwap-mel_20-mpl_20-no_norm-rel
 create_dataset_kwargs:
   verbose: true
   quant: 3.0e+9
   start: "2022-07-01T00:00:00+00:00"
-  stop: "2022-07-10T00:00:00+00:00"
+  stop: "2022-07-02T00:00:00+00:00"
   replace_nan: 1.0
   split: 0.8
   agents:
@@ -56,7 +56,7 @@ model_kwargs:
 trainer_kwargs:
   max_epochs: 256
   accelerator: gpu  # cpu
-  devices: [ 1 ]
+  devices: [ 0 ]
   gradient_clip_val: 0
   gradient_clip_algorithm: norm  # norm or value
   log_every_n_steps: 600
@@ -78,6 +78,6 @@ trainer_kwargs:
   - class: EarlyStopping
     monitor: val_loss
     min_delta: 0
-    patience: 17
+    patience: 9
     verbose: false
     mode: min
