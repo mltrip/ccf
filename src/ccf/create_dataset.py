@@ -20,6 +20,7 @@ import yaml
 
 from ccf.utils import expand_columns, initialize_time
 from ccf import agents as ccf_agents
+from ccf import transformations as ccf_transformations
 
 
 class Dataset:
@@ -225,6 +226,12 @@ class Dataset:
       for column, scaler_kwargs in scalers.items():
         if isinstance(scaler_kwargs, dict):
           c = scaler_kwargs.pop('class')
+          if 'transformation' in scaler_kwargs:
+            transformation = scaler_kwargs['transformation']
+            if isinstance(transformation, dict):
+              for t_type, t_kwargs in transformation.items():
+                t_class = t_kwargs.pop('class')
+                transformation[t_type] = getattr(ccf_transformations, t_class)(**t_kwargs)
           s = getattr(pf.data.encoders, c)(**scaler_kwargs)
         else:
           s = scaler_kwargs
@@ -232,14 +239,16 @@ class Dataset:
       dataset_kwargs['scalers'] = scalers
     target_scaler = dataset_kwargs.get('target_normalizer', 'auto')
     if isinstance(target_scaler, dict):
+      c = target_scaler.pop('class')
+      if 'transformation' in target_scaler:
+        transformation = target_scaler['transformation']
+        if isinstance(transformation, dict):
+          for t_type, t_kwargs in transformation.items():
+            t_class = t_kwargs.pop('class')
+            transformation[t_type] = getattr(ccf_transformations, t_class)(**t_kwargs)
+      target_scaler = getattr(pf.data.encoders, c)(**target_scaler)
       if len(target) > 1:
-        c = target_scaler.pop('class')
-        target_scaler = getattr(pf.data.encoders, c)(**target_scaler)
-        target_scalers = [target_scaler for _ in target]
-        target_scaler = pf.MultiNormalizer(target_scalers)
-      else:
-        c = target_scaler.pop('class')
-        target_scaler = getattr(pf.data.encoders, c)(**target_scaler)
+        target_scaler = pf.MultiNormalizer([target_scaler for _ in target])
     dataset_kwargs['target_normalizer'] = target_scaler
     # Workaround of pytorch forecasting "column names must not contain '.' characters" -> Replace '.' to ',' 
     old2new = {x: x.replace('.', ',') for x in df.columns}

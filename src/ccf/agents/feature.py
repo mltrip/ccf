@@ -5,7 +5,7 @@ from copy import deepcopy
 import time
 import random
 from pprint import pprint
-from datetime import datetime
+from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
@@ -64,12 +64,12 @@ class DeltaKafka(Kafka):
       next_t = cur_t + self.quant
       watermark_t = next_t - self.watermark
       print(f'\nnow:       {datetime.utcnow()}')
-      print(f'start:     {datetime.fromtimestamp(start_t/10**9)}')
-      print(f'delay:     {datetime.fromtimestamp(delay_t/10**9)}')
-      print(f'watermark: {datetime.fromtimestamp(watermark_t/10**9)}')
-      print(f'current:   {datetime.fromtimestamp(cur_t/10**9)}')
-      print(f'next:      {datetime.fromtimestamp(next_t/10**9)}')
-      # print(f'stop {datetime.fromtimestamp(stop_t/10**9)}')
+      print(f'start:     {datetime.fromtimestamp(start_t/10**9, tz=timezone.utc)}')
+      print(f'delay:     {datetime.fromtimestamp(delay_t/10**9, tz=timezone.utc)}')
+      print(f'watermark: {datetime.fromtimestamp(watermark_t/10**9, tz=timezone.utc)}')
+      print(f'current:   {datetime.fromtimestamp(cur_t/10**9, tz=timezone.utc)}')
+      print(f'next:      {datetime.fromtimestamp(next_t/10**9, tz=timezone.utc)}')
+      # print(f'stop {datetime.fromtimestamp(stop_t/10**9, tz=timezone.utc)}')
       # Append to buffer
       cur_buffer_t = watermark_t
       while cur_buffer_t < next_t:
@@ -126,7 +126,6 @@ class DeltaKafka(Kafka):
       print(f'dt: {dt}')
       
 
-      
 class DeltaInfluxDB(InfluxDB):
   def __init__(self, client=None, bucket=None, query_api=None, write_api=None,
                feature=None, kind='rat', replace_nan=1.0, topic_keys=None, 
@@ -156,12 +155,9 @@ class DeltaInfluxDB(InfluxDB):
   def __call__(self):
     start, stop, size, quant = initialize_time(self.start, self.stop, 
                                                self.size, self.quant)
-    print(f'Opening...')
-    t = time.time()
     client = self.init_client(self.client)
     query_api = self.get_query_api(client, self.query_api)
     write_api = self.get_write_api(client, self.write_api)
-    print(f'Open time: {time.time() - t}')  
     # Update streams
     topic_key_streams = {}
     for topic, keys in self.topic_keys.items():
@@ -197,12 +193,12 @@ class DeltaInfluxDB(InfluxDB):
       next_t = cur_t + quant
       watermark_t = next_t - self.watermark
       print(f'\nnow:       {datetime.utcnow()}')
-      print(f'start:     {datetime.fromtimestamp(start_t/10**9)}')
-      print(f'delay:     {datetime.fromtimestamp(delay_t/10**9)}')
-      print(f'watermark: {datetime.fromtimestamp(watermark_t/10**9)}')
-      print(f'current:   {datetime.fromtimestamp(cur_t/10**9)}')
-      print(f'next:      {datetime.fromtimestamp(next_t/10**9)}')
-      print(f'stop:      {datetime.fromtimestamp(stop_t/10**9)}')
+      print(f'start:     {datetime.fromtimestamp(start_t/10**9, tz=timezone.utc)}')
+      print(f'delay:     {datetime.fromtimestamp(delay_t/10**9, tz=timezone.utc)}')
+      print(f'watermark: {datetime.fromtimestamp(watermark_t/10**9, tz=timezone.utc)}')
+      print(f'current:   {datetime.fromtimestamp(cur_t/10**9, tz=timezone.utc)}')
+      print(f'next:      {datetime.fromtimestamp(next_t/10**9, tz=timezone.utc)}')
+      print(f'stop:      {datetime.fromtimestamp(stop_t/10**9, tz=timezone.utc)}')
       for topic, key_stream in topic_key_streams.items():
         for key, stream in key_stream.items():
           buffer = topic_key_buffers.setdefault(topic, {}).setdefault(key, deque())
@@ -243,19 +239,16 @@ class DeltaInfluxDB(InfluxDB):
           data_frame_tag_columns = ['exchange', 'base', 'quote', 'quant', 'feature']
           if self.verbose:
             print(df.tail(-1))
-          t00 = time.time()
           write_api.write(bucket=self.bucket, 
                           record=df.tail(-1),  # skip first row because delta shift 1 is 0
                           data_frame_measurement_name='feature',
                           data_frame_tag_columns=data_frame_tag_columns)
-          print(f'write: {time.time() - t00}')
+      dt = time.time() - t0
       print(f'dt: {dt}')     
     # Close
-    print(f'Closing...')
-    t = time.time()
+    t00 = time.time()
     write_api.close()
     client.close()
-    print(f'Close time: {time.time() - t}')  
 
           
 def evaluate_features_delta_ema_qv_vwap(
