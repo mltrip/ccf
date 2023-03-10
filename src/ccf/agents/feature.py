@@ -507,6 +507,7 @@ def evaluate_qv(values, maxdepth=None):
     new_values[b_v_key] = v
     new_values['b_q'] += q
     new_values['b_v'] += v
+  new_values['o_v'] = new_values['a_v'] + new_values['b_v']
   return new_values
 
 
@@ -550,6 +551,7 @@ def evaluate_qv_df(df, depth=None):
   new_df['b_v'] = new_df[b_v_cols].sum(axis=1)
   new_df['a_q'] = df[a_q_cols].sum(axis=1)
   new_df['b_q'] = df[b_q_cols].sum(axis=1)
+  new_df['o_v'] = new_df[['a_v', 'b_v']].sum(axis=1)
   return new_df
 
 
