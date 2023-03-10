@@ -122,7 +122,7 @@ class Metric(Agent):
           message['metric'] = 'sklearn'
         elif self._metric_class in globals():
           metric = self._metric(y_true=target_value, y_pred=value, y_last=last_value,
-                                **self._metric_kwargs)
+                                name=name, **self._metric_kwargs)
           message['metric'] = 'ccf'
         else:
           raise NotImplementedError(self._metric_class)
@@ -198,7 +198,7 @@ class Metric(Agent):
     wait_first_future(_executor, futures)
 
         
-def MASE(y_true, y_pred, y_last):
+def MASE(y_true, y_pred, y_last, name):
   mae_naive = abs(y_true - y_last)
   mae = abs(y_true - y_pred)
   if mae_naive != 0:
@@ -207,29 +207,49 @@ def MASE(y_true, y_pred, y_last):
     return None
 
 
-def ROR(y_true, y_pred, y_last, kind, threshold, fees, random_guess=None):
+def ROR(y_true, y_pred, y_last, name, 
+        kind='all', threshold=0.0, fees=0.0, random_guess=None):
   if random_guess is None:
     dy_pred = y_pred / y_last - 1.0
   else:
     dy_pred = random.uniform(-random_guess, random_guess)
   dy_true = y_true / y_last - 1.0
   if kind == 'all':
-    if abs(dy_pred) > threshold:
-      if dy_pred > 0:
+    if name == 'value':
+      if dy_pred > threshold:  # Long
         return dy_true - fees
-      elif dy_pred < 0:
+      elif dy_pred < -threshold:  # short
         return -dy_true - fees
-      else:
+      else:  # hold
         return 0
+    elif name.startswith('quantile'):
+      quantile = float(name.split('_')[1])
+      if quantile < 0.5:  # long
+        if dy_pred > threshold:
+          return dy_true - fees
+        else:
+          return 0
+      elif quantile > 0.5:  # short
+        if dy_pred < -threshold:
+          return -dy_true - fees
+        else:
+          return 0
+      else:  # q == 0.5 -> all
+        if dy_pred > threshold:  # Long
+          return dy_true - fees
+        elif dy_pred < -threshold:  # short
+          return -dy_true - fees
+        else:  # hold
+          return 0
     else:
-      return 0
+      raise NotImplementedError(name)
   elif kind == 'long':
     if dy_pred > threshold:
       return dy_true - fees
     else:
       return 0
   elif kind == 'short':
-    if -dy_pred > threshold:
+    if dy_pred < -threshold:
       return -dy_true - fees
     else:
       return 0
