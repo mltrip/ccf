@@ -14,11 +14,11 @@ agents:
     feature: rat-ema-qv-vwap_20
     kind: rat
     verbose: false
-    start: "2022-06-30T16:00:00+00:00"
-    stop: "2022-08-01T00:00:00+00:00"
+    start: "2022-07-31T00:00:00+00:00"
+    stop: "2022-11-01T00:00:00+00:00"
     size: ~
     quant: 3.0e+9
-    delay: 0e+9  # 2 days
+    delay: 86400e+9  # 2 days
     watermark: 15.0e+9  # min 2*quant
     depth: 20
     topic_keys:
