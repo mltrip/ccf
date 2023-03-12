@@ -11,7 +11,7 @@ create_dataset_kwargs:
   verbose: true
   quant: 3.0e+9
   start: "2022-07-01T00:00:00+00:00"
-  stop: "2022-07-02T00:00:00+00:00"
+  stop: "2022-08-01T00:00:00+00:00"
   replace_nan: 1.0
   split: 0.8
   agents:

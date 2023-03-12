@@ -1,0 +1,44 @@
+time_idx: time_idx
+allow_missing_timesteps: true
+add_relative_time_idx: true
+target: rat_1-m_p-m_p
+group_ids:
+# - exchange  # Embedding error if only one https://github.com/jdb78/pytorch-forecasting/issues/1154
+- base
+- quote
+static_categoricals:
+# - exchange  # Embedding error if only one https://github.com/jdb78/pytorch-forecasting/issues/1154
+- base
+- quote
+max_encoder_length: 20
+max_prediction_length: 20
+time_varying_unknown_reals:
+- ^rat_0-ema_.*vwap
+# - rat_1-m_p-m_p
+target_normalizer:
+  class: EncoderNormalizer  # TorchNormalizer issue https://github.com/jdb78/pytorch-forecasting/issues/947
+  method: identity
+  center: false  # relative + standard + false -> https://github.com/jdb78/pytorch-forecasting/issues/613
+  transformation:
+    forward: 
+      class: PowerMinusOne
+      p: 1024
+      min: -3
+      max: 3
+    reverse: 
+      class: PowerPlusOne
+      p: 0.0009765625
+      min: 0
+      max: 2
+scalers:
+  class: EncoderNormalizer  # TorchNormalizer issue https://github.com/jdb78/pytorch-forecasting/issues/947
+  method: identity
+  center: false  # relative + standard + false -> https://github.com/jdb78/pytorch-forecasting/issues/613
+  transformation: 
+    forward: 
+      class: MinusOne
+    reverse: 
+      class: PlusOne
+categorical_encoders:
+  class: NaNLabelEncoder
+  add_nan: true

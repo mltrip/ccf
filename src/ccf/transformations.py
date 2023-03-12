@@ -1,6 +1,8 @@
 import torch
+import torch.nn.functional as F
 
-
+torch.set_printoptions(precision=8)
+                       
 class PlusOne:
   def __init__(self):
     super().__init__()   
@@ -15,3 +17,38 @@ class MinusOne:
   
   def __call__(self, x):
     return x - 1
+
+  
+class PowerMinusOne:
+  def __init__(self, p, min, max):
+    super().__init__()
+    self.p = p
+    self.min = min
+    self.max = max
+    self.xs = {}
+  
+  def __call__(self, x):
+    p = self.p
+    x = F.relu(x)  # x >= 0
+    x = 2.0 - F.relu(-x + 2.0)  # x <= 2
+    x = F.relu(torch.pow(x, p) - 1.0) - F.relu(torch.pow(x - 2.0, p) - 1.0)
+    x = self.min + F.relu(x - self.min)  # x > min
+    x = self.max - F.relu(-x + self.max)  # x < max
+    return x
+  
+
+class PowerPlusOne:
+  def __init__(self, p, min, max):
+    super().__init__()
+    self.p = p
+    self.min = min
+    self.max = max
+  
+  def __call__(self, x):
+    p = self.p
+    x = -1.0 + F.relu(x + 1.0)  # x >= -1
+    x = 1.0 - F.relu(-x + 1.0)  # x <= 1
+    x = F.relu(torch.pow(x + 1.0, p) - 1.0) - F.relu(torch.pow(F.relu(-x) + 1.0, p) - 1.0) + 1.0
+    x = self.min + F.relu(x - self.min)  # x > min
+    x = self.max - F.relu(-x + self.max)  # x < max  
+    return x
