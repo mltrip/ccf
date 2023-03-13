@@ -5,74 +5,79 @@ from pytorch_forecasting.metrics.base_metrics import MultiHorizonMetric
 
  
 class ROR(MultiHorizonMetric):
-  """Rate of return
-  
-  See Also:
-    * https://en.wikipedia.org/wiki/Rate_of_return
-  """
-
   def __init__(self, 
-               quantiles: List[float] = [0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98],
-               fees: float = 0,
-               direction: str = 'all',
-               kind: float = 1,
-               th: str = 'any',
-               sl: float = None,
-               tp: float = None,
-               target_kind: str = None,
-               target_scale: float = None,
+               quantiles: Optional[List[float]] = None,
+               target_kind: str = 'value',
+               direction: str = 'qs',
+               fees: float = 0.,
+               threshold: float = 0.,
+               mask_kind: Union[str, float] = 'none',
+               stop_loss: Optional[float] = None,
+               take_profit: Optional[float] = None,
                **kwargs):
       """Rate of return
+      
+      Actually it's a reward - opposite to loss.
+      
       Args:
           quantiles: quantiles for metric
+          target_kind: value, rel, rat, lograt
+          direction: pos, neg, all, max or qs
           fees: fees
-          dir: pos, neg, all, max or none
-          kind: one, two
-          target_kind: none, rel, rat, lograt
-          scale: scale
-          sl: stop loss
-          tp: take profit
-          th: threshold: item, any, all or float from 0 to 1
+          threshold: decision threshold 
+          mask_kind: none, any, all or float from 0 to 1
+          stop_loss: stop loss
+          take_profit: take profit
+      
+      See Also:
+          * https://en.wikipedia.org/wiki/Rate_of_return
       """
-      name = '-'.join(['ROR', 
-                       f'f_{fees*100:.4g}%', 
-                       f'd_{direction}'])
-      if isinstance(kind, str):
-        name += f'-k_{kind}'
+      name = 'ROR'
+      name += f'-d_{direction}'
+      name += f'-f_{fees:.6g}'
+      name += f'-th_{threshold:.6g}'
+      if isinstance(mask_kind, str):
+        name += f'-m_{mask_kind}'
       else:  # float/int
-        name += f'-k_{kind:.2g}'
-      if isinstance(th, str):
-        name += f'-th_{th}'
-      else:  # float/int
-        name += f'-th_{th*100:.2g}%' 
-      if sl is not None:
-        name += f'-sl_{sl*100:.4g}%'
-      if tp is not None:
-        name += f'-tp_{tp*100:.4g}%'
+        name += f'-m_{mask_kind:.6g}'
+      if stop_loss is not None:
+        name += f'-sl_{stop_loss:.6g}'
+      if take_profit is not None:
+        name += f'-tp_{take_profit:.6g}'
       super().__init__(name=name, quantiles=quantiles, **kwargs)
-      self.fees = fees
-      self.kind = kind
-      self.direction = direction
       self.target_kind = target_kind
-      self.target_scale = target_scale
-      self.sl = sl
-      self.tp = tp
-      self.th = th
+      self.direction = direction
+      self.threshold = threshold
+      self.mask_kind = mask_kind
+      self.fees = fees
+      self.sl = stop_loss
+      self.tp = take_profit
+
       
   def loss(self, y_pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    """Evaluate loss
+    
+    Args:
+      y_pred: prediction output of network 
+          with shape - n_samples x prediction_horizon x n_outputs or n_samples x prediction_horizon
+      target: actual values with shape - n_samples x prediction_horizon
+      
+    Returns:
+      losses: shape like y_pred
+    """
     is_quantile = True
     if y_pred.ndim == 2:
       is_quantile = False
       y_pred = y_pred.unsqueeze(-1)
+    # print(f'name: {self.name}')
+    # print(f'is_quantile: {is_quantile}')
+    # print(f'quantiles: {self.quantiles}')
     # print('target', target.shape)
     # print(target[0, ..., 0])
     # print('y_pred', y_pred.shape)
     # print(y_pred[0, ..., 0])
-    # ROR
-    if self.target_scale is not None:
-      y_pred = y_pred / self.target_scale
-      target = target / self.target_scale
-    if self.target_kind is None:
+    # ROR (relative to first horizon)
+    if self.target_kind == 'value':
       target_0 = target[..., :1]
       y_pred_0 = y_pred[..., :1, :]
       dy_target = target - target_0
@@ -80,24 +85,26 @@ class ROR(MultiHorizonMetric):
       dy_pred = y_pred - y_pred_0
       ror_pred = dy_pred / y_pred_0
     elif self.target_kind == 'rel':
-      target_0 = target[..., :1]
-      y_pred_0 = y_pred[..., :1, :]
-      ror_target = target.cumsum(1) - target_0
-      ror_pred = y_pred.cumsum(1) - y_pred_0
+      ror_target = target + 1
+      ror_pred = y_pred + 1
+      ror_target[..., :1] = 1
+      ror_pred[..., :1, :] = 1
+      ror_target = ror_target.cumprod(1) - 1
+      ror_pred = ror_pred.cumprod(1) - 1
     elif self.target_kind == 'rat':
-      y_pred = y_pred - 1
-      target = target - 1
-      target_0 = target[..., :1]
-      y_pred_0 = y_pred[..., :1, :]
-      ror_target = target.cumsum(1) - target_0
-      ror_pred = y_pred.cumsum(1) - y_pred_0
+      ror_target = target.clone().detach()
+      ror_pred = y_pred.clone().detach()
+      ror_target[..., :1] = 1
+      ror_pred[..., :1, :] = 1
+      ror_target = ror_target.cumprod(1) - 1
+      ror_pred = ror_pred.cumprod(1) - 1
     elif self.target_kind == 'lograt':
-      y_pred = y_pred.exp() - 1
-      target = target.exp() - 1
-      target_0 = target[..., :1]
-      y_pred_0 = y_pred[..., :1, :]
-      ror_target = target.cumsum(1) - target_0
-      ror_pred = y_pred.cumsum(1) - y_pred_0  
+      y_pred = y_pred.exp()
+      target = target.exp()
+      ror_target[..., :1] = 1
+      ror_pred[..., :1, :] = 1
+      ror_target = ror_target.cumprod(1) - 1
+      ror_pred = ror_pred.cumprod(1) - 1
     else:
       raise NotImplementedError(self.target_kind)
     # SL/TP
@@ -128,35 +135,35 @@ class ROR(MultiHorizonMetric):
     # print('ror_target', ror_target.shape)
     # print(ror_target[0, ..., 0])
     # Fees
-    if isinstance(self.kind, str):
-      raise ValueError(self.kind)
-    elif isinstance(self.kind, (float, int)):
-      kfees = self.kind*self.fees
-      pred_fees = kfees + kfees*(1 + ror_pred)
-      target_fees = self.fees + self.fees*(1 + ror_target)
-    else:
-      raise ValueError(self.kind)
-    # Decision threshold
-    pos_mask = ror_pred > pred_fees
-    neg_mask = -ror_pred > pred_fees
+    pred_fees = self.fees + self.fees*(1 + ror_pred)
+    target_fees = self.fees + self.fees*(1 + ror_target)
+    # Decision
+    pos_mask = ror_pred > pred_fees + self.threshold
+    neg_mask = -ror_pred > pred_fees + self.threshold
     horizon = ror_pred.size(1)
-    if self.th == 'item':
+    if self.mask_kind == 'none':
       pass
-    elif self.th == 'any':
+    elif self.mask_kind == 'any':
       pos_mask = pos_mask.any(1, keepdim=True).expand(-1, horizon, -1)
       neg_mask = neg_mask.any(1, keepdim=True).expand(-1, horizon, -1)
-    elif self.th == 'all':
-      pos_mask = pos_mask.all(1, keepdim=True).expand(-1, horizon, -1)
-      neg_mask = neg_mask.all(1, keepdim=True).expand(-1, horizon, -1)
-    elif isinstance(self.th, float):
-      pos_sum = pos_mask.sum(1, keepdim=True).expand(-1, horizon, -1)
-      neg_sum = neg_mask.sum(1, keepdim=True).expand(-1, horizon, -1)
-      pos_th = pos_sum / horizon
-      neg_th = neg_sum / horizon
-      pos_mask = pos_th > self.th
-      neg_mask = neg_th > self.th
+    elif self.mask_kind == 'all':  # skip first horizon (always False)
+      pos_mask = pos_mask[:, 1:, :].all(1, keepdim=True).expand(-1, horizon, -1)
+      neg_mask = neg_mask[:, 1:, :].all(1, keepdim=True).expand(-1, horizon, -1)
+    elif self.mask_kind == 'last':
+      pos_mask = pos_mask[:, -1:, :].expand(-1, horizon, -1)
+      neg_mask = neg_mask[:, -1:, :].expand(-1, horizon, -1)
+    elif self.mask_kind == 'max':
+      pos_mask = ror_target > 0
+      neg_mask = ror_target < 0
+    elif isinstance(self.mask_kind, float):  
+      pos_sum = pos_mask[:, 1:, :].sum(1, keepdim=True).expand(-1, horizon, -1)
+      neg_sum = neg_mask[:, 1:, :].sum(1, keepdim=True).expand(-1, horizon, -1)
+      pos_th = pos_sum / (horizon - 1)
+      neg_th = neg_sum / (horizon - 1)
+      pos_mask = pos_th > self.mask_kind
+      neg_mask = neg_th > self.mask_kind
     else:
-      raise ValueError(self.th)
+      raise NotImplementedError(self.mask_kind)
     # Results
     losses = torch.zeros_like(y_pred)
     if self.direction == 'all':
@@ -168,21 +175,26 @@ class ROR(MultiHorizonMetric):
       losses[neg_mask] = -ror_target[neg_mask] - target_fees[neg_mask]
     elif self.direction == 'none':
       losses = ror_target
-    elif self.direction == 'max':
-      pos_mask = ror_target > 0
-      neg_mask = ror_target < 0
+    elif self.direction == 'qs':
+      for i, q in enumerate(self.quantiles):
+        if q > 0.5:
+          pos_mask[..., i] = False
+        elif q < 0.5:
+          neg_mask[..., i] = False
+        else:  # q == 0.5
+          pass
       losses[pos_mask] = ror_target[pos_mask] - target_fees[pos_mask]
       losses[neg_mask] = -ror_target[neg_mask] - target_fees[neg_mask]
-      losses[losses < 0] = 0
     else:
-      raise ValueError(self.direction)
+      raise NotImplementedError(self.direction)
+    # print(losses)
     return losses if is_quantile else losses[..., 0]
   
   def to_prediction(self, y_pred: torch.Tensor) -> torch.Tensor:
     """
     Convert network prediction into a point prediction.
     Args:
-        y_pred: prediction output of network
+        y_pred: prediction output of network  
     Returns:
         torch.Tensor: point prediction
     """
@@ -200,92 +212,3 @@ class ROR(MultiHorizonMetric):
         torch.Tensor: prediction quantiles
     """
     return y_pred
-
-  
-class RORLoss(MultiHorizonMetric):
-  """Rate Of Return Loss
-  
-  See Also:
-    * https://en.wikipedia.org/wiki/Rate_of_return
-  """
-
-  def __init__(self, 
-               quantiles: List[float] = [0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98],
-               fees: float = 0,
-               direction: str = 'all',
-               **kwargs):
-      """Rate of return
-      Args:
-          quantiles: quantiles for metric
-          fees: fees
-          dir: pos, neg or all
-      """
-      name = '_'.join(['ROR', f'{fees*100}%', direction])
-      super().__init__(name=name, quantiles=quantiles, **kwargs)
-      self.fees = fees
-      self.direction = direction
-      
-  def loss(self, y_pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
-    is_quantile = True
-    if y_pred.ndim == 2:
-      is_quantile = False
-      y_pred = y_pred.unsqueeze(-1)
-    # print('target', target.shape)
-    # print('y_pred', y_pred.shape)
-    target_0 = target[..., :1]
-    # print('target_0', target_0.shape)
-    y_pred_0 = y_pred[..., :1, :]
-    # print('y_pred_0', y_pred_0.shape)
-    dy_target = target - target_0
-    # print('dy_target', dy_target.shape)
-    ror_target = dy_target / target_0
-    # print('ror_target', ror_target.shape)
-    dy_pred = y_pred - y_pred_0
-    # print('dy_pred', dy_pred.shape)
-    ror_pred = dy_pred / y_pred_0
-    # print('ror_pred', ror_pred.shape)
-    # print(ror_pred[0, ..., 3])
-    # print(ror_target[0, ..., 3])
-    ror_target = ror_target.unsqueeze(-1).expand(-1, -1, ror_pred.size(dim=2))  # to quantiles
-    pos_pred_delta = nn.functional.relu(ror_pred - self.fees)
-    neg_pred_delta = nn.functional.relu(-ror_pred - self.fees)
-    pos_target_delta = nn.functional.relu(ror_target - self.fees)
-    neg_target_delta = nn.functional.relu(-ror_target - self.fees)
-    # pos_target_delta = ror_target - self.fees
-    # neg_target_delta = -ror_target - self.fees
-    if self.direction == 'all':
-      losses_pos = nn.functional.relu(pos_pred_delta - pos_target_delta)
-      # print(losses_pos[0, ..., 3])
-      losses_neg = nn.functional.relu(neg_pred_delta - neg_target_delta)
-      # print(losses_neg[0, ..., 3])
-      losses = losses_pos + losses_neg
-    elif self.direction == 'pos': 
-      losses = nn.functional.relu(pos_pred_delta - pos_target_delta)
-    elif self.direction == 'neg':
-      losses = nn.functional.relu(neg_pred_delta - neg_target_delta)
-    else:
-      raise ValueError(self.direction)
-    return losses if is_quantile else losses[..., 0]
-  
-  def to_prediction(self, y_pred: torch.Tensor) -> torch.Tensor:
-    """
-    Convert network prediction into a point prediction.
-    Args:
-        y_pred: prediction output of network
-    Returns:
-        torch.Tensor: point prediction
-    """
-    if y_pred.ndim == 3:
-      idx = self.quantiles.index(0.5)
-      y_pred = y_pred[..., idx]
-    return y_pred
-
-  def to_quantiles(self, y_pred: torch.Tensor) -> torch.Tensor:
-    """
-    Convert network prediction into a quantile prediction.
-    Args:
-        y_pred: prediction output of network
-    Returns:
-        torch.Tensor: prediction quantiles
-    """
-    return 
