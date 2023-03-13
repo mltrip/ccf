@@ -16,10 +16,10 @@ from hydra.core.global_hydra import GlobalHydra
 from omegaconf import DictConfig, OmegaConf
 import pytorch_forecasting as pf
 import pytorch_lightning as pl
+from torch import nn
 
 import ccf
-from ccf import models as ccf_models
-from ccf import agents as ccf_agents
+from ccf import metrics as ccf_metrics
 from ccf.create_dataset import Dataset
 from ccf.model_mlflow import CCFModel, load_model
 
@@ -50,15 +50,43 @@ def main(hydra_config, create_dataset_kwargs, dataloader_kwargs, model_kwargs,
     parent_model, last_version, last_stage = load_model(parent_name, parent_version, parent_stage)
     if parent_model is None:
       model_kwargs_ = deepcopy(model_kwargs)
+      # Initialize metrics
+      logging_metrics = model_kwargs_.get('logging_metrics', None)
+      if logging_metrics is not None:
+        metrics = []
+        for metric in logging_metrics:
+          if isinstance(metric, (str, dict)):
+            if isinstance(metric, dict):
+              metric_class_name = metric.pop('class')
+            else:  # str
+              metric_class_name = metric
+              metric = {}
+            metric_class = getattr(pf.metrics, metric_class_name, None)
+            if metric_class is None:
+              metric_class = getattr(ccf_metrics, metric_class_name, None)
+            if metric_class is None:
+              raise NotImplementedError(metric_class_name)
+            metric = metric_class(**metric)
+          else:  # Already initialized
+            pass
+          metrics.append(metric)
+        model_kwargs_['logging_metrics'] = nn.ModuleList(metrics)
+      # Initialize loss
       loss_kwargs = model_kwargs_.pop('loss')
-      l = getattr(pf.metrics, loss_kwargs.pop('class'))
-      loss = l(**loss_kwargs)
+      loss_class_name = loss_kwargs.pop('class')
+      loss_class = getattr(pf.metrics, loss_class_name, None)
+      if loss_class is None:
+        loss_class = getattr(ccf_metrics, loss_class_name, None)
+      if loss_class is None:
+        raise NotImplementedError(loss_class_name)
+      loss = loss_class(**loss_kwargs)
       if ds_t.multi_target:
         model_kwargs_['loss'] = pf.metrics.MultiLoss(
           metrics=[loss for _ in ds_t.target_names])
       else:
         model_kwargs_['loss'] = loss
       model_kwargs_['dataset'] = ds_t
+      # Initialize model
       class_name = model_kwargs_.pop('class')
       model_class = getattr(pf.models, class_name, None)
       if model_class is None:
