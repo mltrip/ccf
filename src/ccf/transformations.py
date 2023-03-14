@@ -2,7 +2,72 @@ import torch
 import torch.nn.functional as F
 
 torch.set_printoptions(precision=8)
-                       
+      
+  
+class Identity:
+  def __init__(self):
+    super().__init__()
+  
+  def __call__(self, x):
+    """
+    Args:
+      x: with shape prediction_horizon
+    """
+    return x
+  
+  
+class Prod:
+  def __init__(self, p):
+    super().__init__()
+    self.p = p
+  
+  def __call__(self, x):
+    """
+    Args:
+      x: with shape prediction_horizon
+    """
+    return x*self.p
+  
+  
+class Div:
+  def __init__(self, p):
+    super().__init__()
+    self.p = p
+  
+  def __call__(self, x):
+    """
+    Args:
+      x: with shape prediction_horizon
+    """
+    return x / self.p
+  
+  
+class CumProd:
+  def __init__(self):
+    super().__init__()   
+  
+  def __call__(self, x):
+    """
+    Args:
+      x: with shape prediction_horizon
+    """
+    return x.cumprod(dim=0)
+
+  
+class InvCumProd:
+  def __init__(self):
+    super().__init__()   
+  
+  def __call__(self, x):
+    """
+    Args:
+      x: with shape n_samples x prediction_horizon x n_outputs or n_samples x prediction_horizon
+    """
+    prev_x = x.roll(shifts=1, dims=1)
+    prev_x[:, :1, ...] = 1
+    return x / prev_x
+  
+  
 class PlusOne:
   def __init__(self):
     super().__init__()   
