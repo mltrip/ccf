@@ -1,17 +1,17 @@
 defaults:
- - dataset@create_dataset_kwargs.dataset_kwargs: mid-rat-ema_vwap_1_1-mel_20-mpl_20-no_target-power_1024-rel
+ - dataset@create_dataset_kwargs.dataset_kwargs: mid-rat-ema_vwap_base_10_1_1-mel_40-mpl_20-no_cat-no_group
  - _self_
  
 kind: occasional
 parent_name: ~
 parent_version: ~
 parent_stage: ~
-model_name: influxdb-mid-rat-ema_vwap_1_1-mel_20-mpl_20-no_target-power_1024-rel
+model_name: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_40-mpl_20-no_cat-no_group
 create_dataset_kwargs:
   verbose: true
   quant: 3.0e+9
   start: "2022-07-01T00:00:00+00:00"
-  stop: "2022-07-02T00:00:00+00:00"
+  stop: "2022-07-07T00:00:00+00:00"
   replace_nan: 1.0
   split: 0.8
   agents:
@@ -32,24 +32,27 @@ dataloader_kwargs:
   train:
     train: true
     num_workers: 16
-    batch_size: 32
+    batch_size: 128
   val:
     train: false
     num_workers: 16
-    batch_size: 32
+    batch_size: 128
 model_kwargs:
   class: TemporalFusionTransformer
   # learning_rate: 0.03125  # 2^-6 1/32 
-  learning_rate: 0.00390625  # 2^-8 1/256 
-  # learning_rate: 0.0000152587890625  # 2^-16 1/65536 
+  # learning_rate: 0.00390625  # 2^-8 1/256 
+  # learning_rate: 0.0009765625  # 2^-10 1/1024
+  learning_rate: 0.0000152587890625  # 2^-16 1/65536 
   hidden_size: 8
   attention_head_size: 1
-  dropout: 0
+  dropout: 0.1
   hidden_continuous_size: 8
   lstm_layers: 1
-  # output_size: 7  # Inferred from loss if loss is in pytorch geomtric
+  output_size: 7  # Inferred from loss if loss is from pytorch geometric
   loss:
-    class: QuantileLoss
+    class: ScaledQuantileLoss
+    quantiles: [ 0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98 ]
+    scale: 1.0e4
   log_interval: 0
   reduce_on_plateau_patience: 2
   reduce_on_plateau_reduction: 2
@@ -101,13 +104,13 @@ model_kwargs:
     direction: neg
     mask_kind: last
 trainer_kwargs:
-  max_epochs: 1
+  max_epochs: 256
   accelerator: gpu  # cpu
-  devices: [ 0 ]
-  gradient_clip_val: 0.1
+  devices: [ 1 ]
+  gradient_clip_val: 0
   gradient_clip_algorithm: norm  # norm or value
   track_grad_norm: 2
-  log_every_n_steps: 1
+  log_every_n_steps: 100
   # limit_train_batches: 5
   logger:
   - class: MLFlowLogger
