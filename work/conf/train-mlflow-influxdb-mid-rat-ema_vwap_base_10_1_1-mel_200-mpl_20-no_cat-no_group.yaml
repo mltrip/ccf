@@ -1,12 +1,12 @@
 defaults:
- - dataset@create_dataset_kwargs.dataset_kwargs: mid-rat-ema_vwap_1_1-mel_20-mpl_20-no_target-no_cat
+ - dataset@create_dataset_kwargs.dataset_kwargs: mid-rat-ema_vwap_base_10_1_1-mel_200-mpl_20-no_cat-no_group
  - _self_
  
 kind: occasional
 parent_name: ~
 parent_version: ~
 parent_stage: ~
-model_name: influxdb-mid-rat-ema_vwap_1_1-mel_20-mpl_20-no_target-no_cat
+model_name: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_200-mpl_20-no_cat-no_group
 create_dataset_kwargs:
   verbose: true
   quant: 3.0e+9
@@ -40,7 +40,7 @@ dataloader_kwargs:
 model_kwargs:
   class: TemporalFusionTransformer
   # learning_rate: 0.03125  # 2^-6 1/32 
-  # learning_rate: 0.00390625  # 2^-8 1/256
+  # learning_rate: 0.00390625  # 2^-8 1/256 
   # learning_rate: 0.0009765625  # 2^-10 1/1024
   learning_rate: 0.0000152587890625  # 2^-16 1/65536 
   hidden_size: 8
@@ -108,7 +108,7 @@ trainer_kwargs:
   gradient_clip_val: 0
   gradient_clip_algorithm: norm  # norm or value
   track_grad_norm: 2
-  log_every_n_steps: 100
+  log_every_n_steps: 600
   # limit_train_batches: 5
   logger:
   - class: MLFlowLogger

@@ -26,7 +26,9 @@ from ccf import transformations as ccf_transformations
 class Dataset:
   def __init__(self, agents, dataset_kwargs, quant=None, size=None, 
                start=None, stop=None, executor=None, replace_nan=None,
-               split=None, target_prefix='tgt', df_only=False, watermark=None, verbose=False):
+               split=None, target_prefix='tgt', replace_dot=',',
+               default_group_column='group_id',
+               df_only=False, watermark=None, verbose=False):
     start = os.getenv('CCF_DATASET_START', None) if start is None else start
     stop = os.getenv('CCF_DATASET_STOP', None) if stop is None else stop
     size = os.getenv('CCF_DATASET_SIZE', None) if size is None else size
@@ -49,6 +51,8 @@ class Dataset:
     self.dataset_kwargs = dataset_kwargs
     self.executor = {} if executor is None else executor
     self.replace_nan = replace_nan
+    self.replace_dot = replace_dot
+    self.default_group_column = default_group_column
     if split is None:
       split = os.getenv('CCF_DATASET_SPLIT', None)
       split = float(split) if isinstance(split, str) else split
@@ -131,7 +135,7 @@ class Dataset:
     t0 = time.time()
     dataset_kwargs = deepcopy(self.dataset_kwargs)
     time_idx = dataset_kwargs['time_idx']
-    group_ids = dataset_kwargs['group_ids']
+    group_ids = dataset_kwargs.get('group_ids', [])
     max_enc_len = dataset_kwargs['max_encoder_length']
     max_pred_len = dataset_kwargs['max_prediction_length']
     dfs = []
@@ -251,7 +255,7 @@ class Dataset:
         target_scaler = pf.MultiNormalizer([target_scaler for _ in target])
     dataset_kwargs['target_normalizer'] = target_scaler
     # Workaround of pytorch forecasting "column names must not contain '.' characters" -> Replace '.' to ',' 
-    old2new = {x: x.replace('.', ',') for x in df.columns}
+    old2new = {x: x.replace('.', self.replace_dot) for x in df.columns}
     for key in ['target',
                 'group_ids', 
                 'time_varying_unknown_reals',
@@ -276,6 +280,10 @@ class Dataset:
     if dataset_kwargs.get('allow_missing_timesteps', False):   
       df = df.dropna()  # Remove rows with nan values
     if self.split is not None:
+      if len(group_ids) == 0:  # If you have only one timeseries, set this to the name of column that is constant.
+        group_ids = [self.default_group_column]
+        dataset_kwargs['group_ids'] = group_ids
+        df[self.default_group_column] = 0
       df1s, df2s = [], []
       cnt1, cnt2 = 0, 0
       for g, gdf in df.groupby(group_ids):
@@ -284,7 +292,7 @@ class Dataset:
         df1 = gdf[:split_idx]
         df1_len = len(df1)
         df1 = df1.reset_index()
-        df1 = df1.set_index(np.arange(cnt, cnt + df1_len))
+        df1 = df1.set_index(np.arange(cnt1, cnt1 + df1_len))
         df1[time_idx] = np.arange(df1_len)
         cnt1 += df1_len
         df1s.append(df1)
@@ -292,7 +300,7 @@ class Dataset:
         df2 = gdf[split_idx:]
         df2_len = len(df2)
         df2 = df2.reset_index()
-        df2 = df2.set_index(np.arange(cnt, cnt + df2_len))
+        df2 = df2.set_index(np.arange(cnt2, cnt2 + df2_len))
         df2[time_idx] = np.arange(df2_len)
         cnt2 += df2_len
         df2s.append(df2)
