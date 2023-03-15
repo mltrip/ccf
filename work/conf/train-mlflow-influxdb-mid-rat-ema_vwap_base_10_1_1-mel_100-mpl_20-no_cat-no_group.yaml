@@ -10,8 +10,8 @@ model_name: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_100-mpl_20-no_cat-no_group
 create_dataset_kwargs:
   verbose: true
   quant: 3.0e+9
-  start: "2022-07-01T00:00:00+00:00"
-  stop: "2022-07-07T00:00:00+00:00"
+  start: "2022-08-01T00:00:00+00:00"
+  stop: "2022-09-01T00:00:00+00:00"
   replace_nan: 1.0
   split: 0.8
   agents:
@@ -48,19 +48,53 @@ model_kwargs:
   dropout: 0.1
   hidden_continuous_size: 8
   lstm_layers: 1
-  # output_size: 7  # Inferred from loss
+  output_size: 1  # Inferred from loss if loss is from pytorch geometric
   loss:
-    class: QuantileLoss
+    class: CompositeMetricFix
+    metrics:
+    - class: ScaledMAE
+      scale: 1.0e6
+    - class: AggregationMetric
+      metric:
+        class: ScaledAsignRat
+        scale: 1.0e12
+    weights:
+    - 1.0
+    - 1.0
   log_interval: 0
   reduce_on_plateau_patience: 2
   reduce_on_plateau_reduction: 2
   reduce_on_plateau_min_lr: 1.0e-10
   weight_decay: 0
   logging_metrics:
-  - SMAPE
   - MAE
   - RMSE
   - MAPE
+  - SMAPE
+  - class: ScaledMAE
+    scale: 1.0e6
+  - class: ScaledRMSE
+    scale: 1.0e12
+  - class: ScaledSignRat
+    scale: 1.0e12
+  - class: ScaledAsignRat
+    scale: 1.0e12
+  - class: AggregationMetric
+    metric:
+      class: ScaledMAE
+      scale: 1.0e6
+  - class: AggregationMetric
+    metric:
+      class: ScaledRMSE
+      scale: 1.0e12
+  - class: AggregationMetric
+    metric:
+      class: ScaledSignRat
+      scale: 1.0e12
+  - class: AggregationMetric
+    metric:
+      class: ScaledAsignRat
+      scale: 1.0e12
   - class: ROR
     target_kind: rat
     direction: all
@@ -108,7 +142,7 @@ trainer_kwargs:
   gradient_clip_val: 0
   gradient_clip_algorithm: norm  # norm or value
   track_grad_norm: 2
-  log_every_n_steps: 200
+  log_every_n_steps: 3000
   # limit_train_batches: 5
   logger:
   - class: MLFlowLogger
@@ -133,6 +167,6 @@ trainer_kwargs:
   - class: EarlyStopping
     monitor: val_loss
     min_delta: 0
-    patience: 9
+    patience: 17
     verbose: false
     mode: min

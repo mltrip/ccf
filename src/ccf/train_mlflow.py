@@ -19,15 +19,16 @@ import pytorch_lightning as pl
 from torch import nn
 
 import ccf
-from ccf import metrics as ccf_metrics
 from ccf.create_dataset import Dataset
 from ccf.model_mlflow import CCFModel, load_model
+from ccf.utils import initialize_metric
 
-
+  
 def main(hydra_config, create_dataset_kwargs, dataloader_kwargs, model_kwargs, 
          trainer_kwargs,
          kind, model_name, parent_name=None, parent_version=None, parent_stage=None):
   # Initialize parameters
+  # pl.seed_everything(seed, workers=False)
   # Train
   if 'continual' in kind:
     max_cnt = None
@@ -53,39 +54,19 @@ def main(hydra_config, create_dataset_kwargs, dataloader_kwargs, model_kwargs,
       # Initialize metrics
       logging_metrics = model_kwargs_.get('logging_metrics', None)
       if logging_metrics is not None:
-        metrics = []
-        for metric in logging_metrics:
-          if isinstance(metric, (str, dict)):
-            if isinstance(metric, dict):
-              metric_class_name = metric.pop('class')
-            else:  # str
-              metric_class_name = metric
-              metric = {}
-            metric_class = getattr(pf.metrics, metric_class_name, None)
-            if metric_class is None:
-              metric_class = getattr(ccf_metrics, metric_class_name, None)
-            if metric_class is None:
-              raise NotImplementedError(metric_class_name)
-            metric = metric_class(**metric)
-          else:  # Already initialized
-            pass
-          metrics.append(metric)
+        metrics = [initialize_metric(x) for x in logging_metrics]
         model_kwargs_['logging_metrics'] = nn.ModuleList(metrics)
       # Initialize loss
       loss_kwargs = model_kwargs_.pop('loss')
-      loss_class_name = loss_kwargs.pop('class')
-      loss_class = getattr(pf.metrics, loss_class_name, None)
-      if loss_class is None:
-        loss_class = getattr(ccf_metrics, loss_class_name, None)
-      if loss_class is None:
-        raise NotImplementedError(loss_class_name)
-      loss = loss_class(**loss_kwargs)
+      loss = initialize_metric(loss_kwargs)
+      # Dataset
+      model_kwargs_['dataset'] = ds_t
+      # Multiple targets
       if ds_t.multi_target:
         model_kwargs_['loss'] = pf.metrics.MultiLoss(
           metrics=[loss for _ in ds_t.target_names])
       else:
         model_kwargs_['loss'] = loss
-      model_kwargs_['dataset'] = ds_t
       # Initialize model
       class_name = model_kwargs_.pop('class')
       model_class = getattr(pf.models, class_name, None)
