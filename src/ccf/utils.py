@@ -1,14 +1,18 @@
 import concurrent.futures
 from datetime import datetime, timedelta
-import time
 import os
 import psutil
 import re
 import signal
+import time
 import warnings
 
-import pandas as pd
 import numpy as np
+import pandas as pd
+from pytorch_forecasting.metrics import base_metrics as pf_base_metrics
+from pytorch_forecasting import metrics as pf_metrics
+
+from ccf import metrics as ccf_metrics
 
 
 def expand_columns(ref_columns, columns):
@@ -122,3 +126,28 @@ def initialize_time(start, stop, size, quant):
   # else:
   #   raise NotImplementedError(start, stop, size, quant)
   return start, stop, size, quant
+
+
+def initialize_metric(metric):
+  if isinstance(metric, dict):
+    metric_class_name = metric.pop('class')
+  elif isinstance(metric, str):
+    metric_class_name = metric
+    metric = {}
+  else:
+    raise NotImplementedError(metric)
+  if metric_class_name == 'AggregationMetric':
+    metric['metric'] = initialize_metric(metric['metric'])
+  if metric_class_name in ['CompositeMetric', 'CompositeMetricFix']:
+    metric['metrics'] = [initialize_metric(x) for x in metric['metrics']]
+  metric_class = getattr(pf_metrics, metric_class_name, None)
+  if metric_class is None:
+    metric_class = getattr(pf_base_metrics, metric_class_name, None)
+  if metric_class is None:
+    metric_class = getattr(ccf_metrics, metric_class_name, None)
+  if metric_class is None:
+    raise NotImplementedError(metric_class_name)
+  metric = metric_class(**metric)
+  if metric_class_name == 'AggregationMetric':  # TODO PR to PF?
+    metric.name = f'Agg{metric.metric.name}'
+  return metric

@@ -1,7 +1,9 @@
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
+from pytorch_forecasting.metrics.base_metrics import MultiHorizonMetric, Metric
 import torch
-from pytorch_forecasting.metrics.base_metrics import MultiHorizonMetric
+import torch.nn.functional as F
+from torchmetrics import Metric as LightningMetric
 
  
 class ROR(MultiHorizonMetric):
@@ -274,3 +276,256 @@ class ScaledQuantileLoss(MultiHorizonMetric):
             torch.Tensor: prediction quantiles
         """
         return y_pred  
+      
+      
+class ScaledSignRat(MultiHorizonMetric):
+    """Scaled sign for rat target"""
+    def __init__(
+        self,
+        reduction="sqrt-mean",
+        scale: float = 1.0,
+        **kwargs
+    ):
+        super().__init__(reduction="sqrt-mean", **kwargs)
+        self.scale = scale
+    
+    def loss(self, y_pred, target):
+        loss = F.relu(-(self.to_prediction(y_pred) - 1)*(target - 1))
+        loss = loss*self.scale
+        return loss
+      
+
+class ScaledAsignRat(MultiHorizonMetric):
+    """Scaled asign (opposite) for rat target"""
+    def __init__(
+        self,
+        reduction="sqrt-mean",
+        scale: float = 1.0,
+        **kwargs
+    ):
+        super().__init__(reduction="sqrt-mean", **kwargs)
+        self.scale = scale
+    
+    def loss(self, y_pred, target):
+        loss = F.relu((self.to_prediction(y_pred) - 1)*(target - 1))
+        loss = loss*self.scale
+        return loss
+      
+      
+class ScaledSignExpRat(MultiHorizonMetric):
+    """Scaled sign exp for rat target"""
+    def __init__(
+        self,
+        reduction="mean",
+        k: float = 1.0,
+        scale: float = 1.0,
+        **kwargs
+    ):
+        super().__init__(reduction="mean", **kwargs)
+        self.scale = scale
+        self.k = k
+    
+    def loss(self, y_pred, target):
+        loss = F.relu(-self.k*(self.to_prediction(y_pred) - 1)*(target - 1)).exp()
+        loss = loss*self.scale
+        return loss
+      
+      
+class ScaledMAE(MultiHorizonMetric):
+    """Scaled MAE"""
+    def __init__(
+        self,
+        scale: float = 1.0,
+        **kwargs
+    ):
+        super().__init__(**kwargs)
+        self.scale = scale
+    
+    def loss(self, y_pred, target):
+        loss = (self.to_prediction(y_pred) - target).abs()
+        loss = loss*self.scale
+        return loss
+      
+
+class ScaledRMSE(MultiHorizonMetric):
+    """Scaled RMSE"""
+    def __init__(
+        self,
+        reduction="sqrt-mean",
+        scale: float = 1.0,
+        **kwargs
+    ):
+        super().__init__(reduction=reduction, **kwargs)
+        self.scale = scale
+    
+    def loss(self, y_pred, target):
+        loss = torch.pow(self.to_prediction(y_pred) - target, 2)
+        loss = loss*self.scale
+        return loss  
+
+      
+# FIXME https://github.com/jdb78/pytorch-forecasting/issues/1033      
+class CompositeMetricFix(Metric):
+    """
+    Metric that combines multiple metrics.
+
+    Metric does not have to be called explicitly but is automatically created when adding and multiplying metrics
+    with each other.
+
+    Example:
+
+        .. code-block:: python
+
+            composite_metric = SMAPE() + 0.4 * MAE()
+    """
+
+    full_state_update = False
+    higher_is_better = False
+    is_differentiable = True
+
+    def __init__(self, metrics: List[LightningMetric] = [], weights: List[float] = None):
+        """
+        Args:
+            metrics (List[LightningMetric], optional): list of metrics to combine. Defaults to [].
+            weights (List[float], optional): list of weights / multipliers for weights. Defaults to 1.0 for all metrics.
+        """
+        if weights is None:
+            weights = [1.0 for _ in metrics]
+        assert len(weights) == len(metrics), "Number of weights has to match number of metrics"
+
+        self.metrics = metrics
+        self.weights = weights
+
+        super().__init__()
+
+    def __repr__(self):
+        name = " + ".join([f"{w:.3g} * {repr(m)}" if w != 1.0 else repr(m) for w, m in zip(self.weights, self.metrics)])
+        return name
+
+    def update(self, y_pred: torch.Tensor, y_actual: torch.Tensor, **kwargs):
+        """
+        Update composite metric
+
+        Args:
+            y_pred: network output
+            y_actual: actual values
+
+        Returns:
+            torch.Tensor: metric value on which backpropagation can be applied
+        """
+        for metric in self.metrics:
+            try:
+                metric.update(y_pred, y_actual, **kwargs)
+            except TypeError:
+                metric.update(y_pred, y_actual)
+
+
+    def compute(self) -> torch.Tensor:
+        """
+        Get metric
+
+        Returns:
+            torch.Tensor: metric
+        """
+        results = []
+        for weight, metric in zip(self.weights, self.metrics):
+            results.append(metric.compute() * weight)
+
+        if len(results) == 1:
+            results = results[0]
+        else:
+            results = torch.stack(results, dim=0).sum(0)
+        return results
+
+
+    @torch.jit.unused
+    def forward(self, y_pred: torch.Tensor, y_actual: torch.Tensor, **kwargs):
+        """
+        Calculate composite metric
+
+        Args:
+            y_pred: network output
+            y_actual: actual values
+            **kwargs: arguments to update function
+
+        Returns:
+            torch.Tensor: metric value on which backpropagation can be applied
+        """
+        results = []
+        for weight, metric in zip(self.weights, self.metrics):
+            try:
+                results.append(metric(y_pred, y_actual, **kwargs) * weight)
+            except TypeError:
+                results.append(metric(y_pred, y_actual) * weight)
+
+        if len(results) == 1:
+            results = results[0]
+        else:
+            results = torch.stack(results, dim=0).sum(0)
+        return results
+
+
+    def _wrap_compute(self, compute: Callable) -> Callable:
+        return compute
+
+    def _sync_dist(self, dist_sync_fn: Optional[Callable] = None, process_group: Optional[Any] = None) -> None:
+        # No syncing required here. syncing will be done in metrics
+        pass
+
+    def reset(self) -> None:
+        for metric in self.metrics:
+            metric.reset()
+
+
+    def persistent(self, mode: bool = False) -> None:
+        for metric in self.metrics:
+            metric.persistent(mode=mode)
+
+
+    def to_prediction(self, y_pred: torch.Tensor, **kwargs) -> torch.Tensor:
+        """
+        Convert network prediction into a point prediction.
+
+        Will use first metric in ``metrics`` attribute to calculate result.
+
+        Args:
+            y_pred: prediction output of network
+            **kwargs: parameters to first metric `to_prediction` method
+
+        Returns:
+            torch.Tensor: point prediction
+        """
+        return self.metrics[0].to_prediction(y_pred, **kwargs)
+
+
+    def to_quantiles(self, y_pred: torch.Tensor, **kwargs) -> torch.Tensor:
+        """
+        Convert network prediction into a quantile prediction.
+
+        Will use first metric in ``metrics`` attribute to calculate result.
+
+        Args:
+            y_pred: prediction output of network
+            **kwargs: parameters to first metric's ``to_quantiles()`` method
+
+        Returns:
+            torch.Tensor: prediction quantiles
+        """
+        return self.metrics[0].to_quantiles(y_pred, **kwargs)
+
+
+    def __add__(self, metric: LightningMetric):
+        if isinstance(metric, self.__class__):
+            self.metrics.extend(metric.metrics)
+            self.weights.extend(metric.weights)
+        else:
+            self.metrics.append(metric)
+            self.weights.append(1.0)
+
+        return self
+
+    def __mul__(self, multiplier: float):
+        self.weights = [w * multiplier for w in self.weights]
+        return self
+
+    __rmul__ = __mul__      
