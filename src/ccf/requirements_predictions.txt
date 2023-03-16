@@ -1,6 +1,6 @@
-hydra-core
-pandas
+hydra-core==1.2.0
+pandas==1.5.1
 # SQLAlchemy
-torch
-psutil
+torch==1.12.1
+psutil==5.9.4
 pytorch-forecasting==0.10.3

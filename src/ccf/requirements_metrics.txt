@@ -1,7 +1,7 @@
-evidently
-hydra-core
+# evidently
+hydra-core==1.2.0
 numpy<1.24  # https://stackoverflow.com/questions/74844262/how-to-solve-error-numpy-has-no-attribute-float-in-python
-pandas
-psutil
+pandas==1.5.1
+psutil==5.9.4
 scikit-learn<1.2  # pytorch-forecasting
 # SQLAlchemy
