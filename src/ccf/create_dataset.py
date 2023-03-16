@@ -135,7 +135,6 @@ class Dataset:
     t0 = time.time()
     dataset_kwargs = deepcopy(self.dataset_kwargs)
     time_idx = dataset_kwargs['time_idx']
-    group_ids = dataset_kwargs.get('group_ids', [])
     max_enc_len = dataset_kwargs['max_encoder_length']
     max_pred_len = dataset_kwargs['max_prediction_length']
     dfs = []
@@ -173,6 +172,13 @@ class Dataset:
     if len(df) == 0:
       return None, None, None, None
     # Dataset
+    # Groups
+    group_ids = dataset_kwargs.get('group_ids', [])
+    if len(group_ids) == 0:  # If you have only one timeseries, set this to the name of column that is constant.
+      group_ids.append(self.default_group_column)
+      dataset_kwargs['group_ids'] = group_ids
+      df[self.default_group_column] = 0
+    # Features
     columns = set()
     columns.add(time_idx)
     for key in ['target',
@@ -195,6 +201,9 @@ class Dataset:
       else:
         dataset_kwargs[key] = cs
       columns.update(cs)
+      if self.verbose:
+        print(key)
+        pprint(cs)
     # Scalers/Encoders
     all_scalers = {}
     scalers = dataset_kwargs.get('scalers', {})
@@ -267,7 +276,13 @@ class Dataset:
       cs = dataset_kwargs.get(key, [])
       cs = [cs] if isinstance(cs, str) else cs
       new_cs = [old2new[x] for x in cs]
-      dataset_kwargs[key] = new_cs if len(new_cs) != 1 else new_cs[0]
+      if key == 'target':  # rename target with prefix
+        dataset_kwargs[key] = new_cs if len(new_cs) != 1 else new_cs[0]
+      else:
+        dataset_kwargs[key] = new_cs
+      if self.verbose:
+        print(key)
+        pprint(new_cs)
     encoders = dataset_kwargs.get('categorical_encoders')
     dataset_kwargs['categorical_encoders'] = {old2new[k]: v for k, v in encoders.items()}
     scalers = dataset_kwargs.get('scalers', {})
@@ -280,10 +295,6 @@ class Dataset:
     if dataset_kwargs.get('allow_missing_timesteps', False):   
       df = df.dropna()  # Remove rows with nan values
     if self.split is not None:
-      if len(group_ids) == 0:  # If you have only one timeseries, set this to the name of column that is constant.
-        group_ids = [self.default_group_column]
-        dataset_kwargs['group_ids'] = group_ids
-        df[self.default_group_column] = 0
       df1s, df2s = [], []
       cnt1, cnt2 = 0, 0
       for g, gdf in df.groupby(group_ids):
@@ -311,9 +322,12 @@ class Dataset:
       df, df2 = all_df, None
     if self.verbose:
       print(df)
+      pprint(df.columns)
       print(df.describe(include='all'))
-      print(df2)
-      print(df2.describe(include='all'))
+      if df2 is not None:
+        print(df2)
+        pprint(df2.columns)
+        print(df2.describe(include='all'))
     if not self.df_only:
       dataset_kwargs['data'] = df.reset_index()
       try:
@@ -331,6 +345,7 @@ class Dataset:
       print(f'dt dataset: {time.time() - t0:.3f}')
       return ds, ds2, df, df2
     else:
+      print(f'dt dataset: {time.time() - t0:.3f}')
       return None, None, df, df2
     
     

@@ -1,7 +1,7 @@
-feedparser
-hydra-core
-psutil
-# pandas
+feedparser==6.0.10
+hydra-core==1.2.0
+psutil==5.9.4
+# pandas==1.5.1
 # SQLAlchemy
-websocket-client
-kafka-python
+websocket-client==1.4.1
+kafka-python==2.0.2
