@@ -26,7 +26,7 @@ from ccf import transformations as ccf_transformations
 class Dataset:
   def __init__(self, agents, dataset_kwargs, quant=None, size=None, 
                start=None, stop=None, executor=None, replace_nan=None,
-               split=None, target_prefix='tgt', replace_dot=',',
+               split=None, target_prefix='tgt', replace_dot=' ',
                default_group_column='group_id',
                df_only=False, watermark=None, verbose=False):
     start = os.getenv('CCF_DATASET_START', None) if start is None else start

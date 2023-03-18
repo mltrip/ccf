@@ -1,5 +1,5 @@
 defaults:
- - dataset@create_dataset_kwargs.dataset_kwargs: mid-rat-ema_vwap_base_10_1_1-mel_80-mpl_20-no_cat-no_group
+ - dataset@create_dataset_kwargs.dataset_kwargs: mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_target-no_cat-no_group
  - metrics@model_kwargs.logging_metrics: logging_all_scaled_1e6
  - _self_
  
@@ -7,7 +7,7 @@ kind: occasional
 parent_name: ~
 parent_version: ~
 parent_stage: ~
-model_name: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_80-mpl_20-no_cat-no_group
+model_name: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_target-no_cat-no_group
 create_dataset_kwargs:
   verbose: true
   quant: 3.0e+9
@@ -44,6 +44,8 @@ model_kwargs:
   # learning_rate: 0.00390625  # 2^-8 1/256 
   # learning_rate: 0.0009765625  # 2^-10 1/1024
   learning_rate: 0.0000152587890625  # 2^-16 1/65536 
+  # learning_rate: 0.00000095367431640625  # 2^-20 1/1048576 
+  # learning_rate: 0.0000002384185791015625  # 2^-22 1/4194304 
   hidden_size: 16
   attention_head_size: 1
   dropout: 0.1
@@ -51,12 +53,14 @@ model_kwargs:
   lstm_layers: 1
   output_size: 1  # Inferred from loss if loss is from pytorch geometric
   loss:
-    class: CompositeMetricFix
-    metrics:
-    - class: ScaledMAE
-      scale: 1.0e6
-    - class: ScaledRMSE
-      scale: 1.0e12
+    class: ScaledMAE
+    scale: 1.0e6
+    # class: CompositeMetricFix
+    # metrics:
+    # - class: ScaledMAE
+    #   scale: 1.0e6
+    # - class: ScaledRMSE
+    #   scale: 1.0e12
     # - class: ScaledSignRat
     #   scale: 1.0e12
     # - class: AggregationMetric
@@ -87,11 +91,11 @@ trainer_kwargs:
   max_epochs: 256
   accelerator: gpu  # cpu
   devices: [ 0 ]
-  gradient_clip_val: 1.0
+  gradient_clip_val: 0
   gradient_clip_algorithm: norm  # norm or value
   track_grad_norm: 2
   log_every_n_steps: 30000
-  # limit_train_batches: 5
+  limit_train_batches: 5
   logger:
   - class: MLFlowLogger
     experiment_name: ~  # default to model_name

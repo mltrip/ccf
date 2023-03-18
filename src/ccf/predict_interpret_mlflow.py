@@ -28,7 +28,7 @@ def predict(model_name, predict_kwargs, create_dataset_kwargs,
             agents, verbose=False, horizons=None, executor=None,
             watermark=None, kind=None, interpret_kwargs=None,
             interpret_attention=True, interpret_importance=True,
-            model_version=None, model_stage=None, replace_dot=',',
+            model_version=None, model_stage=None, replace_dot=' ',
             prediction_prefix='pred', dataloader_kwargs=None, delay=0):
   """Prediction with interpretation. Tested with TFT model only
   
