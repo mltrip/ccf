@@ -11,9 +11,9 @@ create_dataset_kwargs:
   verbose: true
   quant: 3.0e+9
   start: "2022-08-01T00:00:00+00:00"
-  stop: "2022-09-01T00:00:00+00:00"
+  stop: "2022-10-01T00:00:00+00:00"
   replace_nan: 1.0
-  split: 0.8
+  split: 0.75
   agents:
     influxdb: 
       class: InfluxdbDataset
@@ -31,33 +31,42 @@ create_dataset_kwargs:
 dataloader_kwargs:
   train:
     train: true
-    num_workers: 16
-    batch_size: 512
+    num_workers: 32
+    batch_size: 128
   val:
     train: false
-    num_workers: 16
-    batch_size: 512
+    num_workers: 32
+    batch_size: 128
 model_kwargs:
   class: TemporalFusionTransformer
   # learning_rate: 0.03125  # 2^-6 1/32 
   # learning_rate: 0.00390625  # 2^-8 1/256 
   # learning_rate: 0.0009765625  # 2^-10 1/1024
   learning_rate: 0.0000152587890625  # 2^-16 1/65536 
-  hidden_size: 8
+  hidden_size: 16
   attention_head_size: 1
   dropout: 0.1
   hidden_continuous_size: 8
   lstm_layers: 1
+  # output_size: 7  # Inferred from loss if loss is from pytorch geometric
+  # loss:
+  #   class: ScaledQuantileLoss
+  #   quantiles: [ 0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98 ]
+  #   scale: 1.0e6
   output_size: 1  # Inferred from loss if loss is from pytorch geometric
   loss:
-    class: CompositeMetricFix
-    metrics:
-    - class: ScaledMAE
-      scale: 1.0e6
+    class: ScaledMAE
+    scale: 1.0e6
+  # output_size: 1  # Inferred from loss if loss is from pytorch geometric
+  # loss:
+  #   class: CompositeMetricFix
+  #   metrics:
+  #   - class: ScaledMAE
+  #     scale: 1.0e6
     # - class: ScaledRMSE
     #   scale: 1.0e12
-    - class: ScaledSignRat
-      scale: 1.0e12
+    # - class: ScaledSignRat
+    #   scale: 1.0e12
     # - class: AggregationMetric
     #   metric:
     #     class: ScaledMAE
@@ -157,7 +166,7 @@ trainer_kwargs:
   gradient_clip_val: 0
   gradient_clip_algorithm: norm  # norm or value
   track_grad_norm: 2
-  log_every_n_steps: 3000
+  log_every_n_steps: 30000
   # limit_train_batches: 5
   logger:
   - class: MLFlowLogger
@@ -182,6 +191,6 @@ trainer_kwargs:
   - class: EarlyStopping
     monitor: val_loss
     min_delta: 0
-    patience: 9
+    patience: 5
     verbose: false
     mode: min

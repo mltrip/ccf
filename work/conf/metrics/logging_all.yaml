@@ -1,0 +1,68 @@
+- MAE
+- RMSE
+- MAPE
+- SMAPE
+- class: ScaledMAE
+  scale: 1.0
+- class: ScaledRMSE
+  scale: 1.0
+- class: ScaledSignRat
+  scale: 1.0
+- class: ScaledAsignRat
+  scale: 1.0
+- class: AggregationMetric
+  metric:
+    class: ScaledMAE
+    scale: 1.0
+- class: AggregationMetric
+  metric:
+    class: ScaledRMSE
+    scale: 1.0
+- class: AggregationMetric
+  metric:
+    class: ScaledSignRat
+    scale: 1.0
+- class: AggregationMetric
+  metric:
+    class: ScaledAsignRat
+    scale: 1.0
+- class: ROR
+  target_kind: rat
+  direction: all
+  mask_kind: none
+- class: ROR
+  target_kind: rat
+  direction: all
+  mask_kind: max
+- class: ROR
+  target_kind: rat
+  direction: pos
+  mask_kind: max
+- class: ROR
+  target_kind: rat
+  direction: neg
+  mask_kind: max
+- class: ROR
+  target_kind: rat
+  direction: pos
+  mask_kind: none
+- class: ROR
+  target_kind: rat
+  direction: neg
+  mask_kind: none
+- class: ROR
+  target_kind: rat
+  direction: pos
+  mask_kind: all
+- class: ROR
+  target_kind: rat
+  direction: neg
+  mask_kind: all
+- class: ROR
+  target_kind: rat
+  direction: pos
+  mask_kind: last
+- class: ROR
+  target_kind: rat
+  direction: neg
+  mask_kind: last

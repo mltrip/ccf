@@ -10,10 +10,10 @@ model_name: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_100-mpl_20-no_cat-no_group
 create_dataset_kwargs:
   verbose: true
   quant: 3.0e+9
-  start: "2022-08-01T00:00:00+00:00"
-  stop: "2022-09-01T00:00:00+00:00"
+  start: "2022-07-01T00:00:00+00:00"
+  stop: "2022-10-01T00:00:00+00:00"
   replace_nan: 1.0
-  split: 0.8
+  split: 0.75
   agents:
     influxdb: 
       class: InfluxdbDataset
@@ -31,11 +31,11 @@ create_dataset_kwargs:
 dataloader_kwargs:
   train:
     train: true
-    num_workers: 16
+    num_workers: 32
     batch_size: 512
   val:
     train: false
-    num_workers: 16
+    num_workers: 32
     batch_size: 512
 model_kwargs:
   class: TemporalFusionTransformer

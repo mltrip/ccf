@@ -11,9 +11,9 @@ create_dataset_kwargs:
   verbose: true
   quant: 3.0e+9
   start: "2022-07-01T00:00:00+00:00"
-  stop: "2022-09-01T00:00:00+00:00"
+  stop: "2022-10-01T00:00:00+00:00"
   replace_nan: 1.0
-  split: 0.8
+  split: 0.75
   agents:
     influxdb: 
       class: InfluxdbDataset
@@ -26,25 +26,26 @@ create_dataset_kwargs:
       feature_keys:
         rat-ema-qv-vwap_20: [ binance-btc-usdt ]
       client:
-        timeout: 200000
+        timeout: 300000
         verify_ssl: false
 dataloader_kwargs:
   train:
     train: true
-    num_workers: 16
-    batch_size: 512
+    num_workers: 32
+    batch_size: 64
   val:
     train: false
-    num_workers: 16
-    batch_size: 512
+    num_workers: 32
+    batch_size: 64
 model_kwargs:
   class: TemporalFusionTransformer
   # learning_rate: 0.03125  # 2^-6 1/32 
   # learning_rate: 0.00390625  # 2^-8 1/256 
   # learning_rate: 0.0009765625  # 2^-10 1/1024
-  # learning_rate: 0.0000152587890625  # 2^-16 1/65536 
-  learning_rate: 0.00000095367431640625  # 2^-20 1/1048576 
-  hidden_size: 8
+  learning_rate: 0.0000152587890625  # 2^-16 1/65536 
+  # learning_rate: 0.00000095367431640625  # 2^-20 1/1048576 
+  # learning_rate: 0.0000002384185791015625  # 2^-22 1/4194304 
+  hidden_size: 16
   attention_head_size: 1
   dropout: 0.1
   hidden_continuous_size: 8
@@ -60,10 +61,34 @@ model_kwargs:
   reduce_on_plateau_min_lr: 1.0e-10
   weight_decay: 0
   logging_metrics:
-  - SMAPE
   - MAE
   - RMSE
   - MAPE
+  - SMAPE
+  - class: ScaledMAE
+    scale: 1.0e6
+  - class: ScaledRMSE
+    scale: 1.0e12
+  - class: ScaledSignRat
+    scale: 1.0e12
+  - class: ScaledAsignRat
+    scale: 1.0e12
+  - class: AggregationMetric
+    metric:
+      class: ScaledMAE
+      scale: 1.0e6
+  - class: AggregationMetric
+    metric:
+      class: ScaledRMSE
+      scale: 1.0e12
+  - class: AggregationMetric
+    metric:
+      class: ScaledSignRat
+      scale: 1.0e12
+  - class: AggregationMetric
+    metric:
+      class: ScaledAsignRat
+      scale: 1.0e12
   - class: ROR
     target_kind: rat
     direction: all
@@ -111,7 +136,7 @@ trainer_kwargs:
   gradient_clip_val: 0
   gradient_clip_algorithm: norm  # norm or value
   track_grad_norm: 2
-  log_every_n_steps: 3000
+  log_every_n_steps: 30000
   # limit_train_batches: 5
   logger:
   - class: MLFlowLogger
@@ -136,6 +161,6 @@ trainer_kwargs:
   - class: EarlyStopping
     monitor: val_loss
     min_delta: 0
-    patience: 9
+    patience: 5
     verbose: false
     mode: min

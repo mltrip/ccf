@@ -1,5 +1,6 @@
 defaults:
  - dataset@create_dataset_kwargs.dataset_kwargs: mid-rat-ema_vwap_base_10_1_1-mel_600-mpl_20-no_cat-no_group
+ - metrics@model_kwargs.logging_metrics: logging_all_scaled_1e6
  - _self_
  
 kind: occasional
@@ -10,10 +11,10 @@ model_name: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_600-mpl_20-no_cat-no_group
 create_dataset_kwargs:
   verbose: true
   quant: 3.0e+9
-  start: "2022-08-01T00:00:00+00:00"
-  stop: "2022-09-01T00:00:00+00:00"
+  start: "2022-07-01T00:00:00+00:00"
+  stop: "2022-10-01T00:00:00+00:00"
   replace_nan: 1.0
-  split: 0.8
+  split: 0.75
   agents:
     influxdb: 
       class: InfluxdbDataset
@@ -26,83 +27,51 @@ create_dataset_kwargs:
       feature_keys:
         rat-ema-qv-vwap_20: [ binance-btc-usdt ]
       client:
-        timeout: 200000
+        timeout: 300000
         verify_ssl: false
 dataloader_kwargs:
   train:
     train: true
-    num_workers: 16
-    batch_size: 512
+    num_workers: 32
+    batch_size: 128
   val:
     train: false
-    num_workers: 16
-    batch_size: 512
+    num_workers: 32
+    batch_size: 128
 model_kwargs:
   class: TemporalFusionTransformer
   # learning_rate: 0.03125  # 2^-6 1/32 
   # learning_rate: 0.00390625  # 2^-8 1/256 
   # learning_rate: 0.0009765625  # 2^-10 1/1024
   learning_rate: 0.0000152587890625  # 2^-16 1/65536 
-  hidden_size: 8
+  hidden_size: 16
   attention_head_size: 1
   dropout: 0.1
   hidden_continuous_size: 8
   lstm_layers: 1
-  output_size: 7  # Inferred from loss if loss is from pytorch geometric
+  output_size: 1  # Inferred from loss if loss is from pytorch geometric
   loss:
-    class: ScaledQuantileLoss
-    quantiles: [ 0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98 ]
-    scale: 1.0e6
+    class: ScaledSignRat
+    scale: 1.0e12
+    # class: CompositeMetricFix
+    # metrics:
+    # - class: ScaledMAE
+    #   scale: 1.0e6
+    # - class: ScaledRMSE
+    #   scale: 1.0e12
+    # - class: ScaledSignRat
+    #   scale: 1.0e12
+  # output_size: 7  # Inferred from loss if loss is from pytorch geometric
+  # loss:
+  #   class: ScaledQuantileLoss
+  #   quantiles: [ 0.02, 0.1, 0.25, 0.5, 0.75, 0.9, 0.98 ]
+  #   scale: 1.0e6
   log_interval: 0
   reduce_on_plateau_patience: 2
   reduce_on_plateau_reduction: 2
   reduce_on_plateau_min_lr: 1.0e-10
   weight_decay: 0
-  logging_metrics:
-  - SMAPE
-  - MAE
-  - RMSE
-  - MAPE
-  - class: ROR
-    target_kind: rat
-    direction: all
-    mask_kind: none
-  - class: ROR
-    target_kind: rat
-    direction: all
-    mask_kind: max
-  - class: ROR
-    target_kind: rat
-    direction: pos
-    mask_kind: max
-  - class: ROR
-    target_kind: rat
-    direction: neg
-    mask_kind: max
-  - class: ROR
-    target_kind: rat
-    direction: pos
-    mask_kind: none
-  - class: ROR
-    target_kind: rat
-    direction: neg
-    mask_kind: none
-  - class: ROR
-    target_kind: rat
-    direction: pos
-    mask_kind: all
-  - class: ROR
-    target_kind: rat
-    direction: neg
-    mask_kind: all
-  - class: ROR
-    target_kind: rat
-    direction: pos
-    mask_kind: last
-  - class: ROR
-    target_kind: rat
-    direction: neg
-    mask_kind: last
+  # logging_metrics:  # from conf/metrics
 trainer_kwargs:
   max_epochs: 256
   accelerator: gpu  # cpu
@@ -135,6 +104,6 @@ trainer_kwargs:
   - class: EarlyStopping
     monitor: val_loss
     min_delta: 0
-    patience: 9
+    patience: 17
     verbose: false
     mode: min
