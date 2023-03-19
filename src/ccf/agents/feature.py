@@ -385,7 +385,8 @@ def unwrap_trade(values):
   return new_values  
   
   
-def evaluate_delta_df(df, kind='lograt', columns_bottom=None, columns_up=None, shift=0):
+def evaluate_delta_df(df, kind='lograt', columns_bottom=None, columns_up=None, 
+                      shift=0, self_only=False):
   if columns_up is None:
     columns_up = [x for x in df.columns if is_numeric_dtype(df[x])]
   columns_up_2 = expand_columns(df.columns, columns_up)
@@ -402,7 +403,10 @@ def evaluate_delta_df(df, kind='lograt', columns_bottom=None, columns_up=None, s
     if shift == 0:  # Remove self
       columns_up_3 = [x for x in columns_up_2 if x != column_bottom]
     else:
-      columns_up_3 = columns_up_2
+      if self_only:
+        columns_up_3 = [x for x in columns_up_2 if x == column_bottom]
+      else:
+        columns_up_3 = columns_up_2
     new_names = {x: '-'.join([prefix, x, column_bottom]) for x in columns_up_3}
     b = df[column_bottom].shift(shift) if shift != 0 else df[column_bottom]
     us = df[columns_up_3]
