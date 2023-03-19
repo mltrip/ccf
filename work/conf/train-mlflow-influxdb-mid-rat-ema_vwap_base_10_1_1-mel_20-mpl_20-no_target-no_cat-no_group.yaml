@@ -33,11 +33,11 @@ dataloader_kwargs:
   train:
     train: true
     num_workers: 32
-    batch_size: 128
+    batch_size: 32
   val:
     train: false
     num_workers: 32
-    batch_size: 128
+    batch_size: 32
 model_kwargs:
   class: TemporalFusionTransformer
   # learning_rate: 0.03125  # 2^-6 1/32 

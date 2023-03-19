@@ -42,9 +42,9 @@ model_kwargs:
   class: TemporalFusionTransformer
   # learning_rate: 0.03125  # 2^-6 1/32 
   # learning_rate: 0.00390625  # 2^-8 1/256 
-  # learning_rate: 0.0009765625  # 2^-10 1/1024
+  learning_rate: 0.0009765625  # 2^-10 1/1024
   # learning_rate: 0.0000152587890625  # 2^-16 1/65536
-  learning_rate: 0.00000095367431640625  # 2^-20 1/1048576
+  # learning_rate: 0.00000095367431640625  # 2^-20 1/1048576
   # learning_rate: 0.0000002384185791015625  # 2^-22 1/4194304
   hidden_size: 16
   attention_head_size: 1

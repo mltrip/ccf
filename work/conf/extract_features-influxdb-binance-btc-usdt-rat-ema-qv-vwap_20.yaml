@@ -14,11 +14,12 @@ agents:
     feature: rat-ema-qv-vwap_20
     kind: rat
     verbose: false
-    start: "2022-10-08T00:00:00+00:00"
-    stop: "2023-01-01T00:00:00+00:00"
+    start: "2022-08-30T00:00:00+00:00"
+    stop: "2022-11-01T00:00:00+00:00"
     size: ~
     quant: 3.0e+9
-    delay: 86400e+9  # 2 days
+    delay: 86400e+9  # 1 day
+    # delay: 0.0
     watermark: 15.0e+9  # min 2*quant
     depth: 20
     topic_keys:
@@ -35,8 +36,8 @@ agents:
         alphas: [ 1.0, 0.1, 0.01, 1e-3, 1e-4 ]
     deltas:
       - shift: 1 
-        columns_up: [ '^m_p$' ]
-        columns_bottom: [ '^m_p$' ]
+        columns_up: [ '^m_p$', '^a_v$', '^b_v$', '^o_v$', '^t_p$', '^t_v$', '^t_v_b$', '^t_v_s$', '^vwap.*', '^ema_.*' ]
+        self_only: True
       - shift: 0
         columns_up: [ '^ema_.*m_p$', '^ema_.*t_p$', '^ema_.*-vwap_mid' ]
         columns_bottom: [ '^ema_.*m_p$' ]
