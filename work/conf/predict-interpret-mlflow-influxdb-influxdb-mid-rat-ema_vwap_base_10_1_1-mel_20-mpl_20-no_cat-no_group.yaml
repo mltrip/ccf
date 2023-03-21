@@ -1,13 +1,10 @@
 defaults:
- - partitioner@agents.prediction.producers.p_1.partitioners.prediction: prediction
- - partitioner@agents.metric.producers.p_1.partitioners.metric: metric
- - partitioner@create_dataset_kwargs.agents.kafka.consumer.partitioners.feature: feature
  - dataset@create_dataset_kwargs.dataset_kwargs: mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
  - _self_
  
-kind: auto_update  # set ~ to constant model
+kind: ~  # set ~ to constant model
 model_name: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
-model_version: ~
+model_version: 1
 model_stage: ~
 verbose: false
 horizons: [ 5, 10, 15, 20 ]
@@ -20,37 +17,40 @@ interpret_attention: True
 interpret_importance: True
 create_dataset_kwargs:
   verbose: false
-  quant: 3.0e+9
-  watermark: 120.0e+9
+  start: "2023-03-21T02:30:00+00:00"
+  stop: "2023-03-21T02:40:00+00:00"
+  quant: 3e9
+  watermark: 120e9
   replace_nan: 1.0
   split: ~
   dataset_kwargs: 
     predict_mode: true
   agents:
-    kafka: 
-      class: KafkaDataset
-      size: 1
+    influxdb: 
+      class: StreamDatasetInfluxDB
+      batch_size: 60e9
+      client:
+        verify_ssl: false
+        timeout: 3000000
       verbose: false
-      topics: [ feature ]
-      executor:
-        class: ProcessPoolExecutor
-        max_workers: 1
       feature_keys:
         rat-ema-qv-vwap_20: [ binance-btc-usdt ]
-      consumer:
-        bootstrap_servers: "kafka:9092"
 agents:
   prediction:
-    class: Kafka
+    class: InfluxDB
+    client:
+      verify_ssl: false
+      timeout: 3000000
     producers:
       p_1:
-        bootstrap_servers: "kafka:9092"
         topic_keys:
           prediction: [ binance-btc-usdt ]
   metric:
-    class: Kafka
+    class: InfluxDB
+    client:
+      verify_ssl: false
+      timeout: 3000000
     producers:
       p_1:
-        bootstrap_servers: "kafka:9092"
         topic_keys:
           metric: [ binance-btc-usdt ]

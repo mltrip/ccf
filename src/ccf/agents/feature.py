@@ -31,7 +31,7 @@ class DeltaKafka(Kafka):
     self.delay = delay
     self.watermark = watermark if watermark is not None else quant
     self.depth = depth
-    self.replace_nan = 1.0
+    self.replace_nan = replace_nan
     self.emas = [] if emas is None else emas
     self.vwaps = [] if vwaps is None else vwaps
     self.deltas = [] if deltas is None else deltas
@@ -166,14 +166,12 @@ class DeltaInfluxDB(InfluxDB):
         if topic == 'lob':
           stream = self.get_lob_batch_stream(query_api, bucket=self.bucket, 
                                              start=self.start, stop=self.stop, 
-                                             size=self.size, quant=self.quant,
                                              batch_size=self.batch_size,
                                              exchange=exchange, base=base, quote=quote, 
                                              verbose=self.verbose)
         elif topic == 'trade':
           stream = self.get_trade_batch_stream(query_api, bucket=self.bucket, 
                                                start=self.start, stop=self.stop, 
-                                               size=self.size, quant=self.quant,
                                                batch_size=self.batch_size,
                                                exchange=exchange, base=base, quote=quote, 
                                                verbose=self.verbose)
@@ -201,25 +199,18 @@ class DeltaInfluxDB(InfluxDB):
       print(f'stop:      {datetime.fromtimestamp(stop_t/10**9, tz=timezone.utc)}')
       for topic, key_stream in topic_key_streams.items():
         for key, stream in key_stream.items():
-          buffer = topic_key_buffers.setdefault(topic, {}).setdefault(key, deque())
+          buffer = topic_key_buffers.setdefault(topic, {}).setdefault(key, [])
           # Append to buffer
           cur_buffer_t = watermark_t
           while cur_buffer_t < next_t:
             try:
-              index, row = next(stream)
-              message = self.iterrow_to_message(index, row)
+              message = next(stream)
               cur_buffer_t = message['timestamp']
               buffer.append(message)
             except StopIteration:
               break
-          # Popleft from buffers (timestamp >= watermark_t)
-          if len(buffer) != 0:
-            min_buffer_t = buffer[0]['timestamp']
-            while min_buffer_t < watermark_t:
-              if len(buffer) != 0:
-                min_buffer_t = buffer.popleft()['timestamp']
-              else:
-                break
+          # Sink buffer
+          buffer = [x for x in self.buffer if x['timestamp'] > watermark_t]
       cur_t = next_t
       # Extract features
       evaluate_features_delta_ema_qv_vwap(topic_key_buffers, topic_key_dataframes, topic_key_features,

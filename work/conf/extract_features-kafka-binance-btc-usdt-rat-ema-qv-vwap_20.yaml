@@ -35,8 +35,8 @@ agents:
         alphas: [ 1.0, 0.1, 0.01, 1e-3, 1e-4 ]
     deltas:
       - shift: 1 
-        columns_up: [ '^m_p$' ]
-        columns_bottom: [ '^m_p$' ]
+        columns_up: [ '^m_p$', '^a_v$', '^b_v$', '^o_v$', '^t_p$', '^t_v$', '^t_v_b$', '^t_v_s$', '^vwap.*', '^ema_.*' ]
+        self_only: True
       - shift: 0
         columns_up: [ '^ema_.*m_p$', '^ema_.*t_p$', '^ema_.*-vwap_mid' ]
         columns_bottom: [ '^ema_.*m_p$' ]

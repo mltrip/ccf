@@ -1,0 +1,60 @@
+defaults:
+  - _self_
+ 
+executor:
+  class: ThreadPoolExecutor
+  max_workers: 1
+agents:
+  influxb:
+    class: MetricInfluxDB
+    executor:
+      class: ThreadPoolExecutor
+      max_workers: 2
+    verbose: true
+    start: "2023-03-21T02:40:00+00:00"
+    stop: "2023-03-21T02:55:00+00:00"
+    quant: 3e9
+    watermark: 9e9
+    batch_size: 60e9
+    keys: [ binance-btc-usdt ]
+    metrics:
+      # - class: sklearn.metrics.mean_absolute_error
+      #   name: MAE
+      # - class: MASE
+      #   name: MASE
+      - class: ROR
+        name: ROR-all-0-0
+        kind: all
+        threshold: 0
+        fees: 0
+      - class: ROR
+        name: ROR-all-0-0-1
+        kind: all
+        threshold: 0
+        fees: 0
+        random_guess: 1.0
+      # - class: ROR
+      #   name: ROR-all-0.002-0
+      #   kind: all
+      #   threshold: 0.002
+      #   fees: 0
+      # - class: ROR
+      #   name: ROR-all-0.0015-0
+      #   kind: all
+      #   threshold: 0.0015
+      #   fees: 0
+      # - class: ROR
+      #   name: ROR-all-0.0001-0
+      #   kind: all
+      #   threshold: 0.0001
+      #   fees: 0
+      # - class: ROR
+      #   name: ROR-all-0.002-0.002
+      #   kind: all
+      #   threshold: 0.002
+      #   fees: 0.002
+      # - class: ROR
+      #   name: ROR-all-0.0015-0.0015
+      #   kind: all
+      #   threshold: 0.0015
+      #   fees: 0.0015

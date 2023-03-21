@@ -46,6 +46,7 @@ def load_model(name, version=None, stage=None, metadata_only=False):
       MLFLOW_TRACKING_PASSWORD=
   """
   stage = 'None' if stage is None else stage
+  version = str(version) if version is not None else version
   client = MlflowClient()
   model = None
   is_found = False
@@ -57,18 +58,24 @@ def load_model(name, version=None, stage=None, metadata_only=False):
     if parent_registered_model is not None:    
       print(f'Registered model "{name}" is found')
       model_version = None
-      for mv in parent_registered_model.latest_versions:
-        if mv.current_stage == stage:
-          model_version = mv
+      if version is None:
+        for mv in parent_registered_model.latest_versions:
+          if mv.current_stage == stage:
+            model_version = mv
+      else:
+        for mv in client.search_model_versions(f"name='{name}'"):
+          if mv.version == version:
+            model_version = mv
       if model_version is not None:
         version = model_version.version
+        stage = model_version.current_stage
         print(f'Model stage "{stage}" with version "{version}" is found')
         model_uri = f'models:/{name}/{version}'
         if not metadata_only:
           model = mlflow.pyfunc.load_model(model_uri=model_uri)
         is_found = True
       else:
-        print(f'Model stage "{stage}" is not found!')
+        print(f'Model stage "{stage}" and/or version "{version}" is not found!')
     else:
       print(f'Registered model "{name}" is not found!')
   else:  # TODO

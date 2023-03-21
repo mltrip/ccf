@@ -6,7 +6,7 @@ import gc
 from copy import deepcopy
 from pprint import pprint
 import os
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import concurrent.futures
 from collections import deque
 
 import hydra
@@ -38,6 +38,7 @@ class Dataset:
     self.stop = stop
     self.size = size
     self.quant = quant
+    self.watermark = int(watermark) if watermark is not None else watermark
     for name, kwargs in agents.items():
       if 'quant' not in kwargs and self.quant is not None:
         kwargs['quant'] = self.quant
@@ -47,9 +48,17 @@ class Dataset:
         kwargs['start'] = self.start
       if 'stop' not in kwargs and self.stop is not None:
         kwargs['stop'] = self.stop
+      if 'watermark' not in kwargs and self.watermark is not None:
+        kwargs['watermark'] = self.watermark
+      class_name = kwargs.pop('class')
+      agents[name] = getattr(ccf_agents, class_name)(**kwargs)
     self.agents = agents
+    if executor is None:
+      executor = {'class': 'ThreadPoolExecutor'}
+    executor_class = executor.pop('class')
+    executor = getattr(concurrent.futures, executor_class)(**executor)
+    self.executor = executor
     self.dataset_kwargs = dataset_kwargs
-    self.executor = {} if executor is None else executor
     self.replace_nan = replace_nan
     self.replace_dot = replace_dot
     self.default_group_column = default_group_column
@@ -59,77 +68,64 @@ class Dataset:
     self.split = split
     self.target_prefix = target_prefix
     self.df_only = df_only
-    self.watermark = int(watermark) if watermark is not None else watermark
     self.verbose = verbose
+    self.buffer = {}
+    
+  def get_features(self):
+    features = {}
+    if len(self.agents) == 1:
+      for name, agent in self.agents.items():
+        agent_features = agent()
+        features.update(agent_features)
+    else:
+      f2c = {}
+      for name, agent in self.agents.items():
+        future_kwargs = {}
+        future = self.executor.submit(agent, **future_kwargs)
+        f2c[future] = [agent, future_kwargs]
+      for future in concurrent.futures.as_completed(f2c):
+        result = future.result()
+        features.update(result)
+    return features
   
   def __call__(self):
     features = self.get_features()
     return self.create_dataset(features)
   
-  def __iter__(self):  # TODO async
-    agents = deepcopy(self.agents)
-    for name, kwargs in agents.items():
-      class_name = kwargs.pop('class')
-      kwargs['size'] = 1
-      agents[name] = getattr(ccf_agents, class_name)(**kwargs)
-    data = {}
-    e = ThreadPoolExecutor(**self.executor)
-    do_drop = False
-    while True:
-      t0 = time.time()
-      if len(agents) == 1:
-        for name, agent in agents.items():
-          result = agent()
-          for feature, df in result.items():
-            data.setdefault(feature, deque()).append(df)
+  def __iter__(self):  # TODO async?
+    self.buffer = {}
+    return self
+  
+  def __next__(self):  # TODO async?
+    t0 = time.time()
+    features = self.get_features()
+    for feature, df in features.items():
+      old_df = self.buffer.get(feature, None)
+      if old_df is not None:
+        self.buffer[feature] = pd.concat([df, old_df]).drop_duplicates().sort_index()
       else:
-        f2c = {}
-        for name, agent in agents.items():
-          future_kwargs = {}
-          future = e.submit(agent, **future_kwargs)
-          f2c[future] = [agent, future_kwargs]
-        for future in as_completed(f2c):
-          result = future.result()
-          for feature, df in result.items():
-            data.setdefault(feature, deque()).append(df)
-      len_data = [len(v) for v in data.values()]
-      print(datetime.utcnow(), time.time() - t0, len_data)
-      if all([v >= self.size for v in len_data]):
-        if self.watermark is not None:
-          do_drop = False
-          last_time = min([v[-1].iloc[-1].name for v in data.values()])
-          delta_time = time.time_ns() - last_time.timestamp()*1e9
-          if delta_time > self.watermark:
-            do_drop = True
-          print(f'delay: {timedelta(microseconds=delta_time/1e3)}, {datetime.utcnow()}, {last_time},  watermark: {timedelta(microseconds=self.watermark/1e3)}, do_drop: {do_drop}')
-        features = {k: pd.concat(v) for k, v in data.items()}
-        for f, d in data.items():
-          d.popleft()
-        yield self.create_dataset(features)
-
-  def get_features(self):
-    # Initialize agents
-    agents = deepcopy(self.agents)
-    for name, kwargs in agents.items():
-      class_name = kwargs.pop('class')
-      agents[name] = getattr(ccf_agents, class_name)(**kwargs)
-    # Collect features
-    features = {}
-    if len(agents) == 1:
-      for name, agent in agents.items():
-        agent_features = agent()
-        features.update(agent_features)
-    else:
-      e = ThreadPoolExecutor(**executor)
-      f2c = {}
-      for name, agent in agents.items():
-        future_kwargs = {}
-        future = e.submit(agent, **future_kwargs)
-        f2c[future] = [agent, future_kwargs]
-      for future in as_completed(f2c):
-        result = future.result()
-        features.update(result)
-    return features
+        self.buffer[feature] = df
+    if self.watermark is not None:
+      for feature, df in self.buffer.items():
+        if len(df) > 0:
+          min_time = df.index.min()
+          max_time = df.index.max()
+          watermark_time = max_time.timestamp()*1e9 - self.watermark
+          watermark_datetime = pd.to_datetime(watermark_time, unit='ns')
+          print(f'\ncreate_dataset watermark')
+          print(f'feature:   {feature}')
+          print(f'now:       {datetime.utcnow()}')
+          print(f'min:       {min_time}')
+          print(f'max:       {max_time}')
+          print(f'watermark: {watermark_datetime}')
+          print(f'rows:      {len(df)}')
+          new_df = df[df.index > watermark_datetime]          
+          print(f'new_min:   {new_df.index.min()}')
+          print(f'new_max:   {new_df.index.max()}')
+          print(f'new_rows:  {len(new_df)}')
+          self.buffer[feature] = new_df
+    print({k: v.shape for k, v in self.buffer.items()})
+    return self.create_dataset(self.buffer)
 
   def create_dataset(self, features):
     t0 = time.time()
