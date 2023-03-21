@@ -77,49 +77,59 @@ def initialize_time(start, stop, size, quant):
         start = datetime.fromisoformat(start)
       except Exception:
         try:
-          start = int(start)
+          start = int(float(start))
         except Exception:
           raise NotImplementedError(start)
+    else:
+      start = int(start)
   if stop is not None:
     if isinstance(stop, str):
       try:
         stop = datetime.fromisoformat(stop)
       except Exception:
         try:
-          stop = int(stop)
+          stop = int(float(stop))
         except Exception:
           raise NotImplementedError(stop)
+    else:
+      stop = int(stop)
   if size is not None:
-    if isinstance(start, str):
-      size = int(size)
+    if isinstance(size, str):
+      size = int(float(size))
     size = int(size)
   if quant is not None:
     if isinstance(quant, str):
       quant = int(float(quant))
     quant = int(quant)
-  if start is not None and stop is None and size is not None and quant is not None:
-    if isinstance(start, int):
+  if start is not None and stop is None and size is None and quant is None:
+    if isinstance(start, int) and start < 0:
+      start = time.time_ns() + start
+    elif isinstance(start, datetime):
+      start = int(start.timestamp())*int(10**9)
+    stop = time.time_ns() 
+  elif start is not None and stop is None and size is not None and quant is not None:
+    if isinstance(start, int) and start < 0:
       start = time.time_ns() + start*quant
       stop = start + size*quant
     elif isinstance(start, datetime):
       start = int(start.timestamp())*int(10**9)
       stop = start + size*quant
   elif start is not None and stop is None and size is None and quant is not None:
-    if isinstance(start, int):
+    if isinstance(start, int) and start < 0:
       start = time.time_ns() + start*quant
     elif isinstance(start, datetime):
       start = int(start.timestamp())*int(10**9)
   elif start is not None and stop is None and size is None and quant is None:
-    if isinstance(start, int):
+    if isinstance(start, int) and start < 0:
       start = time.time_ns() + start
     elif isinstance(start, datetime):
       start = int(start.timestamp())*int(10**9)
   elif start is not None and stop is not None and size is None and quant is not None:
-    if isinstance(start, int):
+    if isinstance(start, int) and start < 0:
       start = time.time_ns() + start
     elif isinstance(start, datetime):
       start = int(start.timestamp())*int(10**9)
-    if isinstance(stop, int):
+    if isinstance(stop, int) and stop < 0:
       stop = time.time_ns() + stop
     elif isinstance(stop, datetime):
       stop = int(stop.timestamp())*int(10**9)

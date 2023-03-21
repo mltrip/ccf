@@ -61,7 +61,14 @@ def predict(model_name, predict_kwargs, create_dataset_kwargs,
   t_data = time.time()
   for ds, _, df, _ in dataset:  # 2. Data retrieving
     dt_data = time.time() - t_data
-    print(datetime.utcnow(), df.index.min(), df.index.max())
+    print(f'\nprediction at {datetime.utcnow()}')
+    if df is None:
+      print('skipped')
+      print(f'dt_data: {dt_data}')
+      t_data = time.time()
+      continue
+    print(f'from {df.index.min()} to {df.index.max()}')
+    print(f'rows: {len(df)}, cols: {len(df.columns)}')
     if verbose:
       print(df)
     # 3. LRU cleaning (due to memory leak)

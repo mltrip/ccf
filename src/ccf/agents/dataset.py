@@ -1,5 +1,5 @@
 # import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 import concurrent.futures
 from collections import deque
 from copy import deepcopy
@@ -16,17 +16,19 @@ from pandas.api.types import is_numeric_dtype
 from kafka import KafkaConsumer, TopicPartition
 
 from ccf.agents.base import Agent
-from ccf.utils import expand_columns
+from ccf.agents import InfluxDB
+from ccf.utils import expand_columns, initialize_time
 from ccf import partitioners as ccf_partitioners
 
 
 class KafkaDataset(Agent):      
   def __init__(self, quant, size, consumer, start=None, stop=None, verbose=False, 
-               topics=None, feature_keys=None, delay=0, executor=None):
+               watermark=None, topics=None, feature_keys=None, delay=0, executor=None):
     self.quant = quant
     self.size = size
     self.start = start
     self.stop = stop
+    self.watermark = watermark
     self.delay = delay
     self.topics = ['feature'] if topics is None else topics
     self.feature_keys = {} if feature_keys is None else feature_keys
@@ -134,13 +136,14 @@ class KafkaDataset(Agent):
 class InfluxdbDataset(Agent):      
   def __init__(self, quant, size=None, start=None, stop=None, client=None, 
                bucket=None, topics=None, feature_keys=None, delay=0,
-               executor=None, aggregate=None, interpolate=None, 
+               executor=None, aggregate=None, interpolate=None, watermark=None,
                from_env_properties=False, batch=None, verbose=False):
     self.quant = quant
     self.size = size
     self.start = start
     self.stop = stop
     self.delay = delay
+    self.watermark = watermark
     self.topics = ['feature'] if topics is None else topics
     self.feature_keys = {} if feature_keys is None else feature_keys
     if executor is None:
@@ -299,3 +302,214 @@ class InfluxdbDataset(Agent):
       features.update(result)
     # print(features)
     return features
+  
+  
+class StreamDatasetInfluxDB(InfluxDB):
+  """Dataset streaming from InfluxDB
+  
+  Note:
+    * Stream is aggregated from set of OnFeature objects
+    * OnFeature object get features from topic-key-feature combination
+    * Use ThreadPoolExecutor because ProcessPoolExecutor resets OnFeature
+    
+  Todo:
+    * Refactor lazy initialization
+  """
+  
+  def __init__(self, client=None, bucket=None, query_api=None, write_api=None,
+               executor=None, topic='feature', feature_keys=None, 
+               quant=None, start=None, stop=None, size=None, 
+               watermark=None, delay=None,
+               batch_size=86400e9, replace_nan=1.0,
+               resample=None, aggregate=None, interpolate=None,
+               verbose=False):
+    super().__init__(client, bucket, query_api, write_api, verbose)
+    if executor is None:
+      executor = {'class': 'ThreadPoolExecutor'}
+    self.executor = executor
+    self.topic = topic
+    self.feature_keys = {} if feature_keys is None else feature_keys
+    self.start = start
+    self.stop = stop
+    self.size = size
+    self.quant = quant
+    self.watermark = int(watermark) if watermark is not None else int(quant)
+    self.delay = self.watermark if delay is None else int(delay)
+    self.batch_size = batch_size
+    self.replace_nan = replace_nan
+    self.resample = {} if resample is None else resample
+    self.aggregate = {'func': 'last'} if aggregate is None else aggregate
+    self.interpolate = {'method': 'pad'} if interpolate is None else interpolate
+    self._executor = None
+    
+  class OnFeature:
+    def __init__(self, client, bucket, query_api,
+                 topic, key, feature, start, stop, size, quant, watermark, delay,
+                 batch_size, replace_nan, resample, aggregate, interpolate,
+                 verbose):
+      self.client = client
+      self.bucket = bucket
+      self.query_api = query_api
+      self.topic = topic
+      self.key = key
+      self.feature = feature
+      self.size = size
+      self.start = start
+      self.stop = stop
+      self.quant = quant
+      self.watermark = watermark
+      self.delay = delay
+      self.batch_size = batch_size
+      self.replace_nan = replace_nan
+      self.resample = resample
+      self.aggregate = aggregate
+      self.interpolate = interpolate
+      self.verbose = verbose
+      self.stream = None
+      self.cur_t = None
+      self.start_t = None
+      self.delay_t = None
+      self.stop_t = None
+      self.buffer = None
+    
+    def init(self):  # Lazy init TODO using properties?
+      if self.stream is None:
+        self.start, self.stop, self.size, self.quant = initialize_time(self.start, self.stop, 
+                                                                       self.size, self.quant)
+        client = InfluxDB.init_client(self.client)
+        query_api = InfluxDB.get_query_api(client, self.query_api)
+        exchange, base, quote = self.key.split('-')
+        if self.topic == 'feature':
+          self.stream = InfluxDB.get_feature_batch_stream(query_api, bucket=self.bucket, 
+                                                          start=self.start, stop=self.stop, 
+                                                          batch_size=self.batch_size,
+                                                          exchange=exchange, base=base, quote=quote, 
+                                                          feature=self.feature, quant=self.quant,
+                                                          verbose=self.verbose)
+        else:
+          raise NotImplementedError(self.topic)
+        self.cur_t = (self.start // self.quant)*self.quant
+        self.start_t = self.cur_t
+        self.delay_t = self.cur_t + self.delay
+        self.stop_t = (self.stop // self.quant)*self.quant
+        self.buffer = []
+        
+    def step(self):
+      # Update timestamps
+      time_t = time.time()
+      next_t = self.cur_t + self.quant
+      watermark_t = next_t - self.watermark
+      print('\ndataset step')
+      print(f'now:       {datetime.utcnow()}')
+      print(f'start:     {datetime.fromtimestamp(self.start_t/10**9, tz=timezone.utc)}')
+      print(f'delay:     {datetime.fromtimestamp(self.delay_t/10**9, tz=timezone.utc)}')
+      print(f'watermark: {datetime.fromtimestamp(watermark_t/10**9, tz=timezone.utc)}')
+      print(f'current:   {datetime.fromtimestamp(self.cur_t/10**9, tz=timezone.utc)}')
+      print(f'next:      {datetime.fromtimestamp(next_t/10**9, tz=timezone.utc)}')
+      print(f'stop:      {datetime.fromtimestamp(self.stop_t/10**9, tz=timezone.utc)}')
+      # Check stop
+      if next_t > self.stop_t:
+        raise StopIteration
+      # Update buffer
+      cur_buffer_t = watermark_t
+      while cur_buffer_t < next_t:
+        try:
+          message = next(self.stream)
+          cur_buffer_t = message['timestamp']
+          self.buffer.append(message)
+        except StopIteration:
+          break
+      # Sink buffer
+      self.buffer = [x for x in self.buffer if x['timestamp'] > watermark_t]
+      # Update current timestamp
+      self.cur_t = next_t
+      # Update dataframe
+      df = pd.DataFrame(self.buffer)
+      if len(df) != 0:
+        df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ns')
+        df = df.set_index('timestamp')
+        # Preprocess dataframe
+        resample = deepcopy(self.resample)
+        resample['rule'] = pd.Timedelta(self.quant, unit='ns')
+        aggregate = deepcopy(self.aggregate)
+        if isinstance(aggregate.get('func', {}), dict):
+          aggregate['func'] = {kk: v for k, v in aggregate.get('func', {}).items() 
+                               for kk in expand_columns(df.columns, [k])}
+        interpolate = deepcopy(self.interpolate) 
+        df = df.resample(**resample).aggregate(**aggregate).interpolate(**interpolate)
+        if self.replace_nan is not None:
+          df = df.replace([np.inf, -np.inf], np.nan).replace({np.nan: self.replace_nan})
+      # Print stats
+      time_dt = time.time() - time_t
+      print(f'end:       {datetime.utcnow()}')
+      print(f'dt: {time_dt:.3f}, rows: {len(df)}, cols: {len(df.columns)}')
+      if self.verbose:
+        print(df)
+      return df
+    
+    def __iter__(self):
+      return self
+    
+    def __next__(self):
+      # Lazy init
+      self.init()
+      # Delay
+      while self.cur_t + self.quant < self.delay_t:
+        self.step()
+      # Step
+      df = self.step()
+      key_feature = '-'.join([self.key, '', self.feature])
+      dfs = {key_feature: df}
+      return dfs
+    
+    def __call__(self):
+      return next(self)
+  
+  def init(self):  # Lazy init TODO using properties?
+    if self._executor is None:
+      executor = deepcopy(self.executor)
+      executor_class = executor.pop('class')
+      executor = getattr(concurrent.futures, executor_class)(**executor)
+      self._executor = executor
+      self.on_features = []
+      for feature, keys in self.feature_keys.items():
+        for key in keys:
+          on_feature_kwargs = {
+            'topic': self.topic,
+            'key': key,
+            'feature': feature,
+            'client': deepcopy(self.client),
+            'size': self.size,
+            'start': self.start,
+            'stop': self.stop,
+            'quant': self.quant,
+            'query_api': self.query_api,
+            'bucket': self.bucket,
+            'watermark': self.watermark,
+            'delay': self.delay,
+            'resample': self.resample,
+            'aggregate': self.aggregate,
+            'interpolate': self.interpolate,
+            'replace_nan': self.replace_nan,
+            'batch_size': self.batch_size,
+            'verbose': self.verbose}
+          on_feature = self.OnFeature(**on_feature_kwargs)
+          self.on_features.append(on_feature)
+  
+  def __iter__(self):
+      return self
+    
+  def __next__(self):
+    # Lazy init
+    self.init()
+    # Step
+    features = {}
+    futures = [self._executor.submit(x) for x in self.on_features]
+    for future in concurrent.futures.as_completed(futures):
+      result = future.result()
+      features.update(result)
+    # print(features)
+    return features
+  
+  def __call__(self):
+    return next(self)
