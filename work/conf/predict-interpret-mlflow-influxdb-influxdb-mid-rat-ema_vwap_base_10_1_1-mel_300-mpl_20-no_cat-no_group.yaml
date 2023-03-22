@@ -1,16 +1,16 @@
 defaults:
- - dataset@create_dataset_kwargs.dataset_kwargs: mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+ - dataset@create_dataset_kwargs.dataset_kwargs: mid-rat-ema_vwap_base_10_1_1-mel_300-mpl_20-no_cat-no_group
  - _self_
  
 kind: ~  # set ~ to constant model
-model_name: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+model_name: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_300-mpl_20-no_cat-no_group
 model_version: 3
 model_stage: ~
 verbose: false
 horizons: [ 5, 10, 15, 20 ]
 predict_kwargs:
   return_index: true
-  mode: quantiles  # prediction or quantiles
+  mode: prediction  # prediction or quantiles
 interpret_kwargs:
   attention_prediction_horizon: 20  # set ~ to interpret all items from horizons field
 interpret_attention: True
@@ -20,7 +20,7 @@ create_dataset_kwargs:
   start: "2023-03-20T23:00:00+00:00"
   stop: "2023-03-22T12:00:00+00:00"
   quant: 3e9
-  watermark: 120e9
+  watermark: 960e9
   replace_nan: ~  # FIXME could change target and rely on metrics
   split: ~
   dataset_kwargs: 
