@@ -294,15 +294,15 @@ class MetricInfluxDB(InfluxDB):
       return messages
       
     def __call__(self):
+      total_t = time.time()
       # Lazy init
       if self._metric is None:
         self.init_metric()
       start, stop, size, quant = initialize_time(self.start, self.stop, 
                                                  self.size, self.quant)
       client = InfluxDB.init_client(self.client)
-      query_api = InfluxDB.get_query_api(client, self.query_api)
-      write_api = InfluxDB.get_write_api(client, self.write_api)
       # Update streams
+      query_api = InfluxDB.get_query_api(client, self.query_api)
       streams = {}
       exchange, base, quote = self.key.split('-')
       streams[self.feature_topic] = InfluxDB.get_feature_batch_stream(
@@ -323,10 +323,10 @@ class MetricInfluxDB(InfluxDB):
       stop_t = (stop // quant)*quant
       buffers = {}
       while cur_t < stop_t:
-        time_t = time.time()
+        step_t = time.time()
         next_t = cur_t + quant
         watermark_t = next_t - self.watermark
-        print('\nmetric')
+        print(f'\nmetric {self._metric_name} {self.key}')
         print(f'now:       {datetime.utcnow()}')
         print(f'start:     {datetime.fromtimestamp(start_t/1e9, tz=timezone.utc)}')
         print(f'delay:     {datetime.fromtimestamp(delay_t/1e9, tz=timezone.utc)}')
@@ -350,7 +350,6 @@ class MetricInfluxDB(InfluxDB):
           buffers[topic] = buffer
           print(f'buffer "{topic}": {len(buffer)}')
         print(f'end:       {datetime.utcnow()}')
-        time_dt = time.time() - time_t
         cur_t = next_t
         # Evaluate metric
         messages = []
@@ -360,13 +359,19 @@ class MetricInfluxDB(InfluxDB):
               ms = self.evaluate_metric(prediction, target)
               messages.extend(ms)
         # Send
+        write_api = InfluxDB.get_write_api(client, self.write_api)
+        send_t = time.time()
         for message in messages:
           record = InfluxDB.message_to_record(message, self.metric_topic)
           results = write_api.write(bucket=self.bucket, record=record,
                                     write_precision='ns')
+        write_api.close()
         print(f'messages:  {len(messages)}')
-        print(f'dt:        {time_dt}')
-  
+        print(f'send_dt:   {time.time() - send_t}')
+        print(f'step_dt:   {time.time() - step_t}')
+      print(f'total_dt:  {time.time() - total_t}')
+      client.close()
+    
   def __call__(self):
     executor = deepcopy(self.executor)
     executor_class = executor.pop('class')
@@ -458,3 +463,16 @@ def ROR(y_true, y_pred, y_last, name,
   else:
     raise NotImplementedError(kind)
   return ror
+
+
+def COUNT(y_true, y_pred, y_last, name, 
+          kind='all', threshold=0.0, fees=0.0, random_guess=None):
+  ror = ROR(y_true=y_true, y_pred=y_pred, y_last=y_last, name=name, 
+            kind=kind, threshold=threshold, fees=fees, random_guess=random_guess)
+  if ror > 0:
+    count = 1
+  elif ror < 0:
+    count = -1
+  else:  # ror == 0
+    count = 0
+  return count
