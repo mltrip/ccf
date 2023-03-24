@@ -133,6 +133,15 @@ def initialize_time(start, stop, size, quant):
       stop = time.time_ns() + stop
     elif isinstance(stop, datetime):
       stop = int(stop.timestamp())*int(10**9)
+  elif start is not None and stop is not None and size is None and quant is None:
+    if isinstance(start, int) and start < 0:
+      start = time.time_ns() + start
+    elif isinstance(start, datetime):
+      start = int(start.timestamp())*int(10**9)
+    if isinstance(stop, int) and stop < 0:
+      stop = time.time_ns() + stop
+    elif isinstance(stop, datetime):
+      stop = int(stop.timestamp())*int(10**9)
   # else:
   #   raise NotImplementedError(start, stop, size, quant)
   return start, stop, size, quant

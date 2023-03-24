@@ -3,7 +3,7 @@ defaults:
  
 executor:
   class: ProcessPoolExecutor
-  max_workers: 1
+  max_workers: 1  # Set to number of agents
 agents:
   influxb:
     class: MetricInfluxDB
@@ -22,13 +22,13 @@ agents:
         # exponential_base: 2
     executor:
       class: ProcessPoolExecutor
-      max_workers: 5
+      max_workers: 6  # Set max_workers to number of metrics and reduce batch_size to ~ day/max_workers! 
+    batch_size: 600e9
     verbose: true
-    start: "2023-03-20T18:00:00+00:00"
-    stop: "2023-03-21T00:00:00+00:00"
+    start: "2023-03-22T23:00:00+00:00"
+    stop: "2023-03-24T00:00:00+00:00"
     quant: 3e9
     watermark: 9e9
-    batch_size: 86400e9
     keys: [ binance-btc-usdt ]
     metrics:
       # - class: sklearn.metrics.mean_absolute_error
@@ -55,6 +55,11 @@ agents:
         name: ROR-all-0.002-0
         kind: all
         threshold: 0.002
+        fees: 0
+      - class: COUNT
+        name: COUNT-all-0.0002-0
+        kind: all
+        threshold: 0.0002
         fees: 0
       - class: ROR
         name: ROR-all-0.0002-0
