@@ -1,0 +1,30 @@
+defaults:
+  - partitioner@agents.one.consumer_partitioner: prediction
+  - partitioner@agents.one.producer_partitioner: metric
+  - _self_
+ 
+executor:
+  class: ThreadPoolExecutor
+  max_workers: 1
+agents:
+  one:
+    class: MomentumTrader
+    strategy: simple_momentum_100
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    threshold: 2e-4  # 1e-4, 2e-4, 3e-4
+    num_forecasts: 3
+    num_d_forecasts: 2
+    num_d2_forecasts: 0
+    quantity: 100
+    is_base_quantity: false
+    # position: short
+    consumer:
+      bootstrap_servers: "kafka:9092"
+    producer:
+      bootstrap_servers: "kafka:9092"
+    
