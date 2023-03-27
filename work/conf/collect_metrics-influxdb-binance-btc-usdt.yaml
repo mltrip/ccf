@@ -2,26 +2,44 @@ defaults:
   - _self_
  
 executor:
-  class: ThreadPoolExecutor
-  max_workers: 1
+  class: ProcessPoolExecutor
+  max_workers: 1  # Set to number of agents
 agents:
   influxb:
     class: MetricInfluxDB
+    client:
+      verify_ssl: false
+      timeout: 3000000
+    write_api:
+      write_options:
+        batch_size: 1000
+        # flush_interval: 1000
+        # jitter_interval: 2000
+        # retry_interval: 5000
+        # max_retries: 5
+        # max_retry_delay: 30000
+        # max_close_wait: 300000
+        # exponential_base: 2
     executor:
-      class: ThreadPoolExecutor
-      max_workers: 2
+      class: ProcessPoolExecutor
+      max_workers: 6  # Set max_workers to number of metrics and reduce batch_size to ~ day/max_workers! 
+    batch_size: 600e9
     verbose: true
-    start: "2023-03-21T02:40:00+00:00"
-    stop: "2023-03-21T02:55:00+00:00"
+    start: "2023-03-22T23:00:00+00:00"
+    stop: "2023-03-24T00:00:00+00:00"
     quant: 3e9
     watermark: 9e9
-    batch_size: 60e9
     keys: [ binance-btc-usdt ]
     metrics:
       # - class: sklearn.metrics.mean_absolute_error
       #   name: MAE
       # - class: MASE
       #   name: MASE
+      - class: COUNT
+        name: COUNT-all-0-0
+        kind: all
+        threshold: 0
+        fees: 0
       - class: ROR
         name: ROR-all-0-0
         kind: all
@@ -33,20 +51,25 @@ agents:
         threshold: 0
         fees: 0
         random_guess: 1.0
-      # - class: ROR
-      #   name: ROR-all-0.002-0
-      #   kind: all
-      #   threshold: 0.002
-      #   fees: 0
+      - class: ROR
+        name: ROR-all-0.002-0
+        kind: all
+        threshold: 0.002
+        fees: 0
+      - class: COUNT
+        name: COUNT-all-0.0002-0
+        kind: all
+        threshold: 0.0002
+        fees: 0
+      - class: ROR
+        name: ROR-all-0.0002-0
+        kind: all
+        threshold: 0.0002
+        fees: 0
       # - class: ROR
       #   name: ROR-all-0.0015-0
       #   kind: all
       #   threshold: 0.0015
-      #   fees: 0
-      # - class: ROR
-      #   name: ROR-all-0.0001-0
-      #   kind: all
-      #   threshold: 0.0001
       #   fees: 0
       # - class: ROR
       #   name: ROR-all-0.002-0.002
