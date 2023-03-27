@@ -165,13 +165,13 @@ class DeltaInfluxDB(InfluxDB):
         exchange, base, quote = key.split('-')
         if topic == 'lob':
           stream = self.get_lob_batch_stream(query_api, bucket=self.bucket, 
-                                             start=self.start, stop=self.stop, 
+                                             start=start, stop=stop, 
                                              batch_size=self.batch_size,
                                              exchange=exchange, base=base, quote=quote, 
                                              verbose=self.verbose)
         elif topic == 'trade':
           stream = self.get_trade_batch_stream(query_api, bucket=self.bucket, 
-                                               start=self.start, stop=self.stop, 
+                                               start=start, stop=stop, 
                                                batch_size=self.batch_size,
                                                exchange=exchange, base=base, quote=quote, 
                                                verbose=self.verbose)
@@ -210,7 +210,8 @@ class DeltaInfluxDB(InfluxDB):
             except StopIteration:
               break
           # Sink buffer
-          buffer = [x for x in self.buffer if x['timestamp'] > watermark_t]
+          buffer = [x for x in buffer if x['timestamp'] > watermark_t]
+          topic_key_buffers[topic][key] = buffer
       cur_t = next_t
       # Extract features
       evaluate_features_delta_ema_qv_vwap(topic_key_buffers, topic_key_dataframes, topic_key_features,
