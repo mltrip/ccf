@@ -69,6 +69,22 @@ def wait_first_future(executor, futures):
       kill_child_processes(os.getpid())
 
       
+def loop_futures(executor, futures):
+  for f in futures:
+    executor.submit(f)
+  for f in concurrent.futures.as_completed(futures):
+    try:
+      r = f.result()
+    except Exception as e:
+      print(f'Exception of {f}: {e}')
+    else:
+      print(f'Result of {f}: {r}')
+    finally:
+      executor.shutdown(wait=False, cancel_futures=True)
+      kill_child_processes(os.getpid())
+      loop(executor, futures)
+      
+      
 def initialize_time(start, stop, size, quant):
   """Convert different combinations of start/stop/size/quant to Unix time in nanoseconds"""
   if start is not None:
