@@ -103,21 +103,34 @@ class Trader(Agent):
                                timestamp=timestamp, timeout=timeout, exchange=exchange)
 
   def get_ticker_orderbook(self, ws, symbols=None, timeout=None, exchange=None):
-    if symbols is not None:
-      if isinstance(symbols, str):
-        params = {"symbol": symbols}
-      elif isinstance(symbols, list):
-        params = {"symbols": symbols}
+    if exchange == 'binance':
+      key_map = {'bidPrice': 'b_p_0', 
+                 'bidQty': 'b_q_0', 
+                 'askPrice': 'a_p_0',
+                 'askQty': 'a_q_0'}
+      if symbols is not None:
+        if isinstance(symbols, str):
+          params = {"symbol": symbols}
+        elif isinstance(symbols, list):
+          params = {"symbols": symbols}
+        else:
+          raise ValueError(symbols)
       else:
-        raise ValueError(symbols)
+        params = None
+      result = self.send_request(ws, 'ticker.book', params, 
+                                 add_api_key=False, add_signature=False, 
+                                 timeout=timeout, exchange=exchange)
+      if result is not None:
+        result = {key_map.get(k, k): v for k, v in result.items()}
     else:
-      params = None
-    result = self.send_request(ws, 'ticker.book', params, 
-                               add_api_key=False, add_signature=False, 
-                               timeout=timeout, exchange=exchange)
+      raise NotImplementedError(exchange)
     if result is not None:
-      for key in ['bidPrice', 'bidQty', 'askPrice', 'askQty']:
-        result[key] = float(result[key])
+      for key in result:
+        if key in ['b_p_0', 'b_q_0', 'a_p_0', 'a_q_0']:
+          result[key] = float(result[key])
+      result['m_p'] = 0.5*(result['a_p_0'] + result['b_p_0'])
+      result['s_p'] = result['a_p_0'] - result['b_p_0']
+      result['s_p-m_p'] = result['s_p'] / result['m_p']
     return result
   
   def get_ticker_price(self, ws, symbols=None, timeout=None, exchange=None):
@@ -134,7 +147,7 @@ class Trader(Agent):
                              add_api_key=False, add_signature=False, 
                              timeout=timeout, exchange=exchange)
   
-  def buy_market(self, ws, symbol, quantity, is_base_quantity=True, is_test=False,
+  def buy_taker(self, ws, symbol, quantity, is_base_quantity=True, is_test=False,
                  recv_window=5000, timeout=None, exchange=None):
     params = {
         "symbol": symbol,
@@ -150,9 +163,29 @@ class Trader(Agent):
     return self.send_request(ws, method, params,
                              timestamp=timestamp, recv_window=recv_window, 
                              timeout=timeout, exchange=exchange)
+  
+  def buy_maker(self, ws, symbol, price, quantity, time_in_force='GTC', 
+                is_base_quantity=True, is_test=False,
+                recv_window=5000, timeout=None, exchange=None):
+    params = {
+        "symbol": symbol,
+        "side": "BUY",
+        "type": "LIMIT",
+        "price": price,
+        "timeInForce": time_in_force
+    }
+    if is_base_quantity:
+      params['quantity'] = quantity
+    else:  # quote
+      params['quoteOrderQty'] = quantity
+    timestamp = int(time.time_ns()/1e6)
+    method = 'order.place' if not is_test else 'order.test'
+    return self.send_request(ws, method, params,
+                             timestamp=timestamp, recv_window=recv_window, 
+                             timeout=timeout, exchange=exchange)
     
-  def sell_market(self, ws, symbol, quantity, is_base_quantity=True, is_test=False,
-                  recv_window=5000, timeout=None, exchange=None):
+  def sell_taker(self, ws, symbol, quantity, is_base_quantity=True, is_test=False,
+                 recv_window=5000, timeout=None, exchange=None):
     params = {
         "symbol": symbol,
         "side": "SELL",
@@ -168,13 +201,68 @@ class Trader(Agent):
                              timestamp=timestamp, recv_window=recv_window, 
                              timeout=timeout, exchange=exchange)
   
+  def sell_maker(self, ws, symbol, price, quantity, time_in_force='GTC', 
+                 is_base_quantity=True, is_test=False,
+                 recv_window=5000, timeout=None, exchange=None):
+    params = {
+        "symbol": symbol,
+        "side": "SELL",
+        "type": "LIMIT",
+        "price": price,
+        "timeInForce": time_in_force
+    }
+    if is_base_quantity:
+      params['quantity'] = quantity
+    else:  # quote
+      params['quoteOrderQty'] = quantity
+    timestamp = int(time.time_ns()/1e6)
+    method = 'order.place' if not is_test else 'order.test'
+    return self.send_request(ws, method, params,
+                             timestamp=timestamp, recv_window=recv_window, 
+                             timeout=timeout, exchange=exchange)
+  
+  def current_open_orders(self, ws, symbol, recv_window=5000, timeout=None, exchange=None):
+    params = {"symbol": symbol}
+    method = 'openOrders.status'
+    timestamp = int(time.time_ns()/1e6)
+    return self.send_request(ws, method, params,
+                             timestamp=timestamp, recv_window=recv_window, 
+                             timeout=timeout, exchange=exchange)
+  
+  def query_order(self, ws, symbol, order_id, recv_window=5000, timeout=None, exchange=None):
+    params = {
+      "symbol": symbol,
+      "orderId": order_id
+    }
+    method = 'order.status'
+    timestamp = int(time.time_ns()/1e6)
+    return self.send_request(ws, method, params,
+                             timestamp=timestamp, recv_window=recv_window, 
+                             timeout=timeout, exchange=exchange)
+  
+  def cancel_order(self, ws, symbol, client_order_id, recv_window=5000, timeout=None, exchange=None):
+    params = {
+      "symbol": symbol,
+      "origClientOrderId": client_order_id
+    }
+    method = 'order.cancel'
+    timestamp = int(time.time_ns()/1e6)
+    return self.send_request(ws, method, params,
+                             timestamp=timestamp, recv_window=recv_window, 
+                             timeout=timeout, exchange=exchange)
+  
+  def cancel_open_orders(self, ws, symbol, recv_window=5000, timeout=None, exchange=None):
+    params = {"symbol": symbol}
+    method = 'openOrders.cancelAll'
+    timestamp = int(time.time_ns()/1e6)
+    return self.send_request(ws, method, params,
+                             timestamp=timestamp, recv_window=recv_window, 
+                             timeout=timeout, exchange=exchange)
+  
+  
   def buy_oco(self, ws, symbol, quantity, price, stop_price, stop_limit_price,
               time_in_force='GTC', new_order_resp_type='RESULT',
               recv_window=5000, timeout=None, exchange=None):
-    # time_in_force
-    # GTC Good 'til Canceled – the order will remain on the book until you cancel it, or the order is completely filled.
-    # IOC Immediate or Cancel – the order will be filled for as much as possible, the unfilled quantity immediately expires.
-    # FOK Fill or Kill – the order will expire unless it cannot be immediately filled for the entire quantity.
     # newOrderRespType Select response format: ACK, RESULT, FULL.
     # MARKET and LIMIT orders use FULL by default, other order types default to ACK.
     # BUY price < market price < stopPrice < stopLimitPrice
@@ -230,12 +318,30 @@ class MomentumTrader(Trader):
     consumer_partitioner=None, consumer=None, 
     producer_partitioner=None, producer=None, 
     timeout=None, 
-    start=None, stop=None, quant=None, size=None, watermark=None, delay=None,
+    start=None, stop=None, quant=None, size=None, watermark=None, delay=None, max_delay=None,
     feature=None, target=None, model=None, version=None, horizon=None, prediction=None,
-    threshold=0.0, num_forecasts=3, num_d_forecasts=2, num_d2_forecasts=0,
+    max_spread=None, is_max_spread_none_only=False, time_in_force='GTC', max_open_orders=None,
+    do_cancel_open_orders=True,
+    t_x=0.0, t_v=0.0, t_a=0.0, n_x=0, n_v=0, n_a=0, 
+    b_t_fs=None, s_t_fs=None, b_m_fs=None, s_m_fs=None,
     quantity=None, is_base_quantity=True, position='none',
     is_test=False, verbose=False
   ):
+    """Momentum Trader
+    time_in_force
+    * GTC Good 'til Canceled – the order will remain on the book until you cancel it, or the order is completely filled.
+    * IOC Immediate or Cancel – the order will be filled for as much as possible, the unfilled quantity immediately expires.
+    * FOK Fill or Kill – the order will expire unless it cannot be immediately filled for the entire quantity.
+    status
+    * NEW – The order has been accepted by the engine.
+    * PARTIALLY_FILLED – A part of the order has been filled.
+    * FILLED – The order has been completed.
+    * CANCELED – The order has been canceled by the user.
+    * PENDING_CANCEL – Currently unused
+    * REJECTED – The order was not accepted by the engine and not processed.
+    * EXPIRED – The order was canceled according to the order type's rules (e.g. LIMIT FOK orders with no fill, LIMIT IOC or MARKET orders that partially fill) or by the exchange, (e.g. orders canceled during liquidation, orders canceled during maintenance)
+    * EXPIRED_IN_MATCH – The order was canceled by the exchange due to STP trigger. (e.g. an order with EXPIRE_TAKER will match with existing orders on the book with the same account or same tradeGroupId)
+    """
     super().__init__(strategy=strategy, api_url=api_url, api_key=api_key, secret_key=secret_key)
     self.key = key
     self.prediction_topic = prediction_topic
@@ -255,16 +361,28 @@ class MomentumTrader(Trader):
     self.size = size
     self.watermark = int(watermark) if watermark is not None else watermark
     self.delay = delay
+    self.max_delay = max_delay
     self.model = model
     self.version = version
     self.feature = feature
     self.target = target
     self.horizon = horizon
     self.prediction = prediction
-    self.threshold = threshold
-    self.num_forecasts = num_forecasts
-    self.num_d_forecasts = num_d_forecasts
-    self.num_d2_forecasts = num_d2_forecasts
+    self.max_spread = max_spread
+    self.is_max_spread_none_only = is_max_spread_none_only
+    self.do_cancel_open_orders = do_cancel_open_orders
+    self.time_in_force = time_in_force
+    self.max_open_orders = max_open_orders
+    self.t_x = t_x
+    self.t_v = t_v
+    self.t_a = t_a
+    self.n_x = n_x
+    self.n_v = n_v
+    self.n_a = n_a
+    self.b_t_fs = [] if b_t_fs is None else b_t_fs
+    self.s_t_fs = [] if s_t_fs is None else s_t_fs
+    self.b_m_fs = [] if b_m_fs is None else b_m_fs
+    self.s_m_fs = [] if s_m_fs is None else s_m_fs
     self.quantity = quantity
     self.is_base_quantity = is_base_quantity
     self.position = position
@@ -319,10 +437,13 @@ class MomentumTrader(Trader):
     base_symbol = base.upper()
     quote_symbol = quote.upper()
     last_timestamp = None
-    last_price = None
-    last_quantity = None
-    threshold_up = 1 + self.threshold
-    threshold_down = 1 - self.threshold
+    order_id = None
+    base_balance = 0.0
+    quote_balance = 0.0
+    if self.do_cancel_open_orders:
+      cancel_result = self.cancel_open_orders(
+        self._ws, symbol, timeout=self.timeout, exchange=exchange)
+      pprint(cancel_result)
     for message in self._consumer:
       try:
         value = message.value
@@ -352,16 +473,41 @@ class MomentumTrader(Trader):
           ticker_orderbook = self.get_ticker_orderbook(
             self._ws, symbol, self.timeout, exchange=exchange)
           buffer.setdefault(timestamp, {}).update(ticker_orderbook)
+          prediction_timestamp = timestamp - self.horizon*self.quant
           current_timestamp = time.time_ns()
           watermark_timestamp = current_timestamp - self.watermark
-          print(f'\ntrade')
+          print(f'\ntrade {self.strategy}')
           print(f'watermark:  {datetime.fromtimestamp(watermark_timestamp/1e9, tz=timezone.utc)}')
+          print(f'prediction: {datetime.fromtimestamp(prediction_timestamp/1e9, tz=timezone.utc)}')
           print(f'now:        {datetime.fromtimestamp(current_timestamp/1e9, tz=timezone.utc)}')
           print(f'last:       {datetime.fromtimestamp(last_timestamp/1e9, tz=timezone.utc)}')
           print(f'current:    {datetime.fromtimestamp(timestamp/1e9, tz=timezone.utc)}')
           print(f'buffer:     {len(buffer)}')
           buffer = {k: v for k, v in buffer.items() if k > watermark_timestamp}
           print(f'new_buffer: {len(buffer)}')
+          if self.max_delay is not None:
+            delay = current_timestamp - prediction_timestamp
+            if delay > self.max_delay:
+              print(f'Skipping: delay {delay} > {self.max_delay}')
+              continue
+          if self.max_spread is not None:
+            spread = ticker_orderbook['s_p-m_p']
+            do_skip = False
+            if spread > self.max_spread:
+              if self.is_max_spread_none_only:
+                if self.position == 'none':
+                  do_skip = True
+              else:  # any position 
+                do_skip = True
+            if do_skip:
+              print(f'Skipping: spread {spread} > {self.max_spread} and position {self.position}')
+              continue
+          # if self.max_open_orders is not None:
+          #   if n_open_orders >= self.max_open_orders:
+          #     print(f'Skipping: number of open orders {n_open_orders} >= {self.max_open_orders}')
+          #     continue
+          #  self.cancel_open_orders(
+          #  self._ws, symbol, timeout=self.timeout, exchange=exchange)
           df = pd.DataFrame(buffer.values())
           if len(df) == 0:
             continue
@@ -371,124 +517,238 @@ class MomentumTrader(Trader):
           print(f'max:        {df.index.max()}')
           print(f'rows:       {len(df)}')
           print(f'columns:    {len(df.columns)}')
-          if self.verbose:
+          if self.verbose > 1:
             print(df)
           if self.prediction in df:
-            df['midPrice'] = df[['askPrice', 'bidPrice']].mean(axis=1)
-            df['forecast_last'] = df[self.prediction] / df['last']
-            df['forecast_mid'] = df[self.prediction] / df['midPrice']
-            df['d_forecast_last'] = df['forecast_last'] - df['forecast_last'].shift(1)
-            df['d2_forecast_last'] = df['d_forecast_last'] - df['d_forecast_last'].shift(1)
-            df['d_forecast_mid'] = df['forecast_mid'] - df['forecast_mid'].shift(1)
-            df['d2_forecast_mid'] = df['d_forecast_mid'] - df['d_forecast_mid'].shift(1)
-            flag_forecasts_last_up = False if self.num_forecasts != 0 else True
-            flag_forecasts_mid_up = False if self.num_forecasts != 0 else True 
-            flag_forecasts_last_down = False if self.num_forecasts != 0 else True
-            flag_forecasts_mid_down = False if self.num_forecasts != 0 else True
-            flag_d_forecasts_last_up = False if self.num_d_forecasts != 0 else True
-            flag_d_forecasts_mid_up = False if self.num_d_forecasts != 0 else True
-            flag_d_forecasts_last_down = False if self.num_d_forecasts != 0 else True
-            flag_d_forecasts_mid_down = False if self.num_d_forecasts != 0 else True
-            flag_d2_forecasts_last_up = False if self.num_d2_forecasts != 0 else True
-            flag_d2_forecasts_mid_up = False if self.num_d2_forecasts != 0 else True
-            flag_d2_forecasts_last_down = False if self.num_d2_forecasts != 0 else True
-            flag_d2_forecasts_mid_down = False if self.num_d2_forecasts != 0 else True
-            if self.num_forecasts > 0 and len(df) >= self.num_forecasts:
-              flag_forecasts_last_up = all(df['forecast_last'][-self.num_forecasts:] > threshold_up)
-              flag_forecasts_mid_up = all(df['forecast_mid'][-self.num_forecasts:] > threshold_up)
-              flag_forecasts_last_down = all(df['forecast_last'][-self.num_forecasts:] < threshold_down)
-              flag_forecasts_mid_down = all(df['forecast_mid'][-self.num_forecasts:] < threshold_down)
-            if self.num_d_forecasts > 0 and len(df) >= self.num_d_forecasts:
-              flag_d_forecasts_last_up = all(df['d_forecast_last'][-self.num_d_forecasts:] > 0)
-              flag_d_forecasts_mid_up = all(df['d_forecast_mid'][-self.num_d_forecasts:] > 0)
-              flag_d_forecasts_last_down = all(df['d_forecast_last'][-self.num_d_forecasts:] < 0)
-              flag_d_forecasts_mid_down = all(df['d_forecast_mid'][-self.num_d_forecasts:] < 0)
-            if self.num_d2_forecasts > 0 and len(df) >= self.num_d2_forecasts:
-              flag_d2_forecasts_last_up = all(df['d2_forecast_last'][-self.num_d2_forecasts:] > 0)
-              flag_d2_forecasts_mid_up = all(df['d2_forecast_mid'][-self.num_d2_forecasts:] > 0)
-              flag_d2_forecasts_last_down = all(df['d2_forecast_last'][-self.num_d2_forecasts:] < 0)
-              flag_d2_forecasts_mid_down = all(df['d2_forecast_mid'][-self.num_d2_forecasts:] < 0)
-            if all([self.position != 'long',
-                    flag_forecasts_last_down, 
-                    flag_forecasts_mid_down,
-                    flag_d_forecasts_last_up,
-                    flag_d_forecasts_mid_up,
-                    flag_d2_forecasts_last_up,
-                    flag_d2_forecasts_mid_up]):
-              action = 'buy'
-              self.position = 'long' if self.position == 'none' else 'none'
-              result = self.buy_market(self._ws, 
-                                       symbol, 
-                                       quantity=self.quantity, 
-                                       is_base_quantity=self.is_base_quantity, 
-                                       is_test=self.is_test,
+            t_cs = ['last', 'm_p', 'a_p_0', 'b_p_0']
+            x_cs = [f'x_{x}' for x in t_cs]
+            v_cs = [f'v_{x}' for x in t_cs]
+            a_cs = [f'a_{x}' for x in t_cs]
+            for x_c, t_c in zip(x_cs, t_cs):
+              df[x_c] = df[self.prediction] / df[t_c] - 1.0
+            for v_c, x_c in zip(v_cs, x_cs):
+              df[v_c] = df[x_c] - df[x_c].shift(1)
+            for a_c, v_c in zip(a_cs, v_cs):
+              df[a_c] = df[v_c] - df[v_c].shift(1)
+            # Flags
+            flags = {x: [None for _ in range(3)] for x in t_cs}  
+            for i, (n, t, cs) in enumerate([[self.n_x, self.t_x, x_cs], 
+                                            [self.n_v, self.t_v, v_cs],
+                                            [self.n_a, self.t_a, a_cs]]):
+              if n != 0 and len(df) >= n:
+                for c, t_c in zip(cs, t_cs):
+                  if all(df[c][-n:] > t):
+                    flag = 1
+                  elif all(df[c][-n:] < -t):
+                    flag = -1
+                  else:
+                    flag = 0
+                  flags[t_c][i] = flag
+            # Check
+            is_b_t = False
+            for f in self.b_t_fs:
+              if f == flags['a_p_0']:
+                is_b_t = True
+                print(f'is_b_t {is_b_t}: {f}')
+                break
+            is_b_m = False
+            for f in self.b_m_fs:
+              if f == flags['b_p_0']:
+                is_b_m = True
+                print(f'is_b_m {is_b_m}: {f}')
+                break
+            is_s_t = False
+            for f in self.s_t_fs:
+              if f == flags['b_p_0']:
+                is_s_t = True
+                print(f'is_s_t {is_s_t}: {f}')
+                break
+            is_s_m = False
+            for f in self.s_m_fs:
+              if f == flags['a_p_0']:
+                is_s_m = True
+                print(f'is_s_m {is_s_m}: {f}')
+                break
+            if self.verbose:
+              print(df[['s_p-m_p', 
+                        'x_b_p_0', 'x_m_p', 'x_a_p_0', 
+                        'v_b_p_0', 'v_m_p', 'v_a_p_0',
+                        'a_b_p_0', 'a_m_p', 'a_a_p_0']])
+            pprint(ticker_orderbook)
+            # Act
+            # Evaluate order
+            print(f'Position: {self.position}')
+            print(f'Active order: {order_id}')
+            if order_id is not None:
+              order = self.query_order(self._ws, symbol, order_id, 
                                        timeout=self.timeout, 
                                        exchange=exchange)
-              pprint(result)
-            elif all([self.position != 'short',
-                    flag_forecasts_last_up, 
-                    flag_forecasts_mid_up,
-                    flag_d_forecasts_last_down,
-                    flag_d_forecasts_mid_down,
-                    flag_d2_forecasts_last_down,
-                    flag_d2_forecasts_mid_down]):
-              action = 'sell'
-              self.position = 'short' if self.position == 'none' else 'none'
-              result = self.sell_market(self._ws,
-                                        symbol, 
+              pprint(order)
+              order_side = order['side']
+              order_status = order['status']
+              if order_status in ['FILLED']:
+                if order_side == 'BUY':
+                  if self.position == 'none':
+                    self.position = 'long'
+                  elif self.position == 'short':
+                    self.position = 'none'
+                  else:
+                    raise ValueError(f"Position can't be {self.position}!")
+                else:  # SELL
+                  if self.position == 'none':
+                    self.position = 'short'
+                  elif self.position == 'long':
+                    self.position = 'none'
+                  else:
+                    raise ValueError(f"Position can't be {self.position}!")
+                quote_quantity = float(order.get('cummulativeQuoteQty', 0.0))  # origQty
+                base_quantity = float(order.get('executedQty', 0.0))
+                if order_side == 'BUY':
+                  quote_quantity = -quote_quantity
+                  base_quantity = -base_quantity
+                base_balance += base_quantity
+                quote_balance += quote_quantity
+                value = {
+                  'metric': 'trade',
+                  'timestamp': current_timestamp,
+                  'exchange': exchange,
+                  'base': base,
+                  'quote': quote,
+                  'quant': self.quant,
+                  'feature': self.feature,
+                  'prediction': self.prediction,
+                  'horizon': self.horizon,
+                  'model': self.model,
+                  'version': self.version,
+                  'target': self.target,
+                  'strategy': self.strategy,
+                  'n_x': self.n_x,
+                  'n_v': self.n_v,
+                  'n_a': self.n_a,
+                  't_x': self.t_x,
+                  't_v': self.t_v,
+                  't_a': self.t_a,
+                  'base_balance': base_balance,
+                  'quote_balance': quote_balance,
+                  'base_quantity': base_quantity,
+                  'quote_quantity': quote_quantity,
+                  'quantity': self.quantity,
+                  'is_base_quantity': self.is_base_quantity,
+                  'position': self.position,
+                  'action': order_side.lower(),
+                  'api_url': self.api_url,
+                  'api_key': self.api_key
+                }
+                # Get status
+                account_status = self.get_account_status(
+                  self._ws, timeout=self.timeout, exchange=exchange)
+                if self.verbose:
+                  print(account_status)
+                for b in account_status.get('balances'):
+                  asset = b['asset']
+                  if asset in [base_symbol, quote_symbol]:
+                    value[f'free_{asset}'] = float(b['free'])
+                    value[f'locked_{asset}'] = float(b['locked'])
+                if self.verbose:
+                  pprint(value)
+                if not self.is_test:
+                  self._producer.send(topic=self.metric_topic, key=self.key, value=value)
+                order, order_id = None, None
+              elif order_status in ['NEW', 'PARTIALLY_FILLED']:  # Process
+                do_b_t = self.position != 'long' and is_b_t
+                do_b_m = self.position != 'long' and is_b_m
+                do_s_t = self.position != 'short' and is_s_t
+                do_s_m = self.position != 'short' and is_s_m
+                do_a = any([do_b_t, do_b_m, do_s_t, do_s_m])
+                print(f'Order {order_id} in process with status: {order_status}')
+                if do_a:  # act
+                  print(f'Cancel order {order_id}')
+                  client_order_id = order['clientOrderId']
+                  self.cancel_order(self._ws, symbol, client_order_id, 
+                                    timeout=self.timeout, exchange=exchange)
+                  order, order_id = None, None
+                else:  # hold
+                  print(f'Check order {order_id}')
+                  order_type = order['type']
+                  if order_type == 'LIMIT':
+                    order_side = order['side']
+                    client_order_id = order['clientOrderId']
+                    order_price = float(order['price'])
+                    current_bid = ticker_orderbook['b_p_0']
+                    current_ask = ticker_orderbook['a_p_0']
+                    if order_side == 'BUY' and order_price != current_bid:
+                      self.cancel_order(self._ws, symbol, client_order_id, 
+                                        timeout=self.timeout, exchange=exchange)
+                      order, order_id = None, None
+                      print(f'Cancel {order_side} order with price {order_price} != {current_bid} top bid')
+                    elif order_side == 'SELL' and order_price != current_ask:
+                      self.cancel_order(self._ws, symbol, client_order_id, 
+                                        timeout=self.timeout, exchange=exchange)
+                      order, order_id = None, None
+                      print(f'Cancel {order_side} order with price {order_price} != {current_ask} top ask')  
+              else:  # End
+                print(f'Order {order_id} ends with status: {order_status}')
+                order, order_id = None, None
+            print(f'Position: {self.position}')
+            print(f'Active order: {order_id}')
+            do_b_t = self.position != 'long' and is_b_t
+            do_b_m = self.position != 'long' and is_b_m
+            do_s_t = self.position != 'short' and is_s_t
+            do_s_m = self.position != 'short' and is_s_m
+            do_a = any([do_b_t, do_b_m, do_s_t, do_s_m])
+            print(f'Action: {do_a}')
+            if do_a and order_id is None:
+              if do_b_t:
+                print('buy_taker')
+                result = self.buy_taker(self._ws, 
+                                         symbol, 
+                                         quantity=self.quantity, 
+                                         is_base_quantity=self.is_base_quantity, 
+                                         is_test=self.is_test,
+                                         timeout=self.timeout, 
+                                         exchange=exchange)
+              elif do_b_m:
+                print('buy_maker')
+                result = self.buy_maker(self._ws, 
+                                        symbol,
+                                        price=ticker_orderbook['b_p_0'],
+                                        time_in_force=self.time_in_force,
                                         quantity=self.quantity, 
                                         is_base_quantity=self.is_base_quantity, 
                                         is_test=self.is_test,
-                                        timeout=self.timeout,
+                                        timeout=self.timeout, 
                                         exchange=exchange)
+              elif do_s_t:
+                print('sell_taker')
+                result = self.sell_taker(self._ws,
+                                          symbol, 
+                                          quantity=self.quantity, 
+                                          is_base_quantity=self.is_base_quantity, 
+                                          is_test=self.is_test,
+                                          timeout=self.timeout,
+                                          exchange=exchange)
+              elif do_s_m:
+                print('sell_maker')
+                result = self.sell_maker(self._ws,
+                                         symbol, 
+                                         price=ticker_orderbook['a_p_0'],
+                                         time_in_force=self.time_in_force,
+                                         quantity=self.quantity, 
+                                         is_base_quantity=self.is_base_quantity, 
+                                         is_test=self.is_test,
+                                         timeout=self.timeout,
+                                         exchange=exchange)
+              else:
+                raise NotImplementedError()
+              order_id = result.get('orderId', None)
+              print(f'New order {order_id}')
               pprint(result)
-            else:  # hold
-              action = 'hold'
-              trade_timestamp = None
-            print(action, self.position)
-            if action in ['sell', 'buy']:
-              if self.verbose:
-                print(df['forecast_last'][-self.num_forecasts:])
-                print(df['d_forecast_last'][-self.num_d_forecasts:])
-              value = {
-                'metric': 'trade',
-                'timestamp': current_timestamp,
-                'exchange': exchange,
-                'base': base,
-                'quote': quote,
-                'quant': self.quant,
-                'feature': self.feature,
-                'prediction': self.prediction,
-                'horizon': self.horizon,
-                'model': self.model,
-                'version': self.version,
-                'target': self.target,
-                'strategy': self.strategy,
-                'threshold': self.threshold,
-                'num_forecasts': self.num_forecasts,
-                'num_d_forecasts': self.num_d_forecasts,
-                'num_d2_forecasts': self.num_d2_forecasts,
-                'quantity': self.quantity,
-                'is_base_quantity': self.is_base_quantity,
-                'position': self.position,
-                'action': action,
-                'api_url': self.api_url,
-                'api_key': self.api_key
-              }
-              account_status = self.get_account_status(
-                self._ws, timeout=self.timeout, exchange=exchange)
-              if self.verbose:
-                print(account_status)
-              for b in account_status.get('balances'):
-                asset = b['asset']
-                if asset in [base_symbol, quote_symbol]:
-                  value[f'free_{asset}'] = float(b['free'])
-                  value[f'locked_{asset}'] = float(b['locked'])
-              pprint(value)
-              self._producer.send(topic=self.metric_topic, key=self.key, value=value)
         last_timestamp = timestamp
       except Exception as e:
-        print(e)
+        raise e
+        # if not self.is_test:
+        #   print(e)
+        # else: 
     if self._consumer is not None:
       self._consumer.close()
     if self._ws is not None:
