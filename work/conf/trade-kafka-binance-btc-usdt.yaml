@@ -1,30 +1,110 @@
 defaults:
-  - partitioner@agents.one.consumer_partitioner: prediction
-  - partitioner@agents.one.producer_partitioner: metric
+  - partitioner@consumer_partitioner: prediction
+  - partitioner@producer_partitioner: metric
   - _self_
  
 executor:
-  class: ThreadPoolExecutor
-  max_workers: 1
+  class: ProcessPoolExecutor
+consumer:
+  bootstrap_servers: "kafka:9092"
+producer:
+  bootstrap_servers: "kafka:9092"
 agents:
-  one:
+  a1:
     class: MomentumTrader
-    strategy: simple_momentum_100
+    strategy: momentum-v_1-q_b_3em3-ms_2em6
     key: binance-btc-usdt
     is_test: false
     verbose: false
     horizon: 20
     prediction: 'quantile_0.5'
     watermark: 60e9
-    threshold: 2e-4  # 1e-4, 2e-4, 3e-4
-    num_forecasts: 3
-    num_d_forecasts: 2
-    num_d2_forecasts: 0
-    quantity: 100
-    is_base_quantity: false
-    # position: short
-    consumer:
-      bootstrap_servers: "kafka:9092"
-    producer:
-      bootstrap_servers: "kafka:9092"
+    max_delay: 30e9
+    max_spread: 2e-6
+    time_in_force: GTC  # GTC, IOC, FOK
+    quantity: 3e-3
+    is_base_quantity: true
+    t_x: 0.0
+    t_v: 2e-5
+    t_a: 0.0
+    n_x: 0
+    n_v: 1
+    n_a: 0
+    b_t_fs: [ [ ~, 1, ~] ]
+    s_t_fs: [ [ ~, -1, ~] ]
+    b_m_fs: [ ]
+    s_m_fs: [ ]
+  a2:
+    class: MomentumTrader
+    strategy: momentum-v_1-q_b_3em3-ms_1em3
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    max_delay: 30e9
+    max_spread: 1e-3
+    time_in_force: GTC  # GTC, IOC, FOK
+    quantity: 3e-3
+    is_base_quantity: true
+    t_x: 0.0
+    t_v: 2e-5
+    t_a: 0.0
+    n_x: 0
+    n_v: 1
+    n_a: 0
+    b_t_fs: [ [ ~, 1, ~] ]
+    s_t_fs: [ [ ~, -1, ~] ]
+    b_m_fs: [ ]
+    s_m_fs: [ ]
+  a3:
+    class: MomentumTrader
+    strategy: momentum-v_1-q_b_3em3
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    max_delay: 30e9
+    max_spread: ~
+    time_in_force: GTC  # GTC, IOC, FOK
+    quantity: 3e-3
+    is_base_quantity: true
+    t_x: 0.0
+    t_v: 2e-5
+    t_a: 0.0
+    n_x: 0
+    n_v: 1
+    n_a: 0
+    b_t_fs: [ [ ~, 1, ~] ]
+    s_t_fs: [ [ ~, -1, ~] ]
+    b_m_fs: [ ]
+    s_m_fs: [ ]
+  a4:
+    class: MomentumTrader
+    strategy: momentum-v_1-q_b_3em3-ms_2em6_none
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    max_delay: 30e9
+    max_spread: 2e-6
+    is_max_spread_none_only: true
+    time_in_force: GTC  # GTC, IOC, FOK
+    quantity: 3e-3
+    is_base_quantity: true
+    t_x: 0.0
+    t_v: 2e-5
+    t_a: 0.0
+    n_x: 0
+    n_v: 1
+    n_a: 0
+    b_t_fs: [ [ ~, 1, ~] ]
+    s_t_fs: [ [ ~, -1, ~] ]
+    b_m_fs: [ ]
+    s_m_fs: [ ]
     
