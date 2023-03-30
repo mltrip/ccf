@@ -440,6 +440,8 @@ class MomentumTrader(Trader):
     order_id = None
     base_balance = 0.0
     quote_balance = 0.0
+    last_base_balance = 0.0
+    last_quote_balance = 0.0
     if self.do_cancel_open_orders:
       cancel_result = self.cancel_open_orders(
         self._ws, symbol, timeout=self.timeout, exchange=exchange)
@@ -608,6 +610,14 @@ class MomentumTrader(Trader):
                   base_quantity = -base_quantity
                 base_balance += base_quantity
                 quote_balance += quote_quantity
+                if self.position == 'none':
+                  base_delta = base_balance - last_base_balance
+                  quote_delta = quote_balance - last_quote_balance
+                  last_base_balance = base_balance
+                  last_quote_balance = quote_balance
+                else:
+                  base_delta = None
+                  quote_delta = None
                 value = {
                   'metric': 'trade',
                   'timestamp': current_timestamp,
@@ -630,6 +640,8 @@ class MomentumTrader(Trader):
                   't_a': self.t_a,
                   'base_balance': base_balance,
                   'quote_balance': quote_balance,
+                  'base_delta': base_delta,
+                  'quote_delta': quote_delta,
                   'base_quantity': base_quantity,
                   'quote_quantity': quote_quantity,
                   'quantity': self.quantity,
@@ -745,10 +757,36 @@ class MomentumTrader(Trader):
               pprint(result)
         last_timestamp = timestamp
       except Exception as e:
+        print(e)
+        # Close position
+        if self.position != 'none':
+          ws = websocket.WebSocket()
+          ws.connect(self.api_url, timeout=self.timeout)
+          if self.position == 'short':
+            result = self.buy_taker(ws, 
+                                    symbol, 
+                                    quantity=self.quantity, 
+                                    is_base_quantity=self.is_base_quantity, 
+                                    is_test=self.is_test,
+                                    timeout=self.timeout, 
+                                    exchange=exchange)
+            pprint(result)
+          elif self.position == 'long':
+            result = self.sell_taker(ws,
+                                     symbol, 
+                                     quantity=self.quantity, 
+                                     is_base_quantity=self.is_base_quantity, 
+                                     is_test=self.is_test,
+                                     timeout=self.timeout,
+                                     exchange=exchange)
+            pprint(result)
+          self.position = 'none'
+          ws.close()
+        if self._consumer is not None:
+          self._consumer.close()
+        if self._ws is not None:
+          self._ws.close()
         raise e
-        # if not self.is_test:
-        #   print(e)
-        # else: 
     if self._consumer is not None:
       self._consumer.close()
     if self._ws is not None:
