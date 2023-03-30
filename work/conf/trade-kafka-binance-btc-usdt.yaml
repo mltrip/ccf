@@ -12,7 +12,7 @@ producer:
 agents:
   a1:
     class: MomentumTrader
-    strategy: momentum-v_1-q_b_3em3-ms_2em6
+    strategy: momentum-nv_1-tv_1em5-q_b_3em3-ms_2em6
     key: binance-btc-usdt
     is_test: false
     verbose: false
@@ -25,7 +25,7 @@ agents:
     quantity: 3e-3
     is_base_quantity: true
     t_x: 0.0
-    t_v: 2e-5
+    t_v: 1e-5
     t_a: 0.0
     n_x: 0
     n_v: 1
@@ -36,7 +36,7 @@ agents:
     s_m_fs: [ ]
   a2:
     class: MomentumTrader
-    strategy: momentum-v_1-q_b_3em3-ms_1em3
+    strategy: momentum-nv_1-tv_1em5-q_b_3em3-ms_1em5
     key: binance-btc-usdt
     is_test: false
     verbose: false
@@ -44,12 +44,12 @@ agents:
     prediction: 'quantile_0.5'
     watermark: 60e9
     max_delay: 30e9
-    max_spread: 1e-3
+    max_spread: 1e-5
     time_in_force: GTC  # GTC, IOC, FOK
     quantity: 3e-3
     is_base_quantity: true
     t_x: 0.0
-    t_v: 2e-5
+    t_v: 1e-5
     t_a: 0.0
     n_x: 0
     n_v: 1
@@ -60,7 +60,7 @@ agents:
     s_m_fs: [ ]
   a3:
     class: MomentumTrader
-    strategy: momentum-v_1-q_b_3em3
+    strategy: momentum-nv_1-tv_1em5-q_b_3em3
     key: binance-btc-usdt
     is_test: false
     verbose: false
@@ -73,7 +73,7 @@ agents:
     quantity: 3e-3
     is_base_quantity: true
     t_x: 0.0
-    t_v: 2e-5
+    t_v: 1e-5
     t_a: 0.0
     n_x: 0
     n_v: 1
@@ -84,7 +84,7 @@ agents:
     s_m_fs: [ ]
   a4:
     class: MomentumTrader
-    strategy: momentum-v_1-q_b_3em3-ms_2em6_none
+    strategy: momentum-nv_1-tv_1em5-q_b_3em3-ms_2em6_none
     key: binance-btc-usdt
     is_test: false
     verbose: false
@@ -98,7 +98,7 @@ agents:
     quantity: 3e-3
     is_base_quantity: true
     t_x: 0.0
-    t_v: 2e-5
+    t_v: 1e-5
     t_a: 0.0
     n_x: 0
     n_v: 1
@@ -107,4 +107,153 @@ agents:
     s_t_fs: [ [ ~, -1, ~] ]
     b_m_fs: [ ]
     s_m_fs: [ ]
-    
+  a5:
+    class: MomentumTrader
+    strategy: momentum-nv_1-tv_1em5-q_b_3em3-ms_1em5_none
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    max_delay: 30e9
+    max_spread: 1e-5
+    is_max_spread_none_only: true
+    time_in_force: GTC  # GTC, IOC, FOK
+    quantity: 3e-3
+    is_base_quantity: true
+    t_x: 0.0
+    t_v: 1e-5
+    t_a: 0.0
+    n_x: 0
+    n_v: 1
+    n_a: 0
+    b_t_fs: [ [ ~, 1, ~] ]
+    s_t_fs: [ [ ~, -1, ~] ]
+    b_m_fs: [ ]
+    s_m_fs: [ ]
+  a6:
+    class: MomentumTrader
+    strategy: momentum-nv_4-tv_1em5-q_b_3em3-ms_1em5_none
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    max_delay: 30e9
+    max_spread: 1e-5
+    is_max_spread_none_only: true
+    time_in_force: GTC  # GTC, IOC, FOK
+    quantity: 3e-3
+    is_base_quantity: true
+    t_x: 0.0
+    t_v: 0.0
+    t_a: 0.0
+    n_x: 0
+    n_v: 4
+    n_a: 0
+    b_t_fs: [ [ ~, 1, ~] ]
+    s_t_fs: [ [ ~, -1, ~] ]
+    b_m_fs: [ ]
+    s_m_fs: [ ]
+  a7:
+    class: MomentumTrader
+    strategy: momentum-nv_4-tv_1em5-q_b_3em3
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    max_delay: 30e9
+    max_spread: ~
+    is_max_spread_none_only: false
+    time_in_force: GTC  # GTC, IOC, FOK
+    quantity: 3e-3
+    is_base_quantity: true
+    t_x: 0.0
+    t_v: 0.0
+    t_a: 0.0
+    n_x: 0
+    n_v: 4
+    n_a: 0
+    b_t_fs: [ [ ~, 1, ~] ]
+    s_t_fs: [ [ ~, -1, ~] ]
+    b_m_fs: [ ]
+    s_m_fs: [ ]
+  a8:
+    class: MomentumTrader
+    strategy: momentum-nv_2-tv_1em5-q_b_3em3-ms_1em5_none
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    max_delay: 30e9
+    max_spread: 1e-5
+    is_max_spread_none_only: true
+    time_in_force: GTC  # GTC, IOC, FOK
+    quantity: 3e-3
+    is_base_quantity: true
+    t_x: 0.0
+    t_v: 1e-5
+    t_a: 0.0
+    n_x: 0
+    n_v: 2
+    n_a: 0
+    b_t_fs: [ [ ~, 1, ~] ]
+    s_t_fs: [ [ ~, -1, ~] ]
+    b_m_fs: [ ]
+    s_m_fs: [ ]
+  a9:
+    class: MomentumTrader
+    strategy: momentum-nv_6-tv_1em5-q_b_3em3
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    max_delay: 30e9
+    max_spread: ~
+    is_max_spread_none_only: true
+    time_in_force: GTC  # GTC, IOC, FOK
+    quantity: 3e-3
+    is_base_quantity: true
+    t_x: 0.0
+    t_v: 1e-5
+    t_a: 0.0
+    n_x: 0
+    n_v: 6
+    n_a: 0
+    b_t_fs: [ [ ~, 1, ~] ]
+    s_t_fs: [ [ ~, -1, ~] ]
+    b_m_fs: [ ]
+    s_m_fs: [ ]
+  a10:
+    class: MomentumTrader
+    strategy: momentum-nv_6-tv_1em5-q_b_3em3-ms_2em6_none
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    max_delay: 30e9
+    max_spread: 2e-6
+    is_max_spread_none_only: true
+    time_in_force: GTC  # GTC, IOC, FOK
+    quantity: 3e-3
+    is_base_quantity: true
+    t_x: 0.0
+    t_v: 1e-5
+    t_a: 0.0
+    n_x: 0
+    n_v: 6
+    n_a: 0
+    b_t_fs: [ [ ~, 1, ~] ]
+    s_t_fs: [ [ ~, -1, ~] ]
+    b_m_fs: [ ]
+    s_m_fs: [ ]
