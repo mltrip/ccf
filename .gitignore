@@ -136,6 +136,8 @@ celerybeat.pid
 .env.secret.mlflow
 .env.secret.model
 .env.secret.optuna
+.env.secret.trade*
+!.env.secret.trade.example
 .venv
 env/
 venv/

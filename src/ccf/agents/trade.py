@@ -758,8 +758,8 @@ class MomentumTrader(Trader):
         last_timestamp = timestamp
       except Exception as e:
         print(e)
-        # Close position
         if self.position != 'none':
+          print('Closing open positions after exception')
           ws = websocket.WebSocket()
           ws.connect(self.api_url, timeout=self.timeout)
           if self.position == 'short':
