@@ -1,10 +1,11 @@
 import concurrent.futures
+import os
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
 from ccf import agents as ccf_agents
-from ccf.utils import wait_first_future
+from ccf.utils import wait_first_future, kill_child_processes
 
 
 def trade(
@@ -40,9 +41,14 @@ def trade(
       r = f.result()
     except Exception as e:
       print(f'Exception of {n}: {e}')
-      # raise e
     else:
       print(f'Result of {n}: {r}')
+    finally:
+      print(f'Executor shutdown')
+      executor.shutdown(wait=False, cancel_futures=True)
+      print(f'Kill child processes')
+      kill_child_processes(os.getpid())
+  print('Done')
 
     
 @hydra.main(version_base=None)
