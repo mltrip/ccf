@@ -555,11 +555,12 @@ def get_data(start, exchange, base, quote,
   return df
     
   
-def train(hydra_config, model_name, model_version=None, model_stage=None,
+def train(hydra_config, 
+          model_name, model_version=None, model_stage=None,
           data_kwargs=None, model_kwargs=None, learn_kwargs=None, env_kwargs=None, 
-          split=0.75, n_envs=4, seed=None,
-          parent_name=None, parent_version=None, parent_stage=None,
-          is_tune=False, do_train=True, do_backtest=True, verbose=0):
+          split=0.75, n_envs=4, seed=None, verbose=0,
+          is_tune=False, parent_name=None, parent_version=None, parent_stage=None,
+          do_train=True, do_backtest=True):
   data_kwargs = {} if data_kwargs is None else data_kwargs
   env_kwargs = {} if env_kwargs is None else env_kwargs
   model_kwargs = {} if model_kwargs is None else model_kwargs
@@ -569,6 +570,9 @@ def train(hydra_config, model_name, model_version=None, model_stage=None,
                    **{f'model-{k}': v for k, v in model_kwargs.items()},
                    **{f'learn-{k}': v for k, v in learn_kwargs.items()},
                    **{'split': split, 'n_envs': n_envs, 'seed': seed,
+                      'model_name': model_name, 
+                      'model_version': model_version,
+                      'model_stage': model_stage,
                       'parent_name': parent_name, 
                       'parent_version': parent_version,
                       'parent_stage': parent_stage,
@@ -625,7 +629,7 @@ def train(hydra_config, model_name, model_version=None, model_stage=None,
       print('Training')  
       model.learn(**learn_kwargs)
       print('Saving model')
-      # model.save(model_name)
+      model.save(model_name)
       cwd = Path(hydra_config.runtime.cwd)
       conf_path = cwd / 'conf'
       config_name = hydra_config.job.config_name

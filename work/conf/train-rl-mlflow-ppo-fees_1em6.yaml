@@ -4,9 +4,9 @@ verbose: 0
 do_train: True
 do_backtest: True
 split: 0.75
-model_name: ppo-fees_1em5
+model_name: ppo-fees_1em6
 is_tune: True
-parent_name: ppo-fees_1em5
+parent_name: ppo-fees_1em6
 parent_version: ~  # last
 learn_kwargs:
   # tb_log_name: ppo-fees_1em5
@@ -17,10 +17,10 @@ learn_kwargs:
   progress_bar: True
 env_kwargs:
  cash: 30.0
- commission: 1e-5
+ commission: 1e-6
  window_size: 20
 data_kwargs:
-  # test_size: 10000
+  test_size: 10000
   reload: False
   start: '2023-03-20T00:00:00+00:00'
   stop: '2023-04-01T00:00:00+00:00'
