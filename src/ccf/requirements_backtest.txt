@@ -1,1 +1,1 @@
-backtesting=0.3.3
+backtesting==0.3.3

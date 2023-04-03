@@ -1,4 +1,4 @@
 gym==0.21.0
 stable-baselines3==1.7.0
 tqdm==4.64.1
-backtesting=0.3.3
+backtesting==0.3.3
