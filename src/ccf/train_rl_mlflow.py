@@ -326,6 +326,16 @@ class TradingEnv(gym.Env):
         )
 
         
+def preprocess_data(df, window_size, forecast_column='Forecast', price_column='Close'):
+  cols = [forecast_column, price_column]
+  df2 = df[cols][-window_size:]
+  df2[forecast_column] = df2[forecast_column] / df2[price_column]
+  x = df2.values  # returns a numpy array
+  scaler = preprocessing.StandardScaler(with_mean=True, with_std=True)
+  x_scaled = scaler.fit_transform(x)
+  return x_scaled
+        
+        
 class Episode:
     def __init__(self, episode_data, param: EnvParameter):
         if param.add_feature:
@@ -375,23 +385,9 @@ class Episode:
         self.bt.join()
 
     def observation(self):
-        # Columns
-        # cols = [x for x in self.strategy.data.df.columns if x.startswith('Norm')]  # Normalized
-        cols = ['Forecast', 'Close']
-        # Normalized
-        df = self.strategy.data.df[cols][-self.param.window_size:]
-        df['Forecast'] = df['Forecast'] / df['Close']
-        # print(df)
-        x = df.values # returns a numpy array
-        # min_max_scaler = preprocessing.MinMaxScaler()
-        scaler = preprocessing.StandardScaler(with_mean=True, with_std=True)
-        x_scaled = scaler.fit_transform(x)
-        # df = pd.DataFrame(x_scaled)
-        # print(df)
-        # x = scaler.inverse_transform(df.values)
-        # print(x)
-        # print(x_scaled)
-        return x_scaled
+        df = self.strategy.data.df
+        window_size = self.param.window_size
+        return preprocess_data(df, window_size)
 
     def reward(self):
         # sum of profit percentage

@@ -1,0 +1,66 @@
+defaults:
+  - partitioner@consumer_partitioner: prediction
+  - partitioner@producer_partitioner: metric
+  - _self_
+ 
+executor:
+  class: ProcessPoolExecutor
+consumer:
+  bootstrap_servers: "kafka:9092"
+producer:
+  bootstrap_servers: "kafka:9092"
+agents:
+  rl-ppo-fees_1em4-last-q_b_3em3-ms_1em4-none:
+    class: RLTrader
+    strategy: rl-ppo-fees_1em4-last-q_b_3em3-ms_1em4-none
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    window_size: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    max_delay: 30e9
+    max_spread: 1e-4
+    is_max_spread_none_only: true
+    quantity: 3e-3
+    is_base_quantity: true
+    kind_rl: 'auto_update'
+    model_name_rl: ppo-fees_1em4-last
+    model_version_rl: ~
+  rl-ppo-fees_1em4-last-q_b_3em3-ms_1em4:
+    class: RLTrader
+    strategy: rl-ppo-fees_1em4-last-q_b_3em3-ms_1em4
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    window_size: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    max_delay: 30e9
+    max_spread: 1e-4
+    is_max_spread_none_only: false
+    quantity: 3e-3
+    is_base_quantity: true
+    kind_rl: 'auto_update'
+    model_name_rl: ppo-fees_1em4-last
+    model_version_rl: ~
+  rl-ppo-fees_1em4-last-q_b_3em3:
+    class: RLTrader
+    strategy: rl-ppo-fees_1em4-last-q_b_3em3
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    window_size: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    max_delay: 30e9
+    max_spread: ~
+    is_max_spread_none_only: false
+    quantity: 3e-3
+    is_base_quantity: true
+    kind_rl: 'auto_update'
+    model_name_rl: ppo-fees_1em4-last
+    model_version_rl: ~

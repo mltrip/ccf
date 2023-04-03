@@ -1,0 +1,33 @@
+version: '3.3'
+
+services:
+  trade-kafka-binance-btc-usdt-rl:
+    image: ccf
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    networks:
+      - db
+      - mlflow
+    working_dir: /app/work
+    entrypoint: [ python ]
+    command: [ ../src/ccf/trade.py, -cd, conf, -cn, trade-kafka-binance-btc-usdt-rl ]
+    env_file:
+      - .env.secret.trade.binance.testnet
+    environment:
+      PYTHONPATH: /app/src
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_TRACKING_USERNAME: ccf
+    volumes:
+    # - binance_btc_usdt:/app/work
+      - ../work:/app/work
+    restart: always
+      
+networks:
+  db:
+    driver: bridge
+  mlflow:
+    driver: bridge
+    
+# volumes:
+#   binance_btc_usdt:
