@@ -432,7 +432,7 @@ if __name__ == "__main__":
                 # commission=3.5e-5,  # ~ 100 spread
                 # commission=1e-6,
                 # commission=1e-5,
-                commission=0.0, 
+                commission=1e-5, 
                 margin=1.0, 
                 exclusive_orders=False)
   

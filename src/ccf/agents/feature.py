@@ -403,11 +403,11 @@ def evaluate_delta_df(df, kind='lograt', columns_bottom=None, columns_up=None,
     b = df[column_bottom].shift(shift) if shift != 0 else df[column_bottom]
     us = df[columns_up_3]
     if kind == 'rel':
-      new_df = us.div(b, axis=0) - 1
+      new_df = us.div(b.replace({0: np.nan}), axis=0) - 1
     elif kind == 'rat':
-      new_df = us.div(b, axis=0)
+      new_df = us.div(b.replace({0: np.nan}), axis=0)
     elif kind == 'lograt':
-      new_df = us.log(u.div(b, axis=0))
+      new_df = us.log(u.div(b.replace({0: np.nan}), axis=0))
     new_df = new_df.rename(columns=new_names)
     dfs.append(new_df)
   new_df = pd.concat(dfs, axis=1)
