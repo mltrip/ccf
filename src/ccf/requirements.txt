@@ -4,6 +4,7 @@
 -r requirements_ml.txt
 -r requirements_predictions.txt
 -r requirements_ui.txt
+-r requirements_backtest.txt
 -r requirements_trade.txt
-# -r requirements_rl.txt
+-r requirements_rl.txt
 python-dotenv==1.0.0
