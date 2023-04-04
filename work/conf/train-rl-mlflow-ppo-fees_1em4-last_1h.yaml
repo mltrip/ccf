@@ -3,10 +3,10 @@ seed: 0
 verbose: 0
 do_train: true
 do_backtest: true
-split: 0.75
-model_name: ppo-fees_1em6
+split: ~
+model_name: ppo-fees_1em4-last_1h
 is_tune: true
-parent_name: ppo-fees_1em6
+parent_name: ppo-fees_1em4-last_1h
 parent_version: ~  # last
 learn_kwargs:
   # tb_log_name: ppo-fees_1em5
@@ -14,16 +14,18 @@ learn_kwargs:
   reset_num_timesteps: false
   callback: ~ 
   log_interval: 1  #  The number of rollouts before logging
-  progress_bar: True
+  progress_bar: true
 env_kwargs:
  cash: 30.0
- commission: 1e-6
+ commission: 1e-4
  window_size: 20
 data_kwargs:
   # test_size: 10000
   reload: true
-  start: '2023-03-21T00:00:00+00:00'
-  stop: '2023-04-04T00:00:00+00:00'
+  # start: '2023-04-03T00:00:00+00:00'
+  # stop: '2023-04-04T00:00:00+00:00'
+  start: -3600e9
+  stop: ~
   model_name: 'influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group'
   model_version: 4
   exchange: binance

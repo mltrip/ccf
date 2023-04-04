@@ -1,17 +1,17 @@
 n_envs: 32
 seed: 0
 verbose: 0
-do_train: True
-do_backtest: True
+do_train: true
+do_backtest: true
 split: 0.75
 model_name: ppo-fees_1em2
-is_tune: False
+is_tune: false
 parent_name: ppo-fees_1em2
 parent_version: ~  # last
 learn_kwargs:
   # tb_log_name: ppo-fees_1em5
-  total_timesteps: 1000000  # number of rollouts (epochs) = total_timesteps / (n_steps * n_envs)
-  reset_num_timesteps: False
+  total_timesteps: 1024000  # number of rollouts (epochs) = total_timesteps / (n_steps * n_envs)
+  reset_num_timesteps: false
   callback: ~ 
   log_interval: 1  #  The number of rollouts before logging
   progress_bar: True
@@ -21,9 +21,9 @@ env_kwargs:
  window_size: 20
 data_kwargs:
   # test_size: 10000
-  reload: False
-  start: '2023-03-20T00:00:00+00:00'
-  stop: '2023-04-01T00:00:00+00:00'
+  reload: false
+  start: '2023-03-21T00:00:00+00:00'
+  stop: '2023-04-04T00:00:00+00:00'
   model_name: 'influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group'
   model_version: 4
   exchange: binance
@@ -35,7 +35,7 @@ model_kwargs:
   class: PPO
   policy: MlpPolicy
   learning_rate: 0.0003
-  n_steps: 1000  # The number of steps to run for each environment per update (i.e. rollout buffer size is n_steps * n_envs where n_envs is number of environment copies running in parallel) NOTE: n_steps * n_envs must be greater than 1 (because of the advantage normalization)
+  n_steps: 1024  # The number of steps to run for each environment per update (i.e. rollout buffer size is n_steps * n_envs where n_envs is number of environment copies running in parallel) NOTE: n_steps * n_envs must be greater than 1 (because of the advantage normalization)
   batch_size: 32
   n_epochs: 10  # Number of epoch when optimizing the surrogate loss
   gamma: 0.99 
