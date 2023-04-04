@@ -814,6 +814,7 @@ class RLTrader(Trader):
     feature=None, target=None, model=None, version=None, horizon=None, prediction=None,
     max_spread=None, is_max_spread_none_only=False, time_in_force='GTC', max_open_orders=None,
     do_cancel_open_orders=True, window_size=20,
+    do_log_account_status=False,
     quantity=None, is_base_quantity=True, position='none',
     is_test=False, verbose=False,
     kind_rl=None, model_version_rl=None, model_stage_rl=None
@@ -847,6 +848,7 @@ class RLTrader(Trader):
     self.max_spread = max_spread
     self.is_max_spread_none_only = is_max_spread_none_only
     self.do_cancel_open_orders = do_cancel_open_orders
+    self.do_log_account_status = do_log_account_status
     self.time_in_force = time_in_force
     self.max_open_orders = max_open_orders
     self.window_size = window_size
@@ -1005,12 +1007,6 @@ class RLTrader(Trader):
             if do_skip:
               print(f'Skipping: spread {spread} > {self.max_spread} and position {self.position}')
               continue
-          # if self.max_open_orders is not None:
-          #   if n_open_orders >= self.max_open_orders:
-          #     print(f'Skipping: number of open orders {n_open_orders} >= {self.max_open_orders}')
-          #     continue
-          #  self.cancel_open_orders(
-          #  self._ws, symbol, timeout=self.timeout, exchange=exchange)
           df = pd.DataFrame(buffer.values())
           if len(df) == 0:
             print(f'Skipping: empty data')
@@ -1026,18 +1022,9 @@ class RLTrader(Trader):
           print(f'columns:    {len(df.columns)}')
           if self.verbose > 1:
             print(df)
+          pprint(ticker_orderbook)
           if self.prediction in df:
-            self.update_model_rl()
-            obs = preprocess_data(df=df,  
-                                  window_size=self.window_size,
-                                  forecast_column=self.prediction, 
-                                  price_column='last')
-            if self.verbose > 1:
-              print(obs)
-            action, _states = self._model_rl.predict(obs)  # 0: HOLD, 1: BUY, 2: SELL
-            pprint(ticker_orderbook)
-            # Act
-            # Evaluate order
+            # Evaluate active order
             print(f'Position: {self.position}')
             print(f'Active order: {order_id}')
             if order_id is not None:
@@ -1091,12 +1078,6 @@ class RLTrader(Trader):
                   'version': self.version,
                   'target': self.target,
                   'strategy': self.strategy,
-                  'model_rl': self.model_name_rl,
-                  'version_rl': self.cur_model_version_rl,
-                  'base_balance': base_balance,
-                  'quote_balance': quote_balance,
-                  'base_delta': base_delta,
-                  'quote_delta': quote_delta,
                   'base_quantity': base_quantity,
                   'quote_quantity': quote_quantity,
                   'quantity': self.quantity,
@@ -1104,18 +1085,25 @@ class RLTrader(Trader):
                   'position': self.position,
                   'action': order_side.lower(),
                   'api_url': self.api_url,
-                  'api_key': self.api_key
+                  'api_key': self.api_key,
+                  'base_balance': base_balance,
+                  'quote_balance': quote_balance,
+                  'base_delta': base_delta,
+                  'quote_delta': quote_delta,
+                  'model_rl': self.model_name_rl,
+                  'version_rl': self.cur_model_version_rl
                 }
                 # Get status
-                account_status = self.get_account_status(
-                  self._ws, timeout=self.timeout, exchange=exchange)
-                if self.verbose:
-                  print(account_status)
-                for b in account_status.get('balances'):
-                  asset = b['asset']
-                  if asset in [base_symbol, quote_symbol]:
-                    value[f'free_{asset}'] = float(b['free'])
-                    value[f'locked_{asset}'] = float(b['locked'])
+                if self.do_log_account_status:
+                  account_status = self.get_account_status(
+                    self._ws, timeout=self.timeout, exchange=exchange)
+                  if self.verbose:
+                    print(account_status)
+                  for b in account_status.get('balances'):
+                    asset = b['asset']
+                    if asset in [base_symbol, quote_symbol]:
+                      value[f'free_{asset}'] = float(b['free'])
+                      value[f'locked_{asset}'] = float(b['locked'])
                 if self.verbose:
                   pprint(value)
                 if not self.is_test:
@@ -1151,57 +1139,46 @@ class RLTrader(Trader):
               else:  # End
                 print(f'Order {order_id} ends with status: {order_status}')
                 order, order_id = None, None
-            print(f'Position: {self.position}')
-            print(f'Active order: {order_id}')
-            print(f'Action: {action}')
-            do_buy_taker = action == 1 and self.position != 'long'
-            do_sell_taker = action == 2 and self.position != 'short'
-            if any([do_buy_taker, do_sell_taker]) and order_id is None:
-              if do_buy_taker:
-                print('buy_taker')
-                result = self.buy_taker(self._ws, 
-                                        symbol, 
-                                        quantity=self.quantity, 
-                                        is_base_quantity=self.is_base_quantity, 
-                                        is_test=self.is_test,
-                                        timeout=self.timeout, 
-                                        exchange=exchange)
-              elif do_sell_taker:
-                print('sell_taker')
-                result = self.sell_taker(self._ws,
+            # Create new order if no active order
+            print(f'New position: {self.position}')
+            print(f'New active order: {order_id}')
+            if order_id is None:
+              if self.position == 'none':
+                self.update_model_rl()
+              obs = preprocess_data(df=df,  
+                                    window_size=self.window_size,
+                                    forecast_column=self.prediction, 
+                                    price_column='last')
+              if self.verbose > 1:
+                print(obs)
+              action, _ = self._model_rl.predict(obs)  # 0: HOLD, 1: BUY, 2: SELL
+              print(f'Predicted action: {action}')
+              do_buy_taker = action == 1 and self.position != 'long'
+              do_sell_taker = action == 2 and self.position != 'short'
+              if any([do_buy_taker, do_sell_taker]):
+                if do_buy_taker:
+                  print('buy_taker')
+                  result = self.buy_taker(self._ws, 
                                           symbol, 
                                           quantity=self.quantity, 
                                           is_base_quantity=self.is_base_quantity, 
                                           is_test=self.is_test,
-                                          timeout=self.timeout,
+                                          timeout=self.timeout, 
                                           exchange=exchange)
-              else:
-                raise NotImplementedError()
-              # elif do_b_m:
-              #   print('buy_maker')
-              #   result = self.buy_maker(self._ws, 
-              #                           symbol,
-              #                           price=ticker_orderbook['b_p_0'],
-              #                           time_in_force=self.time_in_force,
-              #                           quantity=self.quantity, 
-              #                           is_base_quantity=self.is_base_quantity, 
-              #                           is_test=self.is_test,
-              #                           timeout=self.timeout, 
-              #                           exchange=exchange)
-              # elif do_s_m:
-              #   print('sell_maker')
-              #   result = self.sell_maker(self._ws,
-              #                            symbol, 
-              #                            price=ticker_orderbook['a_p_0'],
-              #                            time_in_force=self.time_in_force,
-              #                            quantity=self.quantity, 
-              #                            is_base_quantity=self.is_base_quantity, 
-              #                            is_test=self.is_test,
-              #                            timeout=self.timeout,
-              #                            exchange=exchange)
-              order_id = result.get('orderId', None)
-              print(f'New order {order_id}')
-              pprint(result)
+                elif do_sell_taker:
+                  print('sell_taker')
+                  result = self.sell_taker(self._ws,
+                                            symbol, 
+                                            quantity=self.quantity, 
+                                            is_base_quantity=self.is_base_quantity, 
+                                            is_test=self.is_test,
+                                            timeout=self.timeout,
+                                            exchange=exchange)
+                else:
+                  raise NotImplementedError()
+                order_id = result.get('orderId', None)
+                print(f'New order: {order_id}')
+                pprint(result)
         last_timestamp = timestamp
       except Exception as e:
         print(e)
