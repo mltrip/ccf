@@ -500,11 +500,11 @@ def get_data(start, exchange, base, quote,
              reload=False, test_size=None,
              stop=None, horizon=None, feature=None, target=None, bucket='ccf', 
              batch_size=3600e9, verbose=True, quant=None, size=None):
-  data_filename = f'{model_name}-{model_version}.csv'
+  start, stop, size, quant = initialize_time(start, stop, size, quant)
+  data_filename = f'{model_name}-{model_version}-{start}-{stop}.csv'
   data_path = Path(data_filename)
   if not data_path.exists() or reload:
     print('Loading data from DB')
-    start, stop, size, quant = initialize_time(start, stop, size, quant)
     client_kwargs = {'verify_ssl': False}
     client = InfluxDB(client=client_kwargs)
     client_ = client.init_client(client.client)
@@ -583,11 +583,16 @@ def train(hydra_config,
   df = get_data(**data_kwargs)
   
   # Split dataset
-  split_idx = int(len(df)*split)
-  df_train = df.iloc[:split_idx]
-  df_test = df.iloc[split_idx:]
-  print(f'train from {df_train.index.min()} to {df_train.index.max()} with {len(df_train)} rows and {len(df_train.columns)} columns')
-  print(f'test from {df_test.index.min()} to {df_test.index.max()} with {len(df_test)} rows and {len(df_test.columns)} columns')
+  if split is not None:
+    split_idx = int(len(df)*split)
+    df_train = df.iloc[:split_idx]
+    df_test = df.iloc[split_idx:]
+    print(f'train from {df_train.index.min()} to {df_train.index.max()} with {len(df_train)} rows and {len(df_train.columns)} columns')
+    print(f'test from {df_test.index.min()} to {df_test.index.max()} with {len(df_test)} rows and {len(df_test.columns)} columns')
+  else:
+    df_train = df
+    print(f'train from {df_train.index.min()} to {df_train.index.max()} with {len(df_train)} rows and {len(df_train.columns)} columns')
+    df_test = None
   
   # Train
   if do_train:
@@ -617,10 +622,16 @@ def train(hydra_config,
         model = model_class(**model_kwargs)
       else:
         print('Loading model')
-        parent_model, last_version, last_stage = load_model(parent_name, parent_version, parent_stage)
-        # model = model_class.load(path=model_name, env=train_env)
-        model = parent_model.unwrap_python_model().model
-        model.set_env(train_env)
+        last_model, last_version, last_stage = load_model(parent_name, parent_version, parent_stage)
+        if last_model is not None:
+          # model = model_class.load(path=model_name, env=train_env)
+          model = last_model.unwrap_python_model().model
+          model.set_env(train_env)
+        else:
+          print('Model is not found: creating new model')
+          model_kwargs['env'] = train_env
+          model_kwargs['verbose'] = verbose 
+          model = model_class(**model_kwargs)
       model.set_logger(loggers)
       print('Training')  
       model.learn(**learn_kwargs)
@@ -650,13 +661,14 @@ def train(hydra_config,
     bt_param = EnvParameter(**bt_env_kwargs)
     bt_env = OneEnv(bt_param, stop_on_none=False)
     run_backtest(env=bt_env, model=model, filename=f'{model_name}-bt-train.html')
-    print('Backtesting Test')
-    bt_env_kwargs = deepcopy(env_kwargs)
-    bt_env_kwargs['df'] = df_test
-    bt_env_kwargs['mode'] = 'sequential'
-    bt_param = EnvParameter(**bt_env_kwargs)
-    bt_env = OneEnv(bt_param, stop_on_none=False)
-    run_backtest(env=bt_env, model=model, filename=f'{model_name}-bt-test.html')
+    if df_test is not None:
+      print('Backtesting Test')
+      bt_env_kwargs = deepcopy(env_kwargs)
+      bt_env_kwargs['df'] = df_test
+      bt_env_kwargs['mode'] = 'sequential'
+      bt_param = EnvParameter(**bt_env_kwargs)
+      bt_env = OneEnv(bt_param, stop_on_none=False)
+      run_backtest(env=bt_env, model=model, filename=f'{model_name}-bt-test.html')
     
   
 @hydra.main(version_base=None)
