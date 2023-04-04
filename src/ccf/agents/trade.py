@@ -814,6 +814,7 @@ class RLTrader(Trader):
     feature=None, target=None, model=None, version=None, horizon=None, prediction=None,
     max_spread=None, is_max_spread_none_only=False, time_in_force='GTC', max_open_orders=None,
     do_cancel_open_orders=True, window_size=20,
+    sltp_t=None, sltp_r=1.0,
     do_log_account_status=False,
     quantity=None, is_base_quantity=True, position='none',
     is_test=False, verbose=False,
@@ -863,6 +864,8 @@ class RLTrader(Trader):
     self.cur_model_version_rl = model_version_rl
     self.model_stage_rl = model_stage_rl
     self.cur_model_stage_rl = model_stage_rl
+    self.sltp_t = sltp_t  # StopLoss-TakeProfit threshold
+    self.sltp_r = sltp_r  # StopLoss/TakeProfit
     self._consumer = None
     self._producer = None
     self._model_rl = None
@@ -943,7 +946,8 @@ class RLTrader(Trader):
     base_balance = 0.0
     quote_balance = 0.0
     last_base_balance = 0.0
-    last_quote_balance = 0.0    
+    last_quote_balance = 0.0
+    order_ticker = {}
     if self.do_cancel_open_orders:
       cancel_result = self.cancel_open_orders(
         self._ws, symbol, timeout=self.timeout, exchange=exchange)
@@ -1155,9 +1159,49 @@ class RLTrader(Trader):
               print(f'Predicted action: {action}')
               do_buy_taker = action == 1 and self.position != 'long'
               do_sell_taker = action == 2 and self.position != 'short'
-              if any([do_buy_taker, do_sell_taker]):
-                if do_buy_taker:
-                  print('buy_taker')
+              print(f'do_buy_taker: {do_buy_taker}')
+              print(f'do_sell_taker: {do_sell_taker}')
+              # Stop Loss / Take Profit
+              do_sl_long = False
+              do_tp_long = False
+              do_sl_short = False
+              do_tp_short = False
+              if self.sltp_t is not None:
+                cur_a_p_0 = ticker_orderbook.get('a_p_0', None)
+                cur_b_p_0 = ticker_orderbook.get('b_p_0', None)
+                order_a_p_0 = order_ticker.get('a_p_0', None)
+                order_b_p_0 = order_ticker.get('b_p_0', None)
+                print(f'order bid:   {order_b_p_0}')
+                print(f'order ask:   {order_a_p_0}')
+                print(f'current bid: {cur_b_p_0}')
+                print(f'current ask: {cur_a_p_0}')
+                if all([x is not None for x in [cur_a_p_0, cur_b_p_0, order_a_p_0, order_b_p_0]]):
+                  tp_t = self.sltp_t
+                  sl_t = -self.sltp_t*self.sltp_r
+                  if self.position == 'long':
+                    pl = cur_b_p_0 / order_a_p_0 - 1.0  # Taker: Buy by Ask - Sell by Bid
+                    if pl > tp_t:
+                      print(f'tp long: pl {pl} > {tp_t} tp_t')
+                      do_tp_long = True
+                    elif pl < sl_t:
+                      print(f'sl long: pl {pl} < {sl_t} sl_t')
+                      do_sl_long = True
+                  elif self.position == 'short':
+                    pl = order_b_p_0 / cur_a_p_0 - 1.0  # Taker: Sell by Bid - Buy by Ask
+                    if pl > tp_t:
+                      print(f'tp short: pl {pl} > {tp_t} tp_t')
+                      do_tp_short = True
+                    elif pl < sl_t:
+                      print(f'sl short: pl {pl} < {sl_t} sl_t')
+                      do_sl_short = True
+                else:
+                  print(f'Warning SL/TP: no data!')
+                  pprint(ticker_orderbook)
+                  pprint(order_ticker)
+              if any([do_buy_taker, do_sell_taker,
+                      do_sl_long, do_tp_long,
+                      do_sl_short, do_tp_short]):
+                if do_buy_taker or do_sl_short or do_tp_short:
                   result = self.buy_taker(self._ws, 
                                           symbol, 
                                           quantity=self.quantity, 
@@ -1165,8 +1209,7 @@ class RLTrader(Trader):
                                           is_test=self.is_test,
                                           timeout=self.timeout, 
                                           exchange=exchange)
-                elif do_sell_taker:
-                  print('sell_taker')
+                elif do_sell_taker or do_sl_long or do_tp_long:
                   result = self.sell_taker(self._ws,
                                             symbol, 
                                             quantity=self.quantity, 
@@ -1176,6 +1219,7 @@ class RLTrader(Trader):
                                             exchange=exchange)
                 else:
                   raise NotImplementedError()
+                order_ticker = deepcopy(ticker_orderbook)
                 order_id = result.get('orderId', None)
                 print(f'New order: {order_id}')
                 pprint(result)
