@@ -68,7 +68,7 @@ agents:
   #   prediction: 'quantile_0.5'
   #   watermark: 60e9
   #   max_delay: 30e9
-  #   max_spread: ~
+  #   max_spread: 1e-5
   #   time_in_force: GTC  # GTC, IOC, FOK
   #   quantity: 3e-3
   #   is_base_quantity: true
@@ -93,7 +93,6 @@ agents:
   #   watermark: 60e9
   #   max_delay: 30e9
   #   max_spread: 2e-6
-  #   is_max_spread_none_only: true
   #   time_in_force: GTC  # GTC, IOC, FOK
   #   quantity: 3e-3
   #   is_base_quantity: true
@@ -118,7 +117,6 @@ agents:
   #   watermark: 60e9
   #   max_delay: 30e9
   #   max_spread: 1e-5
-  #   is_max_spread_none_only: true
   #   time_in_force: GTC  # GTC, IOC, FOK
   #   quantity: 3e-3
   #   is_base_quantity: true
@@ -143,9 +141,9 @@ agents:
     watermark: 60e9
     max_delay: 30e9
     max_spread: 1e-5
-    is_max_spread_none_only: true
     time_in_force: GTC  # GTC, IOC, FOK
     quantity: 3e-3
+    min_quantity: 9e-3
     is_base_quantity: true
     t_x: 0.0
     t_v: 0.0
@@ -167,10 +165,10 @@ agents:
     prediction: 'quantile_0.5'
     watermark: 60e9
     max_delay: 30e9
-    max_spread: ~
-    is_max_spread_none_only: false
+    max_spread: 1e-5
     time_in_force: GTC  # GTC, IOC, FOK
     quantity: 3e-3
+    min_quantity: 3e-3
     is_base_quantity: true
     t_x: 0.0
     t_v: 0.0
@@ -193,9 +191,9 @@ agents:
     watermark: 60e9
     max_delay: 30e9
     max_spread: 1e-5
-    is_max_spread_none_only: true
     time_in_force: GTC  # GTC, IOC, FOK
     quantity: 3e-3
+    min_quantity: 9e-3
     is_base_quantity: true
     t_x: 0.0
     t_v: 1e-5
@@ -217,10 +215,10 @@ agents:
     prediction: 'quantile_0.5'
     watermark: 60e9
     max_delay: 30e9
-    max_spread: ~
-    is_max_spread_none_only: true
+    max_spread: 2e-6
     time_in_force: GTC  # GTC, IOC, FOK
     quantity: 3e-3
+    min_quantity: 3e-3
     is_base_quantity: true
     t_x: 0.0
     t_v: 1e-5
@@ -243,9 +241,9 @@ agents:
     watermark: 60e9
     max_delay: 30e9
     max_spread: 2e-6
-    is_max_spread_none_only: true
     time_in_force: GTC  # GTC, IOC, FOK
     quantity: 3e-3
+    min_quantity: 9e-3
     is_base_quantity: true
     t_x: 0.0
     t_v: 1e-5

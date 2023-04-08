@@ -18,6 +18,7 @@ def trade(
   consumer=None, producer=None, 
   consumer_partitioner=None, producer_partitioner=None
 ):
+  # Preprocess
   if executor is None:
     executor = {'class': 'ThreadPoolExecutor'}
   if 'max_workers' not in executor:
@@ -33,33 +34,40 @@ def trade(
       agent_kwargs['producer_partitioner'] = producer_partitioner
   # Initialize
   executor_class = executor.pop('class')
-  executor = getattr(concurrent.futures, executor_class)(**executor)
-  future_to_name = {}
+  executor_ = getattr(concurrent.futures, executor_class)(**executor)
+  agents_ = {}
   for name, agent_kwargs in agents.items():
     agent_class = agent_kwargs.pop('class')
-    a = getattr(ccf_agents, agent_class)(**agent_kwargs)
-    future_to_name[executor.submit(a)] = name
+    agents_[name] = getattr(ccf_agents, agent_class)(**agent_kwargs)
   # Run
   try:
-    for f in concurrent.futures.as_completed(future_to_name):
-      n = future_to_name[f]
-      try:
-        r = f.result()
-      except Exception as e:
-        print(f'Exception of {n}: {e}')
-        raise e
-      else:
-        # print(f'Result of {n}: {r}')
-        raise RuntimeError(f'Result of {n}: {r}')
+    if len(agents_) == 1:
+      for name, agent in agents_.items():
+        print(name)
+        agent()
+    else:
+      future_to_name = {}
+      for name, agent in agents_.items():
+        future_to_name[executor_.submit(agent)] = name
+      for f in concurrent.futures.as_completed(future_to_name):
+        n = future_to_name[f]
+        try:
+          r = f.result()
+        except Exception as e:
+          print(f'Exception of {n}: {e}')
+          raise e
+        else:
+          print(f'Result of {n}: {r}')
+          raise RuntimeError(f'Result of {n}: {r}')
   except KeyboardInterrupt:
     print("Keyboard interrupt: trade")
     print(f'Executor shutdown with wait')
-    executor.shutdown(wait=True, cancel_futures=True)
+    executor_.shutdown(wait=True, cancel_futures=True)
   except Exception as e:
     print("Exception: trade")
     print(e)
     print(f'Executor shutdown without wait')
-    executor.shutdown(wait=False, cancel_futures=True)
+    executor_.shutdown(wait=False, cancel_futures=True)
     pid = os.getpid()
     print(f'Parent PID: {pid}')
     parent = psutil.Process(pid)
@@ -99,11 +107,11 @@ def app(cfg: DictConfig) -> None:
 
   
 def handler(signum, frame):
+  """Convert signal to RuntimeError"""
   signame = signal.Signals(signum).name
   raise RuntimeError(f'Signal handler called with signal {signame} ({signum})')
   
   
 if __name__ == "__main__":
-  signal.signal(signal.SIGTERM, handler)
-  signal.signal(signal.SIGINT, handler)
+  signal.signal(signal.SIGTERM, handler)  # send by docker on stop/down by default
   app()

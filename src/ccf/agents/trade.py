@@ -32,9 +32,12 @@ class Trader(Agent):
     self.api_key = os.getenv('TRADE_API_KEY', api_key)
     self.secret_key = os.getenv('TRADE_SECRET_KEY', secret_key)
     
-  def compute_signature(self, params, exchange=None):
-    query = '&'.join(f'{k}={v}' for k, v in sorted(params.items(), key=lambda x: x[0]) if k != 'signature')
-    signature = hmac.new(self.secret_key.encode('utf-8'), query.encode('utf-8'), hashlib.sha256).hexdigest()
+  def compute_signature(self, exchange, params):
+    if exchange == 'binance':
+      query = '&'.join(f'{k}={v}' for k, v in sorted(params.items(), key=lambda x: x[0]) if k != 'signature')
+      signature = hmac.new(self.secret_key.encode('utf-8'), query.encode('utf-8'), hashlib.sha256).hexdigest()
+    else:
+      raise NotImplementedError(exchange)
     return signature
   
   def send_request(self, ws, method, params=None,
@@ -51,7 +54,7 @@ class Trader(Agent):
       if recv_window is not None:
         params['recvWindow'] = recv_window
       if self.secret_key is not None and add_signature:
-        signature = self.compute_signature(params, exchange=exchange)
+        signature = self.compute_signature(exchange=exchange, params=params)
         params['signature'] = signature
       if len(params) > 0:
         request["params"] = params
@@ -252,22 +255,49 @@ class Trader(Agent):
       's_m_vwap': s_m_vwap}
     return vwap
   
-  def buy_taker(self, ws, symbol, quantity, is_base_quantity=True, is_test=False,
-                 recv_window=5000, timeout=None, exchange=None):
-    params = {
-        "symbol": symbol,
-        "side": "BUY",
-        "type": "MARKET"
-    }
-    if is_base_quantity:
-      params['quantity'] = quantity
-    else:  # quote
-      params['quoteOrderQty'] = quantity
-    timestamp = int(time.time_ns()/1e6)
-    method = 'order.place' if not is_test else 'order.test'
-    return self.send_request(ws, method, params,
-                             timestamp=timestamp, recv_window=recv_window, 
-                             timeout=timeout, exchange=exchange)
+  def buy_taker(self, ws, symbol, quantity, exchange, is_base_quantity=True, 
+                is_test=False, recv_window=5000, timeout=None):
+    if exchange == 'binance':
+      params = {
+          "symbol": symbol,
+          "side": "BUY",
+          "type": "MARKET"
+      }
+      if is_base_quantity:
+        params['quantity'] = quantity
+      else:  # quote
+        params['quoteOrderQty'] = quantity
+      timestamp = int(time.time_ns()/1e6)
+      method = 'order.place' if not is_test else 'order.test'
+    else:
+      raise NotImplementedError(exchange)
+    response = self.send_request(ws=ws, method=method, params=params,
+                                 add_api_key=True, add_signature=True,
+                                 timestamp=timestamp, timeout=timeout,
+                                 recv_window=recv_window, exchange=exchange)
+    return response
+  
+  def sell_taker(self, ws, symbol, quantity, exchange, is_base_quantity=True, 
+                 is_test=False, recv_window=5000, timeout=None):
+    if exchange == 'binance':
+      params = {
+          "symbol": symbol,
+          "side": "SELL",
+          "type": "MARKET"
+      }
+      if is_base_quantity:
+        params['quantity'] = quantity
+      else:  # quote
+        params['quoteOrderQty'] = quantity
+      timestamp = int(time.time_ns()/1e6)
+      method = 'order.place' if not is_test else 'order.test'
+    else:
+      raise NotImplementedError(exchange)
+    response = self.send_request(ws=ws, method=method, params=params,
+                                 add_api_key=True, add_signature=True,
+                                 timestamp=timestamp, timeout=timeout,
+                                 recv_window=recv_window, exchange=exchange)
+    return response
   
   def buy_maker(self, ws, symbol, price, quantity, time_in_force='GTC', 
                 is_base_quantity=True, is_test=False,
@@ -285,26 +315,10 @@ class Trader(Agent):
       params['quoteOrderQty'] = quantity
     timestamp = int(time.time_ns()/1e6)
     method = 'order.place' if not is_test else 'order.test'
-    return self.send_request(ws, method, params,
-                             timestamp=timestamp, recv_window=recv_window, 
-                             timeout=timeout, exchange=exchange)
-    
-  def sell_taker(self, ws, symbol, quantity, is_base_quantity=True, is_test=False,
-                 recv_window=5000, timeout=None, exchange=None):
-    params = {
-        "symbol": symbol,
-        "side": "SELL",
-        "type": "MARKET"
-    }
-    if is_base_quantity:
-      params['quantity'] = quantity
-    else:  # quote
-      params['quoteOrderQty'] = quantity
-    timestamp = int(time.time_ns()/1e6)
-    method = 'order.place' if not is_test else 'order.test'
-    return self.send_request(ws, method, params,
-                             timestamp=timestamp, recv_window=recv_window, 
-                             timeout=timeout, exchange=exchange)
+    return self.send_request(ws=ws, method=method, params=params,
+                             add_api_key=True, add_signature=True,
+                             timestamp=timestamp, 
+                             recv_window=recv_window, timeout=timeout, exchange=exchange)
   
   def sell_maker(self, ws, symbol, price, quantity, time_in_force='GTC', 
                  is_base_quantity=True, is_test=False,
@@ -409,44 +423,50 @@ class Trader(Agent):
     return self.send_request(ws, 'orderList.place', params,
                                timestamp, recv_window, timeout, exchange=exchange)
   
+  def close_position(self, ws, position, exchange, symbol, quantity, is_base_quantity,
+                     recv_window=5000, timeout=None, is_test=False, max_attempts=1000):
+    result = None
+    i = 0
+    while result is None and i < max_attempts:
+      i += 1
+      print(f'Closing {position} position attempt {i}/{max_attempts}')
+      if position == 'short':
+        result = self.buy_taker(ws=ws, 
+                                exchange=exchange,
+                                symbol=symbol, 
+                                quantity=quantity, 
+                                is_base_quantity=is_base_quantity, 
+                                is_test=is_test,
+                                recv_window=recv_window,
+                                timeout=timeout)
+      elif position == 'long':
+        result = self.sell_taker(ws=ws,
+                                 exchange=exchange,
+                                 symbol=symbol,
+                                 quantity=quantity, 
+                                 is_base_quantity=is_base_quantity, 
+                                 is_test=is_test,
+                                 recv_window=recv_window,
+                                 timeout=timeout)
+      elif position == 'none':
+        result = {}
+      else:
+        raise NotImplementedError(position)
+    return result
+  
   def __call__(self):
     raise NotImplementedError()
 
 
-class MomentumTrader(Trader):
+class KafkaWebsocketTrader(Trader):
   def __init__(
-    self, strategy, 
-    key, 
-    api_url=None, api_key=None, secret_key=None,
-    prediction_topic='prediction',
-    metric_topic='metric',
+    self, 
+    strategy, key, api_url=None, api_key=None, secret_key=None,
+    prediction_topic='prediction', metric_topic='metric',
     consumer_partitioner=None, consumer=None, 
-    producer_partitioner=None, producer=None, 
-    timeout=None, 
-    start=None, stop=None, quant=None, size=None, watermark=None, delay=None, max_delay=None,
-    feature=None, target=None, model=None, version=None, horizon=None, prediction=None,
-    max_spread=None, is_max_spread_none_only=False, time_in_force='GTC', max_open_orders=None,
-    do_cancel_open_orders=True,
-    t_x=0.0, t_v=0.0, t_a=0.0, n_x=0, n_v=0, n_a=0, 
-    b_t_fs=None, s_t_fs=None, b_m_fs=None, s_m_fs=None,
-    quantity=None, is_base_quantity=True, position='none',
-    is_test=False, verbose=False
+    producer_partitioner=None, producer=None,
+    timeout=None
   ):
-    """Momentum Trader
-    time_in_force
-    * GTC Good 'til Canceled – the order will remain on the book until you cancel it, or the order is completely filled.
-    * IOC Immediate or Cancel – the order will be filled for as much as possible, the unfilled quantity immediately expires.
-    * FOK Fill or Kill – the order will expire unless it cannot be immediately filled for the entire quantity.
-    status
-    * NEW – The order has been accepted by the engine.
-    * PARTIALLY_FILLED – A part of the order has been filled.
-    * FILLED – The order has been completed.
-    * CANCELED – The order has been canceled by the user.
-    * PENDING_CANCEL – Currently unused
-    * REJECTED – The order was not accepted by the engine and not processed.
-    * EXPIRED – The order was canceled according to the order type's rules (e.g. LIMIT FOK orders with no fill, LIMIT IOC or MARKET orders that partially fill) or by the exchange, (e.g. orders canceled during liquidation, orders canceled during maintenance)
-    * EXPIRED_IN_MATCH – The order was canceled by the exchange due to STP trigger. (e.g. an order with EXPIRE_TAKER will match with existing orders on the book with the same account or same tradeGroupId)
-    """
     super().__init__(strategy=strategy, api_url=api_url, api_key=api_key, secret_key=secret_key)
     self.key = key
     self.prediction_topic = prediction_topic
@@ -460,39 +480,6 @@ class MomentumTrader(Trader):
     self.producer_partitioner = producer_partitioner
     self.producer = {} if producer is None else producer
     self.timeout = timeout
-    self.start = start
-    self.stop = stop
-    self.quant = quant
-    self.size = size
-    self.watermark = int(watermark) if watermark is not None else watermark
-    self.delay = delay
-    self.max_delay = max_delay
-    self.model = model
-    self.version = version
-    self.feature = feature
-    self.target = target
-    self.horizon = horizon
-    self.prediction = prediction
-    self.max_spread = max_spread
-    self.is_max_spread_none_only = is_max_spread_none_only
-    self.do_cancel_open_orders = do_cancel_open_orders
-    self.time_in_force = time_in_force
-    self.max_open_orders = max_open_orders
-    self.t_x = t_x
-    self.t_v = t_v
-    self.t_a = t_a
-    self.n_x = n_x
-    self.n_v = n_v
-    self.n_a = n_a
-    self.b_t_fs = [] if b_t_fs is None else b_t_fs
-    self.s_t_fs = [] if s_t_fs is None else s_t_fs
-    self.b_m_fs = [] if b_m_fs is None else b_m_fs
-    self.s_m_fs = [] if s_m_fs is None else s_m_fs
-    self.quantity = quantity
-    self.is_base_quantity = is_base_quantity
-    self.position = position
-    self.is_test = is_test
-    self.verbose = verbose
     self._consumer = None
     self._producer = None
     self._ws = None
@@ -520,39 +507,111 @@ class MomentumTrader(Trader):
     producer['key_serializer'] = partitioner.serialize_key
     producer['value_serializer'] = partitioner.serialize_value
     self._producer = KafkaProducer(**producer)
+  
+  def init_ws(self):
+    self._ws = websocket.WebSocket()
+    self._ws.connect(self.api_url, timeout=self.timeout)
+    
+  def __call__(self):
+    raise NotImplementedError()
+    
+  
+class MomentumTrader(KafkaWebsocketTrader):
+  """Momentum Trader"""
+
+  def __init__(
+    self, 
+    strategy, key, api_url=None, api_key=None, secret_key=None,
+    prediction_topic='prediction', metric_topic='metric',
+    consumer_partitioner=None, consumer=None, 
+    producer_partitioner=None, producer=None, 
+    timeout=None, 
+    start=None, stop=None, quant=None, size=None, watermark=None, delay=None, max_delay=None,
+    feature=None, target=None, model=None, version=None, horizon=None, prediction=None,
+    max_spread=None, is_max_spread_none_only=False, time_in_force='GTC', max_open_orders=None,
+    do_cancel_open_orders=True,
+    t_x=0.0, t_v=0.0, t_a=0.0, n_x=0, n_v=0, n_a=0, 
+    b_t_fs=None, s_t_fs=None, b_m_fs=None, s_m_fs=None,
+    quantity=None, is_base_quantity=True, position='none',
+    is_test=False, verbose=False,
+    do_check_order_placement_open=True,
+    do_check_order_placement_close=True,
+    min_quantity=None, limit=100
+  ):
+    super().__init__(
+      strategy=strategy, key=key, api_url=api_url, api_key=api_key, secret_key=secret_key,
+      prediction_topic=prediction_topic, metric_topic=metric_topic,
+      consumer_partitioner=consumer_partitioner, consumer=consumer, 
+      producer_partitioner=producer_partitioner, producer=producer,
+      timeout=timeout)
+    self.start = start
+    self.stop = stop
+    self.quant = quant
+    self.size = size
+    self.watermark = int(watermark) if watermark is not None else watermark
+    self.delay = delay
+    self.max_delay = max_delay
+    self.model = model
+    self.version = version
+    self.feature = feature
+    self.target = target
+    self.horizon = horizon
+    self.prediction = prediction
+    self.max_spread = max_spread
+    self.do_cancel_open_orders = do_cancel_open_orders
+    self.time_in_force = time_in_force
+    self.max_open_orders = max_open_orders
+    self.t_x = t_x
+    self.t_v = t_v
+    self.t_a = t_a
+    self.n_x = n_x
+    self.n_v = n_v
+    self.n_a = n_a
+    self.b_t_fs = [] if b_t_fs is None else b_t_fs
+    self.s_t_fs = [] if s_t_fs is None else s_t_fs
+    self.b_m_fs = [] if b_m_fs is None else b_m_fs
+    self.s_m_fs = [] if s_m_fs is None else s_m_fs
+    self.quantity = quantity
+    self.is_base_quantity = is_base_quantity
+    self.position = position
+    self.is_test = is_test
+    self.verbose = verbose
+    self.do_check_order_placement_open = do_check_order_placement_open
+    self.do_check_order_placement_close = do_check_order_placement_close
+    self.min_quantity = min_quantity
+    self.limit = limit
       
   def __call__(self):
-    # logger = logging.getLogger('kafka')
-    # logger.setLevel(logging.CRITICAL)
-    # websocket.enableTrace(True if self.verbose > 1 else False)
-    # if self.timeout is not None:
-    #   websocket.setdefaulttimeout(self.timeout)
-    # Lazy init
-    if self._consumer is None:
-      self.init_consumer()
-    if self._producer is None:
-      self.init_producer()
-    if self._ws is None:
-      self._ws = websocket.WebSocket()
-      self._ws.connect(self.api_url, timeout=self.timeout)
-    # Strategy
-    buffer = {}
-    exchange, base, quote = self.key.split('-')
-    symbol = f'{base}{quote}'.upper()
-    base_symbol = base.upper()
-    quote_symbol = quote.upper()
-    last_timestamp = None
-    order_id = None
-    base_balance = 0.0
-    quote_balance = 0.0
-    last_base_balance = 0.0
-    last_quote_balance = 0.0
-    if self.do_cancel_open_orders:
-      cancel_result = self.cancel_open_orders(
-        self._ws, symbol, timeout=self.timeout, exchange=exchange)
-      pprint(cancel_result)
-    for message in self._consumer:
-      try:
+    try:
+      # logger = logging.getLogger('kafka')
+      # logger.setLevel(logging.CRITICAL)
+      # websocket.enableTrace(True if self.verbose > 1 else False)
+      # if self.timeout is not None:
+      #   websocket.setdefaulttimeout(self.timeout)
+      # Lazy init
+      if self._consumer is None:
+        self.init_consumer()
+      if self._producer is None:
+        self.init_producer()
+      if self._ws is None:
+        self.init_ws()
+      # Strategy
+      buffer = {}
+      exchange, base, quote = self.key.split('-')
+      symbol = f'{base}{quote}'.upper()
+      base_symbol = base.upper()
+      quote_symbol = quote.upper()
+      last_timestamp = None
+      order_id = None
+      base_balance = 0.0
+      quote_balance = 0.0
+      last_base_balance = 0.0
+      last_quote_balance = 0.0
+      if self.do_cancel_open_orders:
+        cancel_result = self.cancel_open_orders(
+          self._ws, symbol, timeout=self.timeout, exchange=exchange)
+        pprint(cancel_result)
+      for message in self._consumer:
         value = message.value
         if value['horizon'] != self.horizon:
           continue
@@ -577,9 +636,6 @@ class MomentumTrader(Trader):
         timestamp = value['timestamp']
         buffer.setdefault(timestamp, {}).update(value)
         if last_timestamp is not None and timestamp != last_timestamp:
-          ticker_orderbook = self.get_ticker_orderbook(
-            self._ws, symbol, self.timeout, exchange=exchange)
-          buffer.setdefault(timestamp, {}).update(ticker_orderbook)
           prediction_timestamp = timestamp - self.horizon*self.quant
           current_timestamp = time.time_ns()
           watermark_timestamp = current_timestamp - self.watermark
@@ -597,24 +653,6 @@ class MomentumTrader(Trader):
             if delay > self.max_delay:
               print(f'Skipping: delay {delay} > {self.max_delay}')
               continue
-          if self.max_spread is not None:
-            spread = ticker_orderbook['s_p-m_p']
-            do_skip = False
-            if spread > self.max_spread:
-              if self.is_max_spread_none_only:
-                if self.position == 'none':
-                  do_skip = True
-              else:  # any position 
-                do_skip = True
-            if do_skip:
-              print(f'Skipping: spread {spread} > {self.max_spread} and position {self.position}')
-              continue
-          # if self.max_open_orders is not None:
-          #   if n_open_orders >= self.max_open_orders:
-          #     print(f'Skipping: number of open orders {n_open_orders} >= {self.max_open_orders}')
-          #     continue
-          #  self.cancel_open_orders(
-          #  self._ws, symbol, timeout=self.timeout, exchange=exchange)
           df = pd.DataFrame(buffer.values())
           if len(df) == 0:
             continue
@@ -626,281 +664,293 @@ class MomentumTrader(Trader):
           print(f'columns:    {len(df.columns)}')
           if self.verbose > 1:
             print(df)
-          if self.prediction in df:
-            t_cs = ['last', 'm_p', 'a_p_0', 'b_p_0']
-            x_cs = [f'x_{x}' for x in t_cs]
-            v_cs = [f'v_{x}' for x in t_cs]
-            a_cs = [f'a_{x}' for x in t_cs]
-            for x_c, t_c in zip(x_cs, t_cs):
-              df[x_c] = df[self.prediction] / df[t_c] - 1.0
-            for v_c, x_c in zip(v_cs, x_cs):
-              df[v_c] = df[x_c] - df[x_c].shift(1)
-            for a_c, v_c in zip(a_cs, v_cs):
-              df[a_c] = df[v_c] - df[v_c].shift(1)
-            # Flags
-            flags = {x: [None for _ in range(3)] for x in t_cs}  
-            for i, (n, t, cs) in enumerate([[self.n_x, self.t_x, x_cs], 
-                                            [self.n_v, self.t_v, v_cs],
-                                            [self.n_a, self.t_a, a_cs]]):
-              if n != 0 and len(df) >= n:
-                for c, t_c in zip(cs, t_cs):
-                  if all(df[c][-n:] > t):
-                    flag = 1
-                  elif all(df[c][-n:] < -t):
-                    flag = -1
-                  else:
-                    flag = 0
-                  flags[t_c][i] = flag
-            # Check
-            is_b_t = False
-            for f in self.b_t_fs:
-              if f == flags['a_p_0']:
-                is_b_t = True
-                print(f'is_b_t {is_b_t}: {f}')
-                break
-            is_b_m = False
-            for f in self.b_m_fs:
-              if f == flags['b_p_0']:
-                is_b_m = True
-                print(f'is_b_m {is_b_m}: {f}')
-                break
-            is_s_t = False
-            for f in self.s_t_fs:
-              if f == flags['b_p_0']:
-                is_s_t = True
-                print(f'is_s_t {is_s_t}: {f}')
-                break
-            is_s_m = False
-            for f in self.s_m_fs:
-              if f == flags['a_p_0']:
-                is_s_m = True
-                print(f'is_s_m {is_s_m}: {f}')
-                break
-            if self.verbose:
-              print(df[['s_p-m_p', 
-                        'x_b_p_0', 'x_m_p', 'x_a_p_0', 
-                        'v_b_p_0', 'v_m_p', 'v_a_p_0',
-                        'a_b_p_0', 'a_m_p', 'a_a_p_0']])
-            pprint(ticker_orderbook)
-            # Act
-            # Evaluate order
-            print(f'Position: {self.position}')
-            print(f'Active order: {order_id}')
-            if order_id is not None:
-              order = self.query_order(self._ws, symbol, order_id, 
-                                       timeout=self.timeout, 
-                                       exchange=exchange)
-              pprint(order)
-              order_side = order['side']
-              order_status = order['status']
-              if order_status in ['FILLED']:
-                if order_side == 'BUY':
-                  if self.position == 'none':
-                    self.position = 'long'
-                  elif self.position == 'short':
-                    self.position = 'none'
-                  else:
-                    raise ValueError(f"Position can't be {self.position}!")
-                else:  # SELL
-                  if self.position == 'none':
-                    self.position = 'short'
-                  elif self.position == 'long':
-                    self.position = 'none'
-                  else:
-                    raise ValueError(f"Position can't be {self.position}!")
-                quote_quantity = float(order.get('cummulativeQuoteQty', 0.0))  # origQty
-                base_quantity = float(order.get('executedQty', 0.0))
-                if order_side == 'BUY':
-                  quote_quantity = -quote_quantity
-                  base_quantity = -base_quantity
-                base_balance += base_quantity
-                quote_balance += quote_quantity
-                if self.position == 'none':
-                  base_delta = base_balance - last_base_balance
-                  quote_delta = quote_balance - last_quote_balance
-                  last_base_balance = base_balance
-                  last_quote_balance = quote_balance
+          if self.prediction not in df:
+            print(f'Skipping: no prediction {self.prediction} in df columns: {df.columns}')
+            continue
+          t_cs = ['last']
+          x_cs = [f'x_{x}' for x in t_cs]
+          v_cs = [f'v_{x}' for x in t_cs]
+          a_cs = [f'a_{x}' for x in t_cs]
+          for x_c, t_c in zip(x_cs, t_cs):
+            df[x_c] = df[self.prediction] / df[t_c] - 1.0
+          for v_c, x_c in zip(v_cs, x_cs):
+            df[v_c] = df[x_c] - df[x_c].shift(1)
+          for a_c, v_c in zip(a_cs, v_cs):
+            df[a_c] = df[v_c] - df[v_c].shift(1)
+          # Flags
+          flags = {x: [None for _ in range(3)] for x in t_cs}  
+          for i, (n, t, cs) in enumerate([[self.n_x, self.t_x, x_cs], 
+                                          [self.n_v, self.t_v, v_cs],
+                                          [self.n_a, self.t_a, a_cs]]):
+            if n != 0 and len(df) >= n:
+              for c, t_c in zip(cs, t_cs):
+                if all(df[c][-n:] > t):
+                  flag = 1
+                elif all(df[c][-n:] < -t):
+                  flag = -1
                 else:
-                  base_delta = None
-                  quote_delta = None
-                value = {
-                  'metric': 'trade',
-                  'timestamp': current_timestamp,
-                  'exchange': exchange,
-                  'base': base,
-                  'quote': quote,
-                  'quant': self.quant,
-                  'feature': self.feature,
-                  'prediction': self.prediction,
-                  'horizon': self.horizon,
-                  'model': self.model,
-                  'version': self.version,
-                  'target': self.target,
-                  'strategy': self.strategy,
-                  'n_x': self.n_x,
-                  'n_v': self.n_v,
-                  'n_a': self.n_a,
-                  't_x': self.t_x,
-                  't_v': self.t_v,
-                  't_a': self.t_a,
-                  'base_balance': base_balance,
-                  'quote_balance': quote_balance,
-                  'base_delta': base_delta,
-                  'quote_delta': quote_delta,
-                  'base_quantity': base_quantity,
-                  'quote_quantity': quote_quantity,
-                  'quantity': self.quantity,
-                  'is_base_quantity': self.is_base_quantity,
-                  'position': self.position,
-                  'action': order_side.lower(),
-                  'api_url': self.api_url,
-                  'api_key': self.api_key
-                }
-                # Get status
-                account_status = self.get_account_status(
-                  self._ws, timeout=self.timeout, exchange=exchange)
-                if self.verbose:
-                  print(account_status)
-                for b in account_status.get('balances'):
-                  asset = b['asset']
-                  if asset in [base_symbol, quote_symbol]:
-                    value[f'free_{asset}'] = float(b['free'])
-                    value[f'locked_{asset}'] = float(b['locked'])
-                if self.verbose:
-                  pprint(value)
-                if not self.is_test:
-                  self._producer.send(topic=self.metric_topic, key=self.key, value=value)
-                order, order_id = None, None
-              elif order_status in ['NEW', 'PARTIALLY_FILLED']:  # Process
-                do_b_t = self.position != 'long' and is_b_t
-                do_b_m = self.position != 'long' and is_b_m
-                do_s_t = self.position != 'short' and is_s_t
-                do_s_m = self.position != 'short' and is_s_m
-                do_a = any([do_b_t, do_b_m, do_s_t, do_s_m])
-                print(f'Order {order_id} in process with status: {order_status}')
-                if do_a:  # act
-                  print(f'Cancel order {order_id}')
-                  client_order_id = order['clientOrderId']
-                  self.cancel_order(self._ws, symbol, client_order_id, 
-                                    timeout=self.timeout, exchange=exchange)
-                  order, order_id = None, None
-                else:  # hold
-                  print(f'Check order {order_id}')
-                  order_type = order['type']
-                  if order_type == 'LIMIT':
-                    order_side = order['side']
-                    client_order_id = order['clientOrderId']
-                    order_price = float(order['price'])
-                    current_bid = ticker_orderbook['b_p_0']
-                    current_ask = ticker_orderbook['a_p_0']
-                    if order_side == 'BUY' and order_price != current_bid:
-                      self.cancel_order(self._ws, symbol, client_order_id, 
-                                        timeout=self.timeout, exchange=exchange)
-                      order, order_id = None, None
-                      print(f'Cancel {order_side} order with price {order_price} != {current_bid} top bid')
-                    elif order_side == 'SELL' and order_price != current_ask:
-                      self.cancel_order(self._ws, symbol, client_order_id, 
-                                        timeout=self.timeout, exchange=exchange)
-                      order, order_id = None, None
-                      print(f'Cancel {order_side} order with price {order_price} != {current_ask} top ask')  
-              else:  # End
-                print(f'Order {order_id} ends with status: {order_status}')
-                order, order_id = None, None
-            print(f'Position: {self.position}')
-            print(f'Active order: {order_id}')
-            do_b_t = self.position != 'long' and is_b_t
-            do_b_m = self.position != 'long' and is_b_m
-            do_s_t = self.position != 'short' and is_s_t
-            do_s_m = self.position != 'short' and is_s_m
-            do_a = any([do_b_t, do_b_m, do_s_t, do_s_m])
-            print(f'Action: {do_a}')
-            if do_a and order_id is None:
-              if do_b_t:
-                print('buy_taker')
-                result = self.buy_taker(self._ws, 
-                                         symbol, 
-                                         quantity=self.quantity, 
-                                         is_base_quantity=self.is_base_quantity, 
-                                         is_test=self.is_test,
-                                         timeout=self.timeout, 
-                                         exchange=exchange)
-              elif do_b_m:
-                print('buy_maker')
-                result = self.buy_maker(self._ws, 
-                                        symbol,
-                                        price=ticker_orderbook['b_p_0'],
-                                        time_in_force=self.time_in_force,
-                                        quantity=self.quantity, 
-                                        is_base_quantity=self.is_base_quantity, 
-                                        is_test=self.is_test,
-                                        timeout=self.timeout, 
-                                        exchange=exchange)
-              elif do_s_t:
-                print('sell_taker')
-                result = self.sell_taker(self._ws,
-                                          symbol, 
-                                          quantity=self.quantity, 
-                                          is_base_quantity=self.is_base_quantity, 
-                                          is_test=self.is_test,
-                                          timeout=self.timeout,
-                                          exchange=exchange)
-              elif do_s_m:
-                print('sell_maker')
-                result = self.sell_maker(self._ws,
-                                         symbol, 
-                                         price=ticker_orderbook['a_p_0'],
-                                         time_in_force=self.time_in_force,
-                                         quantity=self.quantity, 
-                                         is_base_quantity=self.is_base_quantity, 
-                                         is_test=self.is_test,
+                  flag = 0
+                flags[t_c][i] = flag
+          # Check
+          is_b_t = False
+          for f in self.b_t_fs:
+            if f == flags['last']:
+              is_b_t = True
+              print(f'is_b_t {is_b_t}: {f}')
+              break
+          # is_b_m = False
+          # for f in self.b_m_fs:
+          #   if f == flags['last']:
+          #     is_b_m = True
+          #     print(f'is_b_m {is_b_m}: {f}')
+          #     break
+          is_s_t = False
+          for f in self.s_t_fs:
+            if f == flags['last']:
+              is_s_t = True
+              print(f'is_s_t {is_s_t}: {f}')
+              break
+          # is_s_m = False
+          # for f in self.s_m_fs:
+          #   if f == flags['last']:
+          #     is_s_m = True
+          #     print(f'is_s_m {is_s_m}: {f}')
+          #     break
+          # Act
+          # Evaluate order
+          print(f'Position: {self.position}')
+          print(f'Active order: {order_id}')
+          if order_id is not None:
+            order = self.query_order(self._ws, symbol, order_id, 
+                                     timeout=self.timeout, 
+                                     exchange=exchange)
+            pprint(order)
+            order_side = order['side']
+            order_status = order['status']
+            if order_status in ['FILLED']:
+              if order_side == 'BUY':
+                if self.position == 'none':
+                  self.position = 'long'
+                elif self.position == 'short':
+                  self.position = 'none'
+                else:
+                  raise ValueError(f"Position can't be {self.position}!")
+              else:  # SELL
+                if self.position == 'none':
+                  self.position = 'short'
+                elif self.position == 'long':
+                  self.position = 'none'
+                else:
+                  raise ValueError(f"Position can't be {self.position}!")
+              quote_quantity = float(order.get('cummulativeQuoteQty', 0.0))  # origQty
+              base_quantity = float(order.get('executedQty', 0.0))
+              if order_side == 'BUY':
+                quote_quantity = -quote_quantity
+                base_quantity = -base_quantity
+              base_balance += base_quantity
+              quote_balance += quote_quantity
+              if self.position == 'none':
+                base_delta = base_balance - last_base_balance
+                quote_delta = quote_balance - last_quote_balance
+                last_base_balance = base_balance
+                last_quote_balance = quote_balance
+              else:
+                base_delta = None
+                quote_delta = None
+              value = {
+                'metric': 'trade',
+                'timestamp': current_timestamp,
+                'exchange': exchange,
+                'base': base,
+                'quote': quote,
+                'quant': self.quant,
+                'feature': self.feature,
+                'prediction': self.prediction,
+                'horizon': self.horizon,
+                'model': self.model,
+                'version': self.version,
+                'target': self.target,
+                'strategy': self.strategy,
+                'n_x': self.n_x,
+                'n_v': self.n_v,
+                'n_a': self.n_a,
+                't_x': self.t_x,
+                't_v': self.t_v,
+                't_a': self.t_a,
+                'base_balance': base_balance,
+                'quote_balance': quote_balance,
+                'base_delta': base_delta,
+                'quote_delta': quote_delta,
+                'base_quantity': base_quantity,
+                'quote_quantity': quote_quantity,
+                'quantity': self.quantity,
+                'is_base_quantity': self.is_base_quantity,
+                'position': self.position,
+                'action': order_side.lower(),
+                'api_url': self.api_url,
+                'api_key': self.api_key
+              }
+              # Get status
+              account_status = self.get_account_status(
+                self._ws, timeout=self.timeout, exchange=exchange)
+              if self.verbose:
+                print(account_status)
+              for b in account_status.get('balances'):
+                asset = b['asset']
+                if asset in [base_symbol, quote_symbol]:
+                  value[f'free_{asset}'] = float(b['free'])
+                  value[f'locked_{asset}'] = float(b['locked'])
+              if self.verbose:
+                pprint(value)
+              if not self.is_test:
+                self._producer.send(topic=self.metric_topic, key=self.key, value=value)
+              order, order_id = None, None
+            elif order_status in ['NEW', 'PARTIALLY_FILLED']:  # Process
+              print(f'Order {order_id} in process with status: {order_status}')
+              # do_b_t = self.position != 'long' and is_b_t
+              # do_b_m = self.position != 'long' and is_b_m
+              # do_s_t = self.position != 'short' and is_s_t
+              # do_s_m = self.position != 'short' and is_s_m
+              # do_a = any([do_b_t, do_b_m, do_s_t, do_s_m])
+              # print(f'Order {order_id} in process with status: {order_status}')
+              # if do_a:  # act
+              #   print(f'Cancel order {order_id}')
+              #   client_order_id = order['clientOrderId']
+              #   self.cancel_order(self._ws, symbol, client_order_id, 
+              #                     timeout=self.timeout, exchange=exchange)
+              #   order, order_id = None, None
+              # else:  # hold
+              #   print(f'Check order {order_id}')
+              #   order_type = order['type']
+              #   if order_type == 'LIMIT':
+              #     order_side = order['side']
+              #     client_order_id = order['clientOrderId']
+              #     order_price = float(order['price'])
+              #     current_bid = orderbook['b_p_0']
+              #     current_ask = orderbook['a_p_0']
+              #     if order_side == 'BUY' and order_price != current_bid:
+              #       self.cancel_order(self._ws, symbol, client_order_id, 
+              #                         timeout=self.timeout, exchange=exchange)
+              #       order, order_id = None, None
+              #       print(f'Cancel {order_side} order with price {order_price} != {current_bid} top bid')
+              #     elif order_side == 'SELL' and order_price != current_ask:
+              #       self.cancel_order(self._ws, symbol, client_order_id, 
+              #                         timeout=self.timeout, exchange=exchange)
+              #       order, order_id = None, None
+              #       print(f'Cancel {order_side} order with price {order_price} != {current_ask} top ask')  
+            else:  # End
+              print(f'Order {order_id} ends with status: {order_status}')
+              order, order_id = None, None
+          print(f'Position: {self.position}')
+          print(f'Active order: {order_id}')
+          do_b_t = self.position != 'long' and is_b_t
+          # do_b_m = self.position != 'long' and is_b_m
+          do_s_t = self.position != 'short' and is_s_t
+          # do_s_m = self.position != 'short' and is_s_m
+          # do_a = any([do_b_t, do_b_m, do_s_t, do_s_m])
+          do_a = any([do_b_t, do_s_t])
+          print(f'Action: {do_a}')
+          if do_a and order_id is None:
+            orderbook = self.get_orderbook(self._ws, 
+                                         symbol=symbol, 
+                                         limit=self.limit, 
                                          timeout=self.timeout,
                                          exchange=exchange)
+            if orderbook is None:
+              print('Skipping: bad orderbook')
+              continue
+            vwap = Trader.calculate_vwap(
+              orderbook=orderbook, 
+              quantity=self.min_quantity, 
+              is_base_quantity=self.is_base_quantity)
+            if vwap is None:
+              print('Skipping: bad vwap')
+              continue
+            pprint(vwap)
+            check_order_placement = vwap['s_m_vwap'] < self.max_spread
+            if not check_order_placement:
+              if self.position == 'none' and self.do_check_order_placement_open:
+                print('Skipping: check order placement')
+                continue
+              elif self.position in ['long', 'short'] and self.do_check_order_placement_close:
+                print('Skipping: check order placement')
+                continue
               else:
-                raise NotImplementedError()
-              order_id = result.get('orderId', None)
-              print(f'New order {order_id}')
-              pprint(result)
+                print(f'Order placement check is {check_order_placement} but not skipping')
+            if do_b_t:
+              print('buy_taker')
+              result = self.buy_taker(self._ws, 
+                                      symbol=symbol, 
+                                      quantity=self.quantity, 
+                                      is_base_quantity=self.is_base_quantity, 
+                                      is_test=self.is_test,
+                                      timeout=self.timeout, 
+                                      exchange=exchange)
+            # elif do_b_m:
+            #   print('buy_maker')
+            #   result = self.buy_maker(self._ws, 
+            #                           symbol,
+            #                           price=orderbook['b_p_0'],
+            #                           time_in_force=self.time_in_force,
+            #                           quantity=self.quantity, 
+            #                           is_base_quantity=self.is_base_quantity, 
+            #                           is_test=self.is_test,
+            #                           timeout=self.timeout, 
+            #                           exchange=exchange)
+            elif do_s_t:
+              print('sell_taker')
+              result = self.sell_taker(self._ws,
+                                       symbol=symbol, 
+                                       quantity=self.quantity, 
+                                       is_base_quantity=self.is_base_quantity, 
+                                       is_test=self.is_test,
+                                       timeout=self.timeout,
+                                       exchange=exchange)
+            # elif do_s_m:
+            #   print('sell_maker')
+            #   result = self.sell_maker(self._ws,
+            #                            symbol, 
+            #                            price=orderbook['a_p_0'],
+            #                            time_in_force=self.time_in_force,
+            #                            quantity=self.quantity, 
+            #                            is_base_quantity=self.is_base_quantity, 
+            #                            is_test=self.is_test,
+            #                            timeout=self.timeout,
+            #                            exchange=exchange)
+            else:
+              raise NotImplementedError()
+            order_id = result.get('orderId', None)
+            print(f'New order {order_id}')
+            pprint(result)
         last_timestamp = timestamp
-      except KeyboardInterrupt:
-        print(f"Keyboard interrupt: trader {self.strategy}")
-      except Exception as e:
-        print(f'Exception: trader {self.strategy}')
-        print(e)
-        # raise e
-      finally:
-        if self.position != 'none':
-          print('Closing open positions after exception')
-          ws = websocket.WebSocket()
-          ws.connect(self.api_url, timeout=self.timeout)
-          if self.position == 'short':
-            result = self.buy_taker(ws, 
-                                    symbol, 
-                                    quantity=self.quantity, 
-                                    is_base_quantity=self.is_base_quantity, 
-                                    is_test=self.is_test,
-                                    timeout=self.timeout, 
-                                    exchange=exchange)
-            pprint(result)
-          elif self.position == 'long':
-            result = self.sell_taker(ws,
-                                     symbol, 
+    except KeyboardInterrupt:
+      print(f"Keyboard interrupt: trader {self.strategy}")
+    except Exception as e:
+      print(f'Exception: trader {self.strategy}')
+      print(e)
+      # raise e
+    finally:
+      print(f'Stop: trader {self.strategy}')
+      if self.position != 'none':
+        self.init_ws()
+        result = self.close_position(ws=self._ws, 
+                                     position=self.position,
+                                     exchange=exchange, 
+                                     symbol=symbol, 
                                      quantity=self.quantity, 
-                                     is_base_quantity=self.is_base_quantity, 
-                                     is_test=self.is_test,
-                                     timeout=self.timeout,
-                                     exchange=exchange)
-            pprint(result)
-          self.position = 'none'
-          ws.close()
-        if self._consumer is not None:
-          self._consumer.close()
-        if self._ws is not None:
-          self._ws.close()
-        raise e
-    if self._consumer is not None:
-      self._consumer.close()
-    if self._ws is not None:
-      self._ws.close()
+                                     is_base_quantity=self.is_base_quantity,
+                                     is_test=self.is_test)
+        pprint(result)
+      print(f'Close consumer: trader {self.strategy}')
+      if self._consumer is not None:
+        self._consumer.close()
+      print(f'Close producer: trader {self.strategy}')
+      if self._producer is not None:
+        self._producer.close()
+      print(f'Close websocket: trader {self.strategy}')
+      if self._ws is not None:
+        self._ws.close()
+      print(f'Done: trader {self.strategy}')
 
       
 class RLTrader(Trader):
