@@ -1,11 +1,16 @@
 import concurrent.futures
 import os
+import platform
+from pprint import pprint
+import psutil
+import signal
+import sys
+import time
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
 from ccf import agents as ccf_agents
-from ccf.utils import wait_first_future, kill_child_processes
 
 
 def trade(
@@ -35,20 +40,56 @@ def trade(
     a = getattr(ccf_agents, agent_class)(**agent_kwargs)
     future_to_name[executor.submit(a)] = name
   # Run
-  for f in concurrent.futures.as_completed(future_to_name):
-    n = future_to_name[f]
-    try:
-      r = f.result()
-    except Exception as e:
-      print(f'Exception of {n}: {e}')
-    else:
-      print(f'Result of {n}: {r}')
-    finally:
-      print(f'Executor shutdown')
-      executor.shutdown(wait=False, cancel_futures=True)
+  try:
+    for f in concurrent.futures.as_completed(future_to_name):
+      n = future_to_name[f]
+      try:
+        r = f.result()
+      except Exception as e:
+        print(f'Exception of {n}: {e}')
+        raise e
+      else:
+        # print(f'Result of {n}: {r}')
+        raise RuntimeError(f'Result of {n}: {r}')
+  except KeyboardInterrupt:
+    print("Keyboard interrupt: trade")
+    print(f'Executor shutdown with wait')
+    executor.shutdown(wait=True, cancel_futures=True)
+  except Exception as e:
+    print("Exception: trade")
+    print(e)
+    print(f'Executor shutdown without wait')
+    executor.shutdown(wait=False, cancel_futures=True)
+    pid = os.getpid()
+    print(f'Parent PID: {pid}')
+    parent = psutil.Process(pid)
+    children = parent.children(recursive=True)
+    print(f'Number of children: {len(children)}')
+    if len(children) > 0:
       print(f'Kill child processes')
-      kill_child_processes(os.getpid())
-  print('Done')
+      if platform.system() == 'Windows':
+        sig = signal.CTRL_C_EVENT
+      else:
+        sig = signal.SIGINT
+      for process in children:
+        print(process)
+        try:
+          process.send_signal(sig)  # Send KeyboardInterrupt
+        except psutil.NoSuchProcess:
+          pass
+      print(f'Wait child processes')
+      def on_terminate(proc):
+        print(f'Process {proc} terminated with exit code {proc.returncode}')
+      gone, alive = psutil.wait_procs(children, 
+                                      timeout=None,
+                                      callback=on_terminate)
+      print('Children gone:')
+      pprint(gone)
+      print('Children alive:')
+      pprint(alive)
+  finally:
+    print('Done: trade')
+    sys.exit(0)
 
     
 @hydra.main(version_base=None)
@@ -57,5 +98,12 @@ def app(cfg: DictConfig) -> None:
   trade(**OmegaConf.to_object(cfg))
 
   
+def handler(signum, frame):
+  signame = signal.Signals(signum).name
+  raise RuntimeError(f'Signal handler called with signal {signame} ({signum})')
+  
+  
 if __name__ == "__main__":
+  signal.signal(signal.SIGTERM, handler)
+  signal.signal(signal.SIGINT, handler)
   app()

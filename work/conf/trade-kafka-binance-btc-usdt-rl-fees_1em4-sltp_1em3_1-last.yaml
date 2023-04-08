@@ -26,6 +26,7 @@ agents:
     sltp_r: 1.0
     sltp_t: 1e-3
     quantity: 3e-3
+    min_quantity: 3e-2
     is_base_quantity: true
     kind_rl: 'auto_update'
     model_name_rl: ppo-fees_1em4-last
@@ -82,6 +83,7 @@ agents:
     sltp_r: 1.0
     sltp_t: 1e-3
     quantity: 3e-3
+    min_quantity: 3e-2
     is_base_quantity: true
     kind_rl: 'auto_update'
     model_name_rl: ppo-fees_1em4-last_6h
@@ -138,6 +140,7 @@ agents:
     sltp_r: 1.0
     sltp_t: 1e-3
     quantity: 3e-3
+    min_quantity: 3e-2
     is_base_quantity: true
     kind_rl: 'auto_update'
     model_name_rl: ppo-fees_1em4-last_1h

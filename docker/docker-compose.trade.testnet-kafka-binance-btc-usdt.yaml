@@ -6,6 +6,8 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+    stop_signal: SIGTERM
+    stop_grace_period: 15s
     networks:
       - db
     working_dir: /app/work
@@ -15,6 +17,7 @@ services:
       - .env.secret.trade.binance.testnet
     environment:
       PYTHONPATH: /app/src
+      PYTHONUNBUFFERED: 1
       MLFLOW_TRACKING_URI: http://mlflow:5000
       MLFLOW_TRACKING_USERNAME: ccf
     volumes:

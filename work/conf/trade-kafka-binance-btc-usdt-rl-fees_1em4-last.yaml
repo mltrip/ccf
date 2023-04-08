@@ -10,9 +10,9 @@ consumer:
 producer:
   bootstrap_servers: "kafka:9092"
 agents:
-  rl-ppo-fees_1em4-last-q_b_3em3-ms_1em4-none:
+  rl-ppo-fees_1em4-last-q_b_3em3-ms_1em4-mq_3em3:
     class: RLTrader
-    strategy: rl-ppo-fees_1em4-last-q_b_3em3-ms_1em4-none
+    strategy: rl-ppo-fees_1em4-last-q_b_3em3-ms_1em4-mq_3em3
     key: binance-btc-usdt
     is_test: false
     verbose: false
@@ -22,51 +22,15 @@ agents:
     watermark: 60e9
     max_delay: 30e9
     max_spread: 1e-4
-    is_max_spread_none_only: true
     quantity: 3e-3
+    min_quantity: 3e-3
     is_base_quantity: true
     kind_rl: 'auto_update'
     model_name_rl: ppo-fees_1em4-last
     model_version_rl: ~
-  # rl-ppo-fees_1em4-last-q_b_3em3-ms_1em4:
-  #   class: RLTrader
-  #   strategy: rl-ppo-fees_1em4-last-q_b_3em3-ms_1em4
-  #   key: binance-btc-usdt
-  #   is_test: false
-  #   verbose: false
-  #   horizon: 20
-  #   window_size: 20
-  #   prediction: 'quantile_0.5'
-  #   watermark: 60e9
-  #   max_delay: 30e9
-  #   max_spread: 1e-4
-  #   is_max_spread_none_only: false
-  #   quantity: 3e-3
-  #   is_base_quantity: true
-  #   kind_rl: 'auto_update'
-  #   model_name_rl: ppo-fees_1em4-last
-  #   model_version_rl: ~
-  # rl-ppo-fees_1em4-last-q_b_3em3:
-  #   class: RLTrader
-  #   strategy: rl-ppo-fees_1em4-last-q_b_3em3
-  #   key: binance-btc-usdt
-  #   is_test: false
-  #   verbose: false
-  #   horizon: 20
-  #   window_size: 20
-  #   prediction: 'quantile_0.5'
-  #   watermark: 60e9
-  #   max_delay: 30e9
-  #   max_spread: ~
-  #   is_max_spread_none_only: false
-  #   quantity: 3e-3
-  #   is_base_quantity: true
-  #   kind_rl: 'auto_update'
-  #   model_name_rl: ppo-fees_1em4-last
-  #   model_version_rl: ~
-  rl-ppo-fees_1em4-last_6h-q_b_3em3-ms_1em4-none:
+  rl-ppo-fees_1em4-last-q_b_3em3-ms_1em4-mq_9em3:
     class: RLTrader
-    strategy: rl-ppo-fees_1em4-last_6h-q_b_3em3-ms_1em4-none
+    strategy: rl-ppo-fees_1em4-last-q_b_3em3-ms_1em4-mq_9em3
     key: binance-btc-usdt
     is_test: false
     verbose: false
@@ -76,51 +40,33 @@ agents:
     watermark: 60e9
     max_delay: 30e9
     max_spread: 1e-4
-    is_max_spread_none_only: true
     quantity: 3e-3
+    min_quantity: 9e-3
+    is_base_quantity: true
+    kind_rl: 'auto_update'
+    model_name_rl: ppo-fees_1em4-last
+    model_version_rl: ~
+  rl-ppo-fees_1em4-last_6h-q_b_3em3-ms_1em4-mq_3em3:
+    class: RLTrader
+    strategy: rl-ppo-fees_1em4-last_6h-q_b_3em3-ms_1em4-mq_3em3
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    window_size: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    max_delay: 30e9
+    max_spread: 1e-4
+    quantity: 3e-3
+    min_quantity: 3e-3
     is_base_quantity: true
     kind_rl: 'auto_update'
     model_name_rl: ppo-fees_1em4-last_6h
     model_version_rl: ~
-  # rl-ppo-fees_1em4-last_6h-q_b_3em3-ms_1em4:
-  #   class: RLTrader
-  #   strategy: rl-ppo-fees_1em4-last_6h-q_b_3em3-ms_1em4
-  #   key: binance-btc-usdt
-  #   is_test: false
-  #   verbose: false
-  #   horizon: 20
-  #   window_size: 20
-  #   prediction: 'quantile_0.5'
-  #   watermark: 60e9
-  #   max_delay: 30e9
-  #   max_spread: 1e-4
-  #   is_max_spread_none_only: false
-  #   quantity: 3e-3
-  #   is_base_quantity: true
-  #   kind_rl: 'auto_update'
-  #   model_name_rl: ppo-fees_1em4-last_6h
-  #   model_version_rl: ~
-  # rl-ppo-fees_1em4-last_6h-q_b_3em3:
-  #   class: RLTrader
-  #   strategy: rl-ppo-fees_1em4-last_6h-q_b_3em3
-  #   key: binance-btc-usdt
-  #   is_test: false
-  #   verbose: false
-  #   horizon: 20
-  #   window_size: 20
-  #   prediction: 'quantile_0.5'
-  #   watermark: 60e9
-  #   max_delay: 30e9
-  #   max_spread: ~
-  #   is_max_spread_none_only: false
-  #   quantity: 3e-3
-  #   is_base_quantity: true
-  #   kind_rl: 'auto_update'
-  #   model_name_rl: ppo-fees_1em4-last_6h
-  #   model_version_rl: ~
-  rl-ppo-fees_1em4-last_1h-q_b_3em3-ms_1em4-none:
+  rl-ppo-fees_1em4-last_6h-q_b_3em3-ms_1em4-mq_9em3:
     class: RLTrader
-    strategy: rl-ppo-fees_1em4-last_1h-q_b_3em3-ms_1em4-none
+    strategy: rl-ppo-fees_1em4-last_6h-q_b_3em3-ms_1em4-mq_9em3
     key: binance-btc-usdt
     is_test: false
     verbose: false
@@ -130,45 +76,45 @@ agents:
     watermark: 60e9
     max_delay: 30e9
     max_spread: 1e-4
-    is_max_spread_none_only: true
     quantity: 3e-3
+    min_quantity: 9e-3
+    is_base_quantity: true
+    kind_rl: 'auto_update'
+    model_name_rl: ppo-fees_1em4-last_6h
+    model_version_rl: ~
+  rl-ppo-fees_1em4-last_1h-q_b_3em3-ms_1em4-mq_3em3:
+    class: RLTrader
+    strategy: rl-ppo-fees_1em4-last_1h-q_b_3em3-ms_1em4-mq_3em3
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    window_size: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    max_delay: 30e9
+    max_spread: 1e-4
+    quantity: 3e-3
+    min_quantity: 3e-3
     is_base_quantity: true
     kind_rl: 'auto_update'
     model_name_rl: ppo-fees_1em4-last_1h
     model_version_rl: ~
-  # rl-ppo-fees_1em4-last_1h-q_b_3em3-ms_1em4:
-  #   class: RLTrader
-  #   strategy: rl-ppo-fees_1em4-last_1h-q_b_3em3-ms_1em4
-  #   key: binance-btc-usdt
-  #   is_test: false
-  #   verbose: false
-  #   horizon: 20
-  #   window_size: 20
-  #   prediction: 'quantile_0.5'
-  #   watermark: 60e9
-  #   max_delay: 30e9
-  #   max_spread: 1e-4
-  #   is_max_spread_none_only: false
-  #   quantity: 3e-3
-  #   is_base_quantity: true
-  #   kind_rl: 'auto_update'
-  #   model_name_rl: ppo-fees_1em4-last_1h
-  #   model_version_rl: ~
-  # rl-ppo-fees_1em4-last_1h-q_b_3em3:
-  #   class: RLTrader
-  #   strategy: rl-ppo-fees_1em4-last_1h-q_b_3em3
-  #   key: binance-btc-usdt
-  #   is_test: false
-  #   verbose: false
-  #   horizon: 20
-  #   window_size: 20
-  #   prediction: 'quantile_0.5'
-  #   watermark: 60e9
-  #   max_delay: 30e9
-  #   max_spread: ~
-  #   is_max_spread_none_only: false
-  #   quantity: 3e-3
-  #   is_base_quantity: true
-  #   kind_rl: 'auto_update'
-  #   model_name_rl: ppo-fees_1em4-last_1h
-  #   model_version_rl: ~
+  rl-ppo-fees_1em4-last_1h-q_b_3em3-ms_1em4-mq_9em3:
+    class: RLTrader
+    strategy: rl-ppo-fees_1em4-last_1h-q_b_3em3-ms_1em4-mq_9em3
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    window_size: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    max_delay: 30e9
+    max_spread: 1e-4
+    quantity: 3e-3
+    min_quantity: 9e-3
+    is_base_quantity: true
+    kind_rl: 'auto_update'
+    model_name_rl: ppo-fees_1em4-last_1h
+    model_version_rl: ~

@@ -10,9 +10,9 @@ consumer:
 producer:
   bootstrap_servers: "kafka:9092"
 agents:
-  rl-ppo-fees_1em4-q_b_3em3-ms_1em4-none:
+  rl-ppo-fees_1em4-q_b_3em3-ms_1em4-mq_3em3:
     class: RLTrader
-    strategy: rl-ppo-fees_1em4-q_b_3em3-ms_1em4-none
+    strategy: rl-ppo-fees_1em4-q_b_3em3-ms_1em4-mq_3em3
     key: binance-btc-usdt
     is_test: false
     verbose: false
@@ -22,33 +22,15 @@ agents:
     watermark: 60e9
     max_delay: 30e9
     max_spread: 1e-4
-    is_max_spread_none_only: true
     quantity: 3e-3
+    min_quantity: 3e-3
     is_base_quantity: true
     kind_rl: 'auto_update'
     model_name_rl: ppo-fees_1em4
     model_version_rl: ~
-  # rl-ppo-fees_1em4-q_b_3em3-ms_1em4:
-  #   class: RLTrader
-  #   strategy: rl-ppo-fees_1em4-q_b_3em3-ms_1em4
-  #   key: binance-btc-usdt
-  #   is_test: false
-  #   verbose: false
-  #   horizon: 20
-  #   window_size: 20
-  #   prediction: 'quantile_0.5'
-  #   watermark: 60e9
-  #   max_delay: 30e9
-  #   max_spread: 1e-4
-  #   is_max_spread_none_only: false
-  #   quantity: 3e-3
-  #   is_base_quantity: true
-  #   kind_rl: 'auto_update'
-  #   model_name_rl: ppo-fees_1em4
-  #   model_version_rl: ~
-  rl-ppo-fees_1em4-q_b_3em3:
+  rl-ppo-fees_1em4-q_b_3em3-ms_1em4-mq_9em3:
     class: RLTrader
-    strategy: rl-ppo-fees_1em4-q_b_3em3
+    strategy: rl-ppo-fees_1em4-q_b_3em3-ms_1em4-mq_9em3
     key: binance-btc-usdt
     is_test: false
     verbose: false
@@ -57,16 +39,16 @@ agents:
     prediction: 'quantile_0.5'
     watermark: 60e9
     max_delay: 30e9
-    max_spread: ~
-    is_max_spread_none_only: false
+    max_spread: 1e-4
     quantity: 3e-3
+    min_quantity: 9e-3
     is_base_quantity: true
     kind_rl: 'auto_update'
     model_name_rl: ppo-fees_1em4
     model_version_rl: ~
-  rl-ppo-fees_1em5-q_b_3em3-ms_1em5-none:
+  rl-ppo-fees_1em5-q_b_3em3-ms_1em5-mq_3em3:
     class: RLTrader
-    strategy: rl-ppo-fees_1em5-q_b_3em3-ms_1em5-none
+    strategy: rl-ppo-fees_1em5-q_b_3em3-ms_1em5-mq_3em3
     key: binance-btc-usdt
     is_test: false
     verbose: false
@@ -76,33 +58,15 @@ agents:
     watermark: 60e9
     max_delay: 30e9
     max_spread: 1e-5
-    is_max_spread_none_only: true
     quantity: 3e-3
+    min_quantity: 3e-3
     is_base_quantity: true
     kind_rl: 'auto_update'
     model_name_rl: ppo-fees_1em5
     model_version_rl: ~
-  # rl-ppo-fees_1em5-q_b_3em3-ms_1em5:
-  #   class: RLTrader
-  #   strategy: rl-ppo-fees_1em5-q_b_3em3-ms_1em5
-  #   key: binance-btc-usdt
-  #   is_test: false
-  #   verbose: false
-  #   horizon: 20
-  #   window_size: 20
-  #   prediction: 'quantile_0.5'
-  #   watermark: 60e9
-  #   max_delay: 30e9
-  #   max_spread: 1e-5
-  #   is_max_spread_none_only: false
-  #   quantity: 3e-3
-  #   is_base_quantity: true
-  #   kind_rl: 'auto_update'
-  #   model_name_rl: ppo-fees_1em5
-  #   model_version_rl: ~
-  rl-ppo-fees_1em5-q_b_3em3:
+  rl-ppo-fees_1em5-q_b_3em3-ms_1em5-mq_9em3:
     class: RLTrader
-    strategy: rl-ppo-fees_1em5-q_b_3em3
+    strategy: rl-ppo-fees_1em5-q_b_3em3-ms_1em5-mq_9em3
     key: binance-btc-usdt
     is_test: false
     verbose: false
@@ -111,16 +75,16 @@ agents:
     prediction: 'quantile_0.5'
     watermark: 60e9
     max_delay: 30e9
-    max_spread: ~
-    is_max_spread_none_only: false
+    max_spread: 1e-5
     quantity: 3e-3
+    min_quantity: 9e-3
     is_base_quantity: true
     kind_rl: 'auto_update'
     model_name_rl: ppo-fees_1em5
     model_version_rl: ~
-  rl-ppo-fees_1em6-q_b_3em3-ms_1em6-none:
+  rl-ppo-fees_1em6-q_b_3em3-ms_1em6-mq_3em3:
     class: RLTrader
-    strategy: rl-ppo-fees_1em6-q_b_3em3-ms_1em6-none
+    strategy: rl-ppo-fees_1em6-q_b_3em3-ms_1em6-mq_3em3
     key: binance-btc-usdt
     is_test: false
     verbose: false
@@ -130,33 +94,15 @@ agents:
     watermark: 60e9
     max_delay: 30e9
     max_spread: 1e-6
-    is_max_spread_none_only: true
     quantity: 3e-3
+    min_quantity: 3e-3
     is_base_quantity: true
     kind_rl: 'auto_update'
     model_name_rl: ppo-fees_1em6
     model_version_rl: ~
-  # rl-ppo-fees_1em6-q_b_3em3-ms_1em6:
-  #   class: RLTrader
-  #   strategy: rl-ppo-fees_1em6-q_b_3em3-ms_1em6
-  #   key: binance-btc-usdt
-  #   is_test: false
-  #   verbose: false
-  #   horizon: 20
-  #   window_size: 20
-  #   prediction: 'quantile_0.5'
-  #   watermark: 60e9
-  #   max_delay: 30e9
-  #   max_spread: 1e-6
-  #   is_max_spread_none_only: false
-  #   quantity: 3e-3
-  #   is_base_quantity: true
-  #   kind_rl: 'auto_update'
-  #   model_name_rl: ppo-fees_1em6
-  #   model_version_rl: ~
-  rl-ppo-fees_1em6-q_b_3em3:
+  rl-ppo-fees_1em6-q_b_3em3-ms_1em6-mq_9em3:
     class: RLTrader
-    strategy: rl-ppo-fees_1em6-q_b_3em3
+    strategy: rl-ppo-fees_1em6-q_b_3em3-ms_1em6-mq_9em3
     key: binance-btc-usdt
     is_test: false
     verbose: false
@@ -165,9 +111,47 @@ agents:
     prediction: 'quantile_0.5'
     watermark: 60e9
     max_delay: 30e9
-    max_spread: ~
-    is_max_spread_none_only: false
     quantity: 3e-3
+    is_base_quantity: true
+    min_quantity: 9e-3
+    max_spread: 1e-6
+    kind_rl: 'auto_update'
+    model_name_rl: ppo-fees_1em6
+    model_version_rl: ~
+  rl-ppo-fees_1em6-q_b_3em3-ms_1em6-mq_3em2:
+    class: RLTrader
+    strategy: rl-ppo-fees_1em6-q_b_3em3-ms_1em6-mq_3em2
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    window_size: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    max_delay: 30e9
+    quantity: 3e-3
+    is_base_quantity: true
+    min_quantity: 3e-2
+    max_spread: 1e-6
+    kind_rl: 'auto_update'
+    model_name_rl: ppo-fees_1em6
+    model_version_rl: ~
+  rl-ppo-fees_1em6-q_b_3em3-ms_1em6-mq_3em3-sltp_1em2_1:
+    class: RLTrader
+    strategy: rl-ppo-fees_1em6-q_b_3em3-ms_1em6-mq_3em3-sltp_1em2_1
+    key: binance-btc-usdt
+    is_test: false
+    verbose: false
+    horizon: 20
+    window_size: 20
+    prediction: 'quantile_0.5'
+    watermark: 60e9
+    max_delay: 30e9
+    max_spread: 1e-6
+    quantity: 3e-3
+    min_quantity: 3e-3
+    sltp_r: 1.0
+    sltp_t: 1e-2
     is_base_quantity: true
     kind_rl: 'auto_update'
     model_name_rl: ppo-fees_1em6

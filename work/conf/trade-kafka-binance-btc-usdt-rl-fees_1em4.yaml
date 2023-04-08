@@ -24,6 +24,7 @@ agents:
     max_spread: 1e-4
     is_max_spread_none_only: true
     quantity: 3e-3
+    min_quantity: 3e-2
     is_base_quantity: true
     kind_rl: 'auto_update'
     model_name_rl: ppo-fees_1em4
@@ -42,6 +43,7 @@ agents:
     max_spread: 1e-4
     is_max_spread_none_only: false
     quantity: 3e-3
+    min_quantity: 3e-2
     is_base_quantity: true
     kind_rl: 'auto_update'
     model_name_rl: ppo-fees_1em4
@@ -60,6 +62,7 @@ agents:
     max_spread: ~
     is_max_spread_none_only: false
     quantity: 3e-3
+    min_quantity: 3e-2
     is_base_quantity: true
     kind_rl: 'auto_update'
     model_name_rl: ppo-fees_1em4
