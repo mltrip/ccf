@@ -10,6 +10,7 @@ from pprint import pprint
 import hmac
 import hashlib
 import logging
+from math import ceil, floor
 
 from kafka import KafkaConsumer, KafkaProducer, TopicPartition
 import pandas as pd
@@ -164,40 +165,69 @@ class Trader(Agent):
                                  add_api_key=False, add_signature=False,
                                  timestamp=None, recv_window=None,
                                  timeout=timeout, exchange=exchange)
-      if result is not None:
-        bids = result.pop('bids', [])
-        asks = result.pop('asks', [])
-        if len(bids) != limit:
-          print(f'Bad orderbook number of bids {len(bids)} != {limit} limit')
-          result = None
-        if len(asks) != limit:
-          print(f'Bad orderbook number of asks {len(asks)} != {limit} limit')
-          result = None
-        if result is not None:
-          for b_i, (b_p, b_q) in enumerate(bids):
-            b_p, b_q = float(b_p), float(b_q)
-            if b_p == 0 or b_q == 0:
-              print(f'Bad orderbook bid {b_i} with price {b_p} and quantity {b_q}')
-              result = None
-              break
-            result[f'b_p_{b_i}'] = b_p
-            result[f'b_q_{b_i}'] = b_q
-        if result is not None:
-          for a_i, (a_p, a_q) in enumerate(asks):
-            a_p, a_q = float(a_p), float(a_q)
-            if a_p == 0 or a_q == 0:
-              print(f'Bad orderbook ask {a_i} with price {a_p} and quantity {a_q}')
-              result = None
-              break
-            result[f'a_p_{a_i}'] = a_p
-            result[f'a_q_{a_i}'] = a_q
-        if result is not None:
-          result['m_p'] = 0.5*(result['a_p_0'] + result['b_p_0'])
-          result['s_p'] = result['a_p_0'] - result['b_p_0']
-          result['s_p-m_p'] = result['s_p'] / result['m_p']
+      result = Trader.message_to_orderbook(exchange=exchange, 
+                                           message=result, 
+                                           stream='orderbook')
     else:
       raise NotImplementedError(exchange) 
     return result
+  
+  @staticmethod
+  def message_to_orderbook(exchange, message, stream):
+    orderbook = None
+    if message is None:
+      return orderbook
+    if exchange == 'binance':
+      if isinstance(message, str):
+        data = json.loads(message)
+      elif isinstance(message, dict):
+        data = message
+      else:
+        raise NotImplementedError(message)
+      if stream == 'ticker':
+        orderbook = {}
+        orderbook['a_p_0'] = float(data.get('a', 0))
+        orderbook['a_q_0'] = float(data.get('A', 0))
+        orderbook['b_p_0'] = float(data.get('b', 0))
+        orderbook['b_q_0'] = float(data.get('B', 0))
+      elif stream == 'orderbook':
+        asks = data.pop('asks', [])
+        bids = data.pop('bids', [])
+        if len(asks) != len(bids) or len(asks) == 0 or len(bids) == 0:
+          orderbook = None
+        else:
+          orderbook = {}
+          for b_i, (b_p, b_q) in enumerate(bids):
+            orderbook[f'b_p_{b_i}'] = float(b_p)
+            orderbook[f'b_q_{b_i}'] = float(b_q)
+          for a_i, (a_p, a_q) in enumerate(asks):
+            orderbook[f'a_p_{a_i}'] = float(a_p)
+            orderbook[f'a_q_{a_i}'] = float(a_q)
+      else:
+        raise NotImplementedError(stream)
+      if orderbook is not None:
+        if any(x == 0 for x in orderbook.values()):
+          orderbook = None
+    else:
+      raise NotImplementedError(exchange)
+    if orderbook is not None:
+      orderbook['m_p'] = 0.5*(orderbook['a_p_0'] + orderbook['b_p_0'])
+      orderbook['s_p'] = orderbook['a_p_0'] - orderbook['b_p_0']
+      orderbook['s_p-m_p'] = orderbook['s_p'] / orderbook['m_p']
+    return orderbook
+  
+  @staticmethod
+  def fn_round(num, step_size, direction=floor):
+    zeros = 0
+    number = float(step_size)
+    while number < 0.1:
+      number *= 10
+      zeros += 1
+    if float(step_size) > 0.1:
+      places = zeros
+    else:
+      places = zeros + 1
+    return direction(num*(10**places)) / float(10**places)
   
   @staticmethod
   def calculate_vwap(orderbook, quantity, is_base_quantity=True):
@@ -529,7 +559,7 @@ class MomentumTrader(KafkaWebsocketTrader):
     start=None, stop=None, quant=None, size=None, watermark=None, delay=None, max_delay=None,
     feature=None, target=None, model=None, version=None, horizon=None, prediction=None,
     max_spread=None, is_max_spread_none_only=False, time_in_force='GTC', max_open_orders=None,
-    do_cancel_open_orders=True,
+    do_cancel_open_orders=False,
     t_x=0.0, t_v=0.0, t_a=0.0, n_x=0, n_v=0, n_a=0, 
     b_t_fs=None, s_t_fs=None, b_m_fs=None, s_m_fs=None,
     quantity=None, is_base_quantity=True, position='none',
@@ -613,6 +643,12 @@ class MomentumTrader(KafkaWebsocketTrader):
         pprint(cancel_result)
       for message in self._consumer:
         value = message.value
+        if value['exchange'] != exchange:
+          continue
+        if value['base'] != base:
+          continue
+        if value['quote'] != quote:
+          continue
         if value['horizon'] != self.horizon:
           continue
         if self.prediction not in value:
@@ -623,7 +659,7 @@ class MomentumTrader(KafkaWebsocketTrader):
         else:
           self.model = value['model']
         if self.version is not None:
-          if value['version'] != self.version:
+          if str(value['version']) != str(self.version):
             continue
         else:
           self.version = value['version']
@@ -1124,6 +1160,12 @@ class RLTrader(Trader):
         pprint(cancel_result)
       for message in self._consumer:
         value = message.value
+        if value['exchange'] != exchange:
+          continue
+        if value['base'] != base:
+          continue
+        if value['quote'] != quote:
+          continue
         if value['horizon'] != self.horizon:
           continue
         if self.prediction not in value:
@@ -1134,7 +1176,7 @@ class RLTrader(Trader):
         else:
           self.model = value['model']
         if self.version is not None:
-          if value['version'] != self.version:
+          if str(value['version']) != str(self.version):
             continue
         else:
           self.version = value['version']
@@ -1428,4 +1470,635 @@ class RLTrader(Trader):
       if self._ws is not None:
         self._ws.close()
       print(f'Done: trader {self.strategy}')
+
+      
+class RLFastTrader(Trader):
+  """Reinforcement Learning Fast Trader
   
+     See Also:
+       * https://binance-docs.github.io/apidocs/spot/en/#websocket-market-streams
+  """
+  
+  def __init__(
+    self, 
+    model_name_rl, 
+    strategy, 
+    key, 
+    api_url=None, api_key=None, secret_key=None,
+    prediction_topic='prediction',
+    metric_topic='metric',
+    consumer_partitioner=None, consumer=None, 
+    producer_partitioner=None, producer=None, 
+    timeout=None, 
+    start=None, stop=None, quant=None, size=None, watermark=None, delay=None, max_delay=None,
+    feature=None, target=None, model=None, version=None, horizon=None, prediction=None,
+    max_spread=None, is_max_spread_none_only=False, limit=100,
+    do_check_order_placement_open=True,
+    do_check_order_placement_close=True,
+    time_in_force='GTC', max_open_orders=None,
+    do_cancel_open_orders=True, window_size=20,
+    sltp_t=None, sltp_r=1.0,
+    do_log_account_status=False,
+    quantity=None, is_base_quantity=True, min_quantity=None, position='none',
+    is_test=False, verbose=False,
+    kind_rl=None, model_version_rl=None, model_stage_rl=None,
+    app=None, run=None, stream='ticker', depth=20, speed=100,
+    open_type='market', close_type='market', 
+    open_buy_price='a_vwap', open_sell_price='b_vwap', 
+    close_buy_price='a_vwap', close_sell_price='b_vwap',
+    precision=8, tick_size=0.01
+  ):
+    super().__init__(strategy=strategy, api_url=api_url, api_key=api_key, secret_key=secret_key)
+    self.key = key
+    exchange, base, quote = self.key.split('-')
+    self.exchange = exchange
+    self.base = base
+    self.quote = quote
+    self.symbol = f'{self.base}{self.quote}'.upper()
+    self.base_symbol = self.base.upper()
+    self.quote_symbol = self.quote.upper()
+    self.prediction_topic = prediction_topic
+    self.metric_topic = metric_topic
+    if consumer_partitioner is None:
+      consumer_partitioner = {}
+    self.consumer_partitioner = consumer_partitioner
+    self.consumer = {} if consumer is None else consumer
+    if producer_partitioner is None:
+      producer_partitioner = {}
+    self.producer_partitioner = producer_partitioner
+    self.producer = {} if producer is None else producer
+    self.timeout = timeout
+    self.start = start
+    self.stop = stop
+    self.quant = quant
+    self.size = size
+    self.watermark = int(watermark) if watermark is not None else watermark
+    self.delay = delay
+    self.max_delay = max_delay
+    self.model = model
+    self.version = version
+    self.feature = feature
+    self.target = target
+    self.horizon = horizon
+    self.prediction = prediction
+    self.max_spread = max_spread
+    self.is_max_spread_none_only = is_max_spread_none_only
+    self.do_cancel_open_orders = do_cancel_open_orders
+    self.do_log_account_status = do_log_account_status
+    self.do_check_order_placement_open = do_check_order_placement_open
+    self.do_check_order_placement_close = do_check_order_placement_close
+    self.time_in_force = time_in_force
+    self.max_open_orders = max_open_orders
+    self.window_size = window_size
+    self.quantity = quantity
+    self.is_base_quantity = is_base_quantity
+    self.limit = limit
+    self.min_quantity = min_quantity
+    self.position = position
+    self.is_test = is_test
+    self.verbose = verbose
+    self.kind_rl = kind_rl
+    self.model_name_rl = model_name_rl
+    self.model_version_rl = model_version_rl
+    self.cur_model_version_rl = model_version_rl
+    self.model_stage_rl = model_stage_rl
+    self.cur_model_stage_rl = model_stage_rl
+    self.sltp_t = sltp_t  # StopLoss-TakeProfit threshold
+    self.sltp_r = sltp_r  # StopLoss/TakeProfit
+    self._consumer = None
+    self._producer = None
+    self._model_rl = None
+    self._ws = None
+    self.app = {} if app is None else app
+    self.run = {} if run is None else run
+    self.cur_timestamp = time.time_ns()
+    self.last_timestamp = time.time_ns()
+    self.buffer = {}
+    self.action = 0  # 0: HOLD, 1: BUY, 2: SELL
+    self.order_id = None
+    self.order_prices = {}
+    self.base_balance = 0.0
+    self.quote_balance = 0.0
+    self.last_base_balance = 0.0
+    self.last_quote_balance = 0.0
+    self.stream = stream
+    self.depth = depth
+    self.speed = speed
+    self.open_type = open_type 
+    self.close_type = close_type
+    self.open_buy_price = open_buy_price
+    self.close_buy_price = close_buy_price
+    self.open_sell_price = open_sell_price
+    self.close_sell_price = close_sell_price
+    self.precision = precision
+    self.tick_size = tick_size
+    
+  def init_consumer(self):
+    consumer = deepcopy(self.consumer)
+    partitioner = deepcopy(self.consumer_partitioner)
+    partitioner_class = partitioner.pop('class')
+    partitioner = getattr(ccf_partitioners, partitioner_class)(**partitioner)
+    partitioner.update()
+    consumer['key_deserializer'] = partitioner.deserialize_key
+    consumer['value_deserializer'] = partitioner.deserialize_value
+    self._consumer = KafkaConsumer(**consumer)
+    partitions = partitioner[self.key]
+    self._consumer.assign([TopicPartition(y, x) 
+                           for x in partitions 
+                           for y in [self.prediction_topic]])
+
+  def init_producer(self):
+    producer = deepcopy(self.producer)
+    partitioner = deepcopy(self.producer_partitioner)
+    partitioner_class = partitioner.pop('class')
+    partitioner = getattr(ccf_partitioners, partitioner_class)(**partitioner)
+    partitioner.update()
+    producer['key_serializer'] = partitioner.serialize_key
+    producer['value_serializer'] = partitioner.serialize_value
+    self._producer = KafkaProducer(**producer)
+  
+  def init_ws(self):
+    self._ws = websocket.WebSocket()
+    self._ws.connect(self.api_url, timeout=self.timeout)
+    
+  def update_model_rl(self):
+    if self._model_rl is None:
+      print('Initalizing model')
+      last_model, last_version, last_stage = load_model(
+          self.model_name_rl, self.model_version_rl, self.model_stage_rl)
+      self._model_rl = last_model.unwrap_python_model().model
+      self.cur_model_version_rl = last_version
+      self.cur_model_stage_rl = last_stage
+    elif self.kind_rl == 'auto_update':
+      print('Auto-updating model')
+      _, last_version, last_stage = load_model(self.model_name_rl, 
+                                               self.model_version_rl, 
+                                               self.model_stage_rl,
+                                               metadata_only=True)
+      if int(last_version) > int(self.cur_model_version_rl):
+        print(f'Updating model from {self.cur_model_version_rl} to {last_version} version')
+        last_model, last_version, last_stage = load_model(
+          self.model_name_rl, self.model_version_rl, self.model_stage_rl)
+        self._model_rl = last_model.unwrap_python_model().model
+        self.cur_model_version_rl = last_version
+        self.cur_model_stage_rl = last_stage
+    else:
+      pass
+    
+  def update_buffer(self, messages):
+    for message in messages:
+      value = message.value
+      if value['exchange'] != self.exchange:
+        continue
+      if value['base'] != self.base:
+        continue
+      if value['quote'] != self.quote:
+        continue
+      if value['horizon'] != self.horizon:
+        continue
+      if self.prediction not in value:
+        continue
+      if self.model is not None:
+        if value['model'] != self.model:
+          continue
+      else:
+        self.model = value['model']
+      if self.version is not None:
+        if str(value['version']) != str(self.version):
+          continue
+      else:
+        self.version = value['version']
+      if self.quant is None:
+        self.quant = value['quant']
+      if self.feature is None:
+        self.feature = value['feature']
+      if self.target is None:
+        self.target = value['target']
+      timestamp = value['timestamp']
+      self.buffer.setdefault(timestamp, {}).update(value)
+    watermark_timestamp = self.cur_timestamp - self.watermark
+    self.buffer = {k: v for k, v in self.buffer.items() if k > watermark_timestamp}
+    
+  def update_action(self):
+    df = pd.DataFrame(self.buffer.values())
+    if len(df) == 0:
+      print(f'Skipping: empty data')
+      return
+    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ns')
+    df = df.set_index('timestamp').sort_index()
+    if self.verbose > 1:
+      print(df)
+    print(f'min:        {df.index.min()}')
+    print(f'max:        {df.index.max()}')
+    print(f'rows:       {len(df)}')
+    print(f'columns:    {len(df.columns)}')
+    if len(df) < self.window_size:
+      print(f'Skipping: data length {len(df)} < window size {self.window_size}')
+      return
+    if self.prediction not in df:
+      print(f'Skipping: no prediction {self.prediction} in df columns: {df.columns}')
+      return
+    if self.max_delay is not None:
+      prediction_timestamp = df.index.max().value - self.horizon*self.quant
+      delay = self.cur_timestamp - prediction_timestamp
+      if delay > self.max_delay:
+        print(f'Skipping: delay {delay} > {self.max_delay}')
+        return
+    if self.position == 'none':
+      self.update_model_rl()
+    obs = preprocess_data(df=df,  
+                          window_size=self.window_size,
+                          forecast_column=self.prediction, 
+                          price_column='last')
+    if self.verbose > 1:
+      print(obs)
+    action, _ = self._model_rl.predict(obs)  # 0: HOLD, 1: BUY, 2: SELL
+    print(f'Predicted action: {action}')
+    return action
+  
+  def update_order(self, symbol, order_id):
+    if order_id is None:
+      return order_id
+    order = self.query_order(self._ws, symbol, order_id, 
+                             timeout=self.timeout, 
+                             exchange=self.exchange)
+    pprint(order)
+    order_side = order['side']
+    order_status = order['status']
+    if order_status in ['FILLED']:
+      if order_side == 'BUY':
+        if self.position == 'none':
+          self.position = 'long'
+        elif self.position == 'short':
+          self.position = 'none'
+        else:
+          raise ValueError(f"Position can't be {self.position}!")
+      else:  # SELL
+        if self.position == 'none':
+          self.position = 'short'
+        elif self.position == 'long':
+          self.position = 'none'
+        else:
+          raise ValueError(f"Position can't be {self.position}!")
+      quote_quantity = float(order.get('cummulativeQuoteQty', 0.0))  # origQty
+      base_quantity = float(order.get('executedQty', 0.0))
+      if order_side == 'BUY':
+        quote_quantity = -quote_quantity
+        base_quantity = -base_quantity
+      self.base_balance += base_quantity
+      self.quote_balance += quote_quantity
+      if self.position == 'none':
+        base_delta = self.base_balance - self.last_base_balance
+        quote_delta = self.quote_balance - self.last_quote_balance
+        last_base_balance = self.base_balance
+        last_quote_balance = self.quote_balance
+      else:
+        base_delta = None
+        quote_delta = None
+      value = {
+        'metric': 'trade',
+        'timestamp': self.cur_timestamp,
+        'exchange': self.exchange,
+        'base': self.base,
+        'quote': self.quote,
+        'quant': self.quant,
+        'feature': self.feature,
+        'prediction': self.prediction,
+        'horizon': self.horizon,
+        'model': self.model,
+        'version': self.version,
+        'target': self.target,
+        'strategy': self.strategy,
+        'base_quantity': base_quantity,
+        'quote_quantity': quote_quantity,
+        'quantity': self.quantity,
+        'is_base_quantity': self.is_base_quantity,
+        'position': self.position,
+        'action': order_side.lower(),
+        'api_url': self.api_url,
+        'api_key': self.api_key,
+        'base_balance': self.base_balance,
+        'quote_balance': self.quote_balance,
+        'base_delta': base_delta,
+        'quote_delta': quote_delta,
+        'model_rl': self.model_name_rl,
+        'version_rl': self.cur_model_version_rl
+      }
+      # Get status
+      if self.do_log_account_status:
+        account_status = self.get_account_status(
+          self._ws, timeout=self.timeout, exchange=self.exchange)
+        if self.verbose:
+          print(account_status)
+        for b in account_status.get('balances'):
+          asset = b['asset']
+          if asset in [self.base_symbol, self.quote_symbol]:
+            value[f'free_{asset}'] = float(b['free'])
+            value[f'locked_{asset}'] = float(b['locked'])
+      if self.verbose:
+        pprint(value)
+      if not self.is_test:
+        self._producer.send(topic=self.metric_topic, key=self.key, value=value)
+      order_id = None
+    elif order_status in ['NEW', 'PARTIALLY_FILLED']:  # In process
+      print(f'Order {order_id} in process with status: {order_status}')
+    else:  # End
+      print(f'Order {order_id} ends with status: {order_status}')
+      order_id = None
+    return order_id
+  
+  def place_order(self, orderbook):
+    if self.order_id is not None:
+      print('Skipping: active order')
+      return self.order_id
+    new_order_id = None
+    do_buy = self.action == 1 and self.position != 'long'
+    do_sell = self.action == 2 and self.position != 'short'
+    print(f'do_buy: {do_buy}, do_sell: {do_sell}')
+    if not do_buy and not do_sell:
+      print('Skipping: no actions')
+      return new_order_id
+    if orderbook is None:
+      print('Skipping: bad orderbook')
+      return new_order_id
+    # VWAP
+    vwap = Trader.calculate_vwap(
+      orderbook=orderbook, 
+      quantity=self.min_quantity, 
+      is_base_quantity=self.is_base_quantity)
+    if vwap is None:
+      print('Skipping: bad vwap')
+      return new_order_id
+    prices = {**orderbook, **vwap}
+    pprint(prices)
+    # Check order placement
+    check_order_placement = prices['s_m_vwap'] < self.max_spread
+    if not check_order_placement:
+      if self.position == 'none' and self.do_check_order_placement_open:
+        print('Skipping: check order placement')
+        return new_order_id
+      elif self.position in ['long', 'short'] and self.do_check_order_placement_close:
+        print('Skipping: check order placement')
+        return new_order_id
+      else:
+        print(f'Order placement check is {check_order_placement} but not skipping')
+    # Stop Loss / Take Profit
+    do_sl_long = False
+    do_tp_long = False
+    do_sl_short = False
+    do_tp_short = False
+    if self.sltp_t is not None and self.position != 'none':
+      cur_a_vwap = prices.get('a_vwap', None)
+      cur_b_vwap = prices.get('b_vwap', None)
+      order_a_vwap = self.order_prices.get('a_vwap', None)
+      order_b_vwap = self.order_prices.get('b_vwap', None)
+      print(f'order bid:   {order_b_vwap}')
+      print(f'order ask:   {order_a_vwap}')
+      print(f'current bid: {cur_b_vwap}')
+      print(f'current ask: {cur_a_vwap}')
+      if all([x is not None for x in [cur_a_vwap, cur_b_vwap, order_a_vwap, order_b_vwap]]):
+        tp_t = self.sltp_t
+        sl_t = -self.sltp_t*self.sltp_r
+        if self.position == 'long':
+          pl = cur_b_vwap / order_a_vwap - 1.0  # Taker: Buy by Ask - Sell by Bid
+          if pl > tp_t:
+            print(f'tp long: pl {pl} > {tp_t} tp_t')
+            do_tp_long = True
+          elif pl < sl_t:
+            print(f'sl long: pl {pl} < {sl_t} sl_t')
+            do_sl_long = True
+        elif self.position == 'short':
+          pl = order_b_vwap / cur_a_vwap - 1.0  # Taker: Sell by Bid - Buy by Ask
+          if pl > tp_t:
+            print(f'tp short: pl {pl} > {tp_t} tp_t')
+            do_tp_short = True
+          elif pl < sl_t:
+            print(f'sl short: pl {pl} < {sl_t} sl_t')
+            do_sl_short = True
+        else:
+          print(f'Warning SL/TP: no prices!')
+          pprint(prices)
+    if any([do_buy, do_sell,
+            do_sl_long, do_tp_long,
+            do_sl_short, do_tp_short]):
+      if self.position == 'none':  # Open
+        if do_buy or do_sl_short or do_tp_short:
+          open_price = Trader.fn_round(prices[self.open_buy_price], self.tick_size)
+          print(f'open buy {self.open_type} {self.open_buy_price} {open_price}')
+          if self.open_type == 'market':
+            result = self.buy_taker(self._ws, 
+                                    symbol=self.symbol, 
+                                    quantity=self.quantity, 
+                                    is_base_quantity=self.is_base_quantity, 
+                                    is_test=self.is_test,
+                                    timeout=self.timeout, 
+                                    exchange=self.exchange)
+          elif self.open_type == 'limit':
+            result = self.buy_maker(self._ws,
+                                    symbol=self.symbol,
+                                    price=open_price,
+                                    time_in_force=self.time_in_force,
+                                    quantity=self.quantity, 
+                                    is_base_quantity=self.is_base_quantity, 
+                                    is_test=self.is_test,
+                                    timeout=self.timeout,
+                                    exchange=self.exchange)
+          else:
+            raise NotImplementedError(self.open_type)
+        elif do_sell or do_sl_long or do_tp_long:
+          open_price = Trader.fn_round(prices[self.open_sell_price], self.tick_size)
+          print(f'open sell {self.open_type} {self.open_sell_price} {open_price}')
+          if self.open_type == 'market':
+            result = self.sell_taker(self._ws,
+                                     symbol=self.symbol, 
+                                     quantity=self.quantity, 
+                                     is_base_quantity=self.is_base_quantity, 
+                                     is_test=self.is_test,
+                                     timeout=self.timeout,
+                                     exchange=self.exchange)
+          elif self.open_type == 'limit':
+            result = self.sell_maker(self._ws,
+                                     symbol=self.symbol,
+                                     price=open_price,
+                                     time_in_force=self.time_in_force,
+                                     quantity=self.quantity, 
+                                     is_base_quantity=self.is_base_quantity, 
+                                     is_test=self.is_test,
+                                     timeout=self.timeout,
+                                     exchange=self.exchange)
+          else:
+            raise NotImplementedError(self.open_type)
+        else:
+          raise NotImplementedError()
+      elif self.position in ['short', 'long']:  # Close
+        if do_buy or do_sl_short or do_tp_short:
+          close_price = Trader.fn_round(prices[self.close_buy_price], self.tick_size)
+          print(f'close buy {self.close_type} {self.close_buy_price} {close_price}')
+          if self.close_type == 'market':
+            result = self.buy_taker(self._ws, 
+                                    symbol=self.symbol, 
+                                    quantity=self.quantity, 
+                                    is_base_quantity=self.is_base_quantity, 
+                                    is_test=self.is_test,
+                                    timeout=self.timeout, 
+                                    exchange=self.exchange)
+          elif self.close_type == 'limit':
+            result = self.buy_maker(self._ws,
+                                    symbol=self.symbol,
+                                    price=close_price,
+                                    time_in_force=self.time_in_force,
+                                    quantity=self.quantity, 
+                                    is_base_quantity=self.is_base_quantity, 
+                                    is_test=self.is_test,
+                                    timeout=self.timeout,
+                                    exchange=self.exchange)
+          else:
+            raise NotImplementedError(self.close_type)
+        elif do_sell or do_sl_long or do_tp_long:
+          close_price = Trader.fn_round(prices[self.close_sell_price], self.tick_size)
+          print(f'close sell {self.close_type} {self.close_sell_price} {close_price}')
+          if self.close_type == 'market':
+            result = self.sell_taker(self._ws,
+                                     symbol=self.symbol, 
+                                     quantity=self.quantity, 
+                                     is_base_quantity=self.is_base_quantity, 
+                                     is_test=self.is_test,
+                                     timeout=self.timeout,
+                                     exchange=self.exchange)
+          elif self.close_type == 'limit':
+            result = self.sell_maker(self._ws,
+                                     symbol=self.symbol,
+                                     price=close_price,
+                                     time_in_force=self.time_in_force,
+                                     quantity=self.quantity, 
+                                     is_base_quantity=self.is_base_quantity, 
+                                     is_test=self.is_test,
+                                     timeout=self.timeout,
+                                     exchange=self.exchange)
+          else:
+            raise NotImplementedError(self.close_type)
+        else:
+          raise NotImplementedError()  
+      else:
+        raise NotImplementedError(self.position)
+      if result is not None:
+        self.order_prices = deepcopy(prices)
+        new_order_id = result.get('orderId', None)
+      else:
+        new_order_id = None
+      pprint(result)
+    return new_order_id
+      
+  def on_open(self, ws, *args, **kwargs):
+      print(f'Open {ws}')
+  
+  def on_close(self, ws, close_status_code, close_msg, *args, **kwargs):
+      print(f'Close {ws}: {close_status_code} {close_msg}')
+      
+  def on_error(self, ws, error, *args, **kwargs):
+      print(f'Error {ws}: {error}')
+      raise error     
+      
+  def on_message(self, ws, message):
+    self.cur_timestamp = time.time_ns()
+    dt = (self.cur_timestamp - self.last_timestamp)/1e9
+    print(f'\ntrade {self.strategy}')
+    print(f'now:        {datetime.fromtimestamp(self.cur_timestamp/1e9, tz=timezone.utc)}')
+    print(f'dt:         {dt}')
+    print(f'buffer:     {len(self.buffer)}')
+    orderbook = Trader.message_to_orderbook(self.exchange, message, self.stream)
+    do_prediction = True
+    result = self._consumer.poll(timeout_ms=0, max_records=None, update_offsets=True)
+    if len(result) > 0:
+      for topic_partition, messages in result.items():
+        self.update_buffer(messages)
+      self.action = self.update_action()
+    self.order_id = self.update_order(self.symbol, self.order_id)
+    self.order_id = self.place_order(orderbook) 
+    print(f'position: {self.position}, action: {self.action}, order_id: {self.order_id}')
+    self.last_timestamp = self.cur_timestamp
+
+  def __call__(self):
+    try:
+      # logger = logging.getLogger('kafka')
+      # logger.setLevel(logging.CRITICAL)
+      # websocket.enableTrace(True if self.verbose > 1 else False)
+      # Lazy init
+      if self._consumer is None:
+        self.init_consumer()
+      if self._producer is None:
+        self.init_producer()
+      if self._ws is None:
+        self.init_ws()
+      if self._model_rl is None:
+        self.update_model_rl()
+      app = deepcopy(self.app)
+      run = deepcopy(self.run)
+      if self.exchange == 'binance':
+        if self.stream == 'ticker':
+          suffix = f'{self.symbol.lower()}@bookTicker'
+        elif self.stream == 'orderbook':
+          suffix = f'{self.symbol.lower()}@depth{self.depth}@{self.speed}ms'
+        else:
+          raise NotImplementedError(self.stream)
+        # wss://stream.binance.com:9443 or wss://stream.binance.com:443
+        url = f'wss://stream.binance.com:9443/ws/{suffix}'
+        app['on_message'] = self.on_message
+        app['on_open'] = self.on_open
+        app['on_close'] = self.on_close
+        app['on_error'] = self.on_error
+        app['url'] = url
+      if self.timeout is not None:
+        websocket.setdefaulttimeout(self.timeout)
+      app = websocket.WebSocketApp(**app)
+      app.run_forever(**run)
+    except KeyboardInterrupt:
+      print(f"Keyboard interrupt: trader {self.strategy}")
+    except Exception as e:
+      print(f'Exception: trader {self.strategy}')
+      print(e)
+      # raise e
+    finally:
+      print(f'Stop: trader {self.strategy}')
+      self.init_ws()
+      if self.order_id is not None:
+        print(f'Cancel open order {self.order_id}: trader {self.strategy}')
+        result = self.cancel_order(self._ws, 
+                                   symbol=self.symbol, 
+                                   client_order_id=self.order_id, 
+                                   timeout=self.timeout, 
+                                   exchange=self.exchange)
+        pprint(result)
+      if self.position != 'none':
+        print(f'Close open {self.position} position: trader {self.strategy}')
+        if self.position == 'short':
+          result = self.buy_taker(self._ws, 
+                                  symbol=self.symbol, 
+                                  quantity=self.quantity, 
+                                  is_base_quantity=self.is_base_quantity, 
+                                  is_test=self.is_test,
+                                  timeout=self.timeout, 
+                                  exchange=self.exchange)
+        elif self.position == 'long':
+          result = self.sell_taker(self._ws,
+                                   symbol=self.symbol,
+                                   quantity=self.quantity, 
+                                   is_base_quantity=self.is_base_quantity, 
+                                   is_test=self.is_test,
+                                   timeout=self.timeout,
+                                   exchange=self.exchange)
+        else:
+          result = {}
+        pprint(result)
+        self.position = 'none'
+        print(f'Position {self.position}: trader {self.strategy}')
+      print(f'Close consumer: trader {self.strategy}')
+      if self._consumer is not None:
+        self._consumer.close()
+      print(f'Close producer: trader {self.strategy}')
+      if self._producer is not None:
+        self._producer.close()
+      print(f'Close websocket: trader {self.strategy}')
+      if self._ws is not None:
+        self._ws.close()
+      print(f'Done: trader {self.strategy}')

@@ -1,0 +1,39 @@
+defaults:
+  - partitioner@consumer_partitioner: prediction
+  - partitioner@producer_partitioner: metric
+  - _self_
+ 
+executor:
+  class: ProcessPoolExecutor
+consumer:
+  bootstrap_servers: "kafka:9092"
+producer:
+  bootstrap_servers: "kafka:9092"
+agents:
+  momentum-nv_6-tv_1em5-qb_5em4-ms_3em5-mq_1em3:
+    class: MomentumTrader
+    strategy: momentum-nv_6-tv_1em5-qb_5em4-ms_3em5-mq_1em3
+    key: binance-btc-tusd
+    model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+    version: 4
+    is_test: false
+    verbose: false
+    horizon: 20
+    prediction: value
+    watermark: 60e9
+    max_delay: 30e9
+    time_in_force: GTC  # GTC, IOC, FOK
+    max_spread: 3e-5
+    quantity: 5e-4
+    min_quantity: 1e-3
+    is_base_quantity: true
+    t_x: 0.0
+    t_v: 1e-5
+    t_a: 0.0
+    n_x: 0
+    n_v: 6
+    n_a: 0
+    b_t_fs: [ [ ~, 1, ~] ]
+    s_t_fs: [ [ ~, -1, ~] ]
+    b_m_fs: [ ]
+    s_m_fs: [ ]

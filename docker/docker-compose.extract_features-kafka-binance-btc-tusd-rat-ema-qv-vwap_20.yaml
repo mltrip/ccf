@@ -1,0 +1,23 @@
+version: '3.3'
+
+services:
+  extract_features-kafka-binance-btc-tusd-rat-ema-qv-vwap_20:
+    image: ccf
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    networks:
+      - db
+    working_dir: /app/work
+    entrypoint: [ python ]
+    command: [ ../src/ccf/extract_features.py, -cd, conf, -cn, extract_features-kafka-binance-btc-tusd-rat-ema-qv-vwap_20 ]
+    environment:
+      PYTHONPATH: /app/src
+    restart: always
+      
+networks:
+  db:
+    driver: bridge
+    
+# volumes:
+#   binance_btc_usdt:

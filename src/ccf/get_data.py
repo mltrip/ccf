@@ -11,6 +11,8 @@ from ccf.utils import wait_first_future
 def get_data(agents, executor=None):
   if executor is None:
     executor = {'class': 'ThreadPoolExecutor'}
+  if 'max_workers' not in executor:
+    executor['max_workers'] = len(agents)
   executor_class = executor.pop('class')
   executor = getattr(concurrent.futures, executor_class)(**executor)
   futures = []

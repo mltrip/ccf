@@ -1,0 +1,138 @@
+defaults:
+  - partitioner@consumer_partitioner: prediction
+  - partitioner@producer_partitioner: metric
+  - _self_
+ 
+executor:
+  class: ProcessPoolExecutor
+consumer:
+  bootstrap_servers: "kafka:9092"
+producer:
+  bootstrap_servers: "kafka:9092"
+agents:
+  # rl-fast-ticker-ppo-fees_1em4-qb_3em3-ms_1em4-mq_3em3-limit_ab_vwap:
+  #   class: RLFastTrader
+  #   strategy: rl-fast-ticker-ppo-fees_1em4-qb_3em3-ms_1em4-mq_3em3-limit_ab_vwap
+  #   key: binance-btc-usdt
+  #   model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+  #   version: 4
+  #   time_in_force: FOK  # GTC, FOK, IOC
+  #   open_type: limit  # market
+  #   close_type: limit  # market
+  #   open_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   close_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   open_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   close_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   stream: ticker
+  #   depth: 20
+  #   speed: 1000
+  #   is_test: false
+  #   verbose: false
+  #   do_log_account_status: true
+  #   horizon: 20
+  #   window_size: 20
+  #   prediction: quantile_0.5  # value, quantile_0.5
+  #   watermark: 60e9
+  #   max_delay: 30e9
+  #   max_spread: 1e-4
+  #   quantity: 3e-3
+  #   min_quantity: 3e-3
+  #   is_base_quantity: true
+  #   kind_rl: 'none'  # 'auto_update'
+  #   model_name_rl: ppo-fees_1em4
+  #   model_version_rl: 7
+  # rl-fast-ticker-ppo-fees_1em4-qb_3em3-ms_1em4-mq_3em3-limit_m_vwap:
+  #   class: RLFastTrader
+  #   strategy: rl-fast-ticker-ppo-fees_1em4-qb_3em3-ms_1em4-mq_3em3-limit_m_vwap
+  #   key: binance-btc-usdt
+  #   model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+  #   version: 4
+  #   time_in_force: FOK  # GTC, FOK, IOC
+  #   open_type: limit  # market
+  #   close_type: limit  # market
+  #   open_buy_price: m_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   close_buy_price: m_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   open_sell_price: m_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   close_sell_price: m_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   stream: ticker
+  #   depth: 20
+  #   speed: 1000
+  #   is_test: false
+  #   verbose: false
+  #   do_log_account_status: true
+  #   horizon: 20
+  #   window_size: 20
+  #   prediction: quantile_0.5  # value, quantile_0.5
+  #   watermark: 60e9
+  #   max_delay: 30e9
+  #   max_spread: 1e-4
+  #   quantity: 3e-3
+  #   min_quantity: 3e-3
+  #   is_base_quantity: true
+  #   kind_rl: 'none'  # 'auto_update'
+  #   model_name_rl: ppo-fees_1em4
+  #   model_version_rl: 7
+  rl-fast-ob-ppo-fees_1em4-qb_3em3-ms_1em4-mq_3em3-olcl-m_vwap:
+    class: RLFastTrader
+    strategy: rl-fast-ob-ppo-fees_1em4-qb_3em3-ms_1em4-mq_3em3-olcl-m_vwap
+    key: binance-btc-usdt
+    model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+    version: 4
+    time_in_force: FOK  # GTC, FOK, IOC
+    open_type: limit  # market
+    close_type: limit  # market
+    open_buy_price: m_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+    close_buy_price: m_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+    open_sell_price: m_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+    close_sell_price: m_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+    precision: 8
+    tick_size: 0.01
+    stream: orderbook
+    depth: 20
+    speed: 100
+    is_test: false
+    verbose: false
+    do_log_account_status: true
+    horizon: 20
+    window_size: 20
+    prediction: quantile_0.5  # value, quantile_0.5
+    watermark: 60e9
+    max_delay: 30e9
+    max_spread: 1e-4
+    quantity: 3e-3
+    min_quantity: 3e-3
+    is_base_quantity: true
+    kind_rl: 'none'  # 'auto_update'
+    model_name_rl: ppo-fees_1em4
+    model_version_rl: 7
+  # rl-fast-ticker-ppo-fees_1em4-qb_3em3-ms_1em4-mq_3em3-ol_cm_ab_vwap:
+  #   class: RLFastTrader
+  #   strategy: rl-fast-ticker-ppo-fees_1em4-qb_3em3-ms_1em4-mq_3em3-ol_cm_ab_vwap
+  #   key: binance-btc-usdt
+  #   model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+  #   version: 4
+  #   time_in_force: FOK  # GTC, FOK, IOC
+  #   open_type: limit  # market
+  #   close_type: market  # market
+  #   open_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   close_buy_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   open_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   close_sell_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   stream: ticker
+  #   depth: 20
+  #   speed: 1000
+  #   is_test: false
+  #   verbose: false
+  #   do_log_account_status: true
+  #   horizon: 20
+  #   window_size: 20
+  #   prediction: quantile_0.5  # value, quantile_0.5
+  #   watermark: 60e9
+  #   max_delay: 30e9
+  #   max_spread: 1e-4
+  #   quantity: 3e-3
+  #   min_quantity: 3e-3
+  #   is_base_quantity: true
+  #   kind_rl: 'none'  # 'auto_update'
+  #   model_name_rl: ppo-fees_1em4
+  #   model_version_rl: 7
