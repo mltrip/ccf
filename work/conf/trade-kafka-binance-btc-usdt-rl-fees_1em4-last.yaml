@@ -48,26 +48,26 @@ agents:
   #   kind_rl: 'auto_update'
   #   model_name_rl: ppo-fees_1em4-last
   #   model_version_rl: ~
-  rl-ppo-fees_1em4-last_6h-q_b_3em3-ms_1em4-mq_3em3:
-    class: RLTrader
-    strategy: rl-ppo-fees_1em4-last_6h-q_b_3em3-ms_1em4-mq_3em3
-    key: binance-btc-usdt
-    model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
-    version: 4
-    is_test: false
-    verbose: false
-    horizon: 20
-    window_size: 20
-    prediction: 'quantile_0.5'
-    watermark: 60e9
-    max_delay: 30e9
-    max_spread: 1e-4
-    quantity: 3e-3
-    min_quantity: 3e-3
-    is_base_quantity: true
-    kind_rl: 'auto_update'
-    model_name_rl: ppo-fees_1em4-last_6h
-    model_version_rl: ~
+  # rl-ppo-fees_1em4-last_6h-q_b_3em3-ms_1em4-mq_3em3:
+  #   class: RLTrader
+  #   strategy: rl-ppo-fees_1em4-last_6h-q_b_3em3-ms_1em4-mq_3em3
+  #   key: binance-btc-usdt
+  #   model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+  #   version: 4
+  #   is_test: false
+  #   verbose: false
+  #   horizon: 20
+  #   window_size: 20
+  #   prediction: 'quantile_0.5'
+  #   watermark: 60e9
+  #   max_delay: 30e9
+  #   max_spread: 1e-4
+  #   quantity: 3e-3
+  #   min_quantity: 3e-3
+  #   is_base_quantity: true
+  #   kind_rl: 'auto_update'
+  #   model_name_rl: ppo-fees_1em4-last_6h
+  #   model_version_rl: ~
   # rl-ppo-fees_1em4-last_6h-q_b_3em3-ms_1em4-mq_9em3:
   #   class: RLTrader
   #   strategy: rl-ppo-fees_1em4-last_6h-q_b_3em3-ms_1em4-mq_9em3
@@ -86,26 +86,26 @@ agents:
   #   kind_rl: 'auto_update'
   #   model_name_rl: ppo-fees_1em4-last_6h
   #   model_version_rl: ~
-  rl-ppo-fees_1em4-last_1h-q_b_3em3-ms_1em4-mq_3em3:
-    class: RLTrader
-    strategy: rl-ppo-fees_1em4-last_1h-q_b_3em3-ms_1em4-mq_3em3
-    key: binance-btc-usdt
-    model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
-    version: 4
-    is_test: false
-    verbose: false
-    horizon: 20
-    window_size: 20
-    prediction: 'quantile_0.5'
-    watermark: 60e9
-    max_delay: 30e9
-    max_spread: 1e-4
-    quantity: 3e-3
-    min_quantity: 3e-3
-    is_base_quantity: true
-    kind_rl: 'auto_update'
-    model_name_rl: ppo-fees_1em4-last_1h
-    model_version_rl: ~
+  # rl-ppo-fees_1em4-last_1h-q_b_3em3-ms_1em4-mq_3em3:
+  #   class: RLTrader
+  #   strategy: rl-ppo-fees_1em4-last_1h-q_b_3em3-ms_1em4-mq_3em3
+  #   key: binance-btc-usdt
+  #   model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+  #   version: 4
+  #   is_test: false
+  #   verbose: false
+  #   horizon: 20
+  #   window_size: 20
+  #   prediction: 'quantile_0.5'
+  #   watermark: 60e9
+  #   max_delay: 30e9
+  #   max_spread: 1e-4
+  #   quantity: 3e-3
+  #   min_quantity: 3e-3
+  #   is_base_quantity: true
+  #   kind_rl: 'auto_update'
+  #   model_name_rl: ppo-fees_1em4-last_1h
+  #   model_version_rl: ~
   # rl-ppo-fees_1em4-last_1h-q_b_3em3-ms_1em4-mq_9em3:
   #   class: RLTrader
   #   strategy: rl-ppo-fees_1em4-last_1h-q_b_3em3-ms_1em4-mq_9em3
