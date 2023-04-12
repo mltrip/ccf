@@ -285,7 +285,7 @@ class Trader(Agent):
       's_m_vwap': s_m_vwap}
     return vwap
   
-  def buy_taker(self, ws, symbol, quantity, exchange, is_base_quantity=True, 
+  def buy_market(self, ws, symbol, quantity, exchange, is_base_quantity=True, 
                 is_test=False, recv_window=5000, timeout=None):
     if exchange == 'binance':
       params = {
@@ -307,7 +307,7 @@ class Trader(Agent):
                                  recv_window=recv_window, exchange=exchange)
     return response
   
-  def sell_taker(self, ws, symbol, quantity, exchange, is_base_quantity=True, 
+  def sell_market(self, ws, symbol, quantity, exchange, is_base_quantity=True, 
                  is_test=False, recv_window=5000, timeout=None):
     if exchange == 'binance':
       params = {
@@ -329,13 +329,13 @@ class Trader(Agent):
                                  recv_window=recv_window, exchange=exchange)
     return response
   
-  def buy_maker(self, ws, symbol, price, quantity, time_in_force='GTC', 
-                is_base_quantity=True, is_test=False,
+  def buy_limit(self, ws, symbol, price, quantity, time_in_force='GTC', 
+                is_base_quantity=True, is_test=False, post_only=False,
                 recv_window=5000, timeout=None, exchange=None):
     params = {
         "symbol": symbol,
         "side": "BUY",
-        "type": "LIMIT",
+        "type": "LIMIT" if not post_only else "LIMIT_MAKER",
         "price": price,
         "timeInForce": time_in_force
     }
@@ -350,13 +350,13 @@ class Trader(Agent):
                              timestamp=timestamp, 
                              recv_window=recv_window, timeout=timeout, exchange=exchange)
   
-  def sell_maker(self, ws, symbol, price, quantity, time_in_force='GTC', 
-                 is_base_quantity=True, is_test=False,
+  def sell_limit(self, ws, symbol, price, quantity, time_in_force='GTC', 
+                 is_base_quantity=True, is_test=False, post_only=False,
                  recv_window=5000, timeout=None, exchange=None):
     params = {
         "symbol": symbol,
         "side": "SELL",
-        "type": "LIMIT",
+        "type": "LIMIT" if not post_only else "LIMIT_MAKER",
         "price": price,
         "timeInForce": time_in_force
     }
@@ -389,16 +389,17 @@ class Trader(Agent):
                              timestamp=timestamp, recv_window=recv_window, 
                              timeout=timeout, exchange=exchange)
   
-  def cancel_replace_buy_maker(self, ws, symbol, order_id, 
+  def cancel_replace_buy_limit(self, ws, symbol, order_id, 
                                price, quantity, time_in_force='GTC',
                                cancel_restrictions=None,
                                cancel_replace_mode='STOP_ON_FAILURE',
                                is_base_quantity=True, is_test=False,
+                               post_only=False,
                                recv_window=5000, timeout=None, exchange=None):
     params = {
         "symbol": symbol,
         "side": "BUY",
-        "type": "LIMIT",
+        "type": "LIMIT" if not post_only else "LIMIT_MAKER",
         "price": price,
         "cancelReplaceMode": cancel_replace_mode,
         "timeInForce": time_in_force,
@@ -417,16 +418,17 @@ class Trader(Agent):
                              timestamp=timestamp, recv_window=recv_window, 
                              timeout=timeout, exchange=exchange)
   
-  def cancel_replace_sell_maker(self, ws, symbol, order_id, 
+  def cancel_replace_sell_limit(self, ws, symbol, order_id, 
                                 price, quantity, time_in_force='GTC',
                                 cancel_restrictions=None,
                                 cancel_replace_mode='STOP_ON_FAILURE',
                                 is_base_quantity=True, is_test=False,
+                                post_only=False,
                                 recv_window=5000, timeout=None, exchange=None):
     params = {
         "symbol": symbol,
         "side": "SELL",
-        "type": "LIMIT",
+        "type": "LIMIT" if not post_only else "LIMIT_MAKER",
         "price": price,
         "cancelReplaceMode": cancel_replace_mode,
         "timeInForce": time_in_force,
@@ -467,7 +469,6 @@ class Trader(Agent):
     return self.send_request(ws, method, params,
                              timestamp=timestamp, recv_window=recv_window, 
                              timeout=timeout, exchange=exchange)
-  
   
   def buy_oco(self, ws, symbol, quantity, price, stop_price, stop_limit_price,
               time_in_force='GTC', new_order_resp_type='RESULT',
@@ -521,7 +522,7 @@ class Trader(Agent):
       i += 1
       print(f'Closing {position} position attempt {i}/{max_attempts}')
       if position == 'short':
-        result = self.buy_taker(ws=ws, 
+        result = self.buy_market(ws=ws, 
                                 exchange=exchange,
                                 symbol=symbol, 
                                 quantity=quantity, 
@@ -530,7 +531,7 @@ class Trader(Agent):
                                 recv_window=recv_window,
                                 timeout=timeout)
       elif position == 'long':
-        result = self.sell_taker(ws=ws,
+        result = self.sell_market(ws=ws,
                                  exchange=exchange,
                                  symbol=symbol,
                                  quantity=quantity, 
@@ -974,8 +975,8 @@ class MomentumTrader(KafkaWebsocketTrader):
               else:
                 print(f'Order placement check is {check_order_placement} but not skipping')
             if do_b_t:
-              print('buy_taker')
-              result = self.buy_taker(self._ws, 
+              print('buy_market')
+              result = self.buy_market(self._ws, 
                                       symbol=symbol, 
                                       quantity=self.quantity, 
                                       is_base_quantity=self.is_base_quantity, 
@@ -983,8 +984,8 @@ class MomentumTrader(KafkaWebsocketTrader):
                                       timeout=self.timeout, 
                                       exchange=exchange)
             # elif do_b_m:
-            #   print('buy_maker')
-            #   result = self.buy_maker(self._ws, 
+            #   print('buy_limit')
+            #   result = self.buy_limit(self._ws, 
             #                           symbol,
             #                           price=orderbook['b_p_0'],
             #                           time_in_force=self.time_in_force,
@@ -994,8 +995,8 @@ class MomentumTrader(KafkaWebsocketTrader):
             #                           timeout=self.timeout, 
             #                           exchange=exchange)
             elif do_s_t:
-              print('sell_taker')
-              result = self.sell_taker(self._ws,
+              print('sell_market')
+              result = self.sell_market(self._ws,
                                        symbol=symbol, 
                                        quantity=self.quantity, 
                                        is_base_quantity=self.is_base_quantity, 
@@ -1003,8 +1004,8 @@ class MomentumTrader(KafkaWebsocketTrader):
                                        timeout=self.timeout,
                                        exchange=exchange)
             # elif do_s_m:
-            #   print('sell_maker')
-            #   result = self.sell_maker(self._ws,
+            #   print('sell_limit')
+            #   result = self.sell_limit(self._ws,
             #                            symbol, 
             #                            price=orderbook['a_p_0'],
             #                            time_in_force=self.time_in_force,
@@ -1391,14 +1392,14 @@ class RLTrader(Trader):
             print(obs)
           action, _ = self._model_rl.predict(obs)  # 0: HOLD, 1: BUY, 2: SELL
           print(f'Predicted action: {action}')
-          do_buy_taker = action == 1 and self.position != 'long'
-          do_sell_taker = action == 2 and self.position != 'short'
-          print(f'do_buy_taker: {do_buy_taker}')
-          print(f'do_sell_taker: {do_sell_taker}')
-          if not do_buy_taker and not do_sell_taker and self.sltp_t is None:
+          do_buy_market = action == 1 and self.position != 'long'
+          do_sell_market = action == 2 and self.position != 'short'
+          print(f'do_buy_market: {do_buy_market}')
+          print(f'do_sell_market: {do_sell_market}')
+          if not do_buy_market and not do_sell_market and self.sltp_t is None:
             print('Skipping: no actions')
             continue
-          # if not do_buy_taker and not do_buy_taker
+          # if not do_buy_market and not do_buy_market
           orderbook = self.get_orderbook(self._ws, 
                                          symbol=symbol, 
                                          limit=self.limit, 
@@ -1443,7 +1444,7 @@ class RLTrader(Trader):
               tp_t = self.sltp_t
               sl_t = -self.sltp_t*self.sltp_r
               if self.position == 'long':
-                pl = cur_b_vwap / order_a_vwap - 1.0  # Taker: Buy by Ask - Sell by Bid
+                pl = cur_b_vwap / order_a_vwap - 1.0  # Buy by Ask - Sell by Bid
                 if pl > tp_t:
                   print(f'tp long: pl {pl} > {tp_t} tp_t')
                   do_tp_long = True
@@ -1451,7 +1452,7 @@ class RLTrader(Trader):
                   print(f'sl long: pl {pl} < {sl_t} sl_t')
                   do_sl_long = True
               elif self.position == 'short':
-                pl = order_b_vwap / cur_a_vwap - 1.0  # Taker: Sell by Bid - Buy by Ask
+                pl = order_b_vwap / cur_a_vwap - 1.0  # Sell by Bid - Buy by Ask
                 if pl > tp_t:
                   print(f'tp short: pl {pl} > {tp_t} tp_t')
                   do_tp_short = True
@@ -1462,19 +1463,19 @@ class RLTrader(Trader):
                 print(f'Warning SL/TP: no data!')
                 pprint(orderbook)
                 pprint(order_vwap)
-          if any([do_buy_taker, do_sell_taker,
+          if any([do_buy_market, do_sell_market,
                   do_sl_long, do_tp_long,
                   do_sl_short, do_tp_short]):
-            if do_buy_taker or do_sl_short or do_tp_short:
-              result = self.buy_taker(self._ws, 
+            if do_buy_market or do_sl_short or do_tp_short:
+              result = self.buy_market(self._ws, 
                                       symbol, 
                                       quantity=self.quantity, 
                                       is_base_quantity=self.is_base_quantity, 
                                       is_test=self.is_test,
                                       timeout=self.timeout, 
                                       exchange=exchange)
-            elif do_sell_taker or do_sl_long or do_tp_long:
-              result = self.sell_taker(self._ws,
+            elif do_sell_market or do_sl_long or do_tp_long:
+              result = self.sell_market(self._ws,
                                         symbol, 
                                         quantity=self.quantity, 
                                         is_base_quantity=self.is_base_quantity, 
@@ -1500,7 +1501,7 @@ class RLTrader(Trader):
         print(f'Close open {self.position} position: trader {self.strategy}')
         self.init_ws()
         if self.position == 'short':
-          result = self.buy_taker(self._ws, 
+          result = self.buy_market(self._ws, 
                                   symbol=symbol, 
                                   quantity=self.quantity, 
                                   is_base_quantity=self.is_base_quantity, 
@@ -1508,7 +1509,7 @@ class RLTrader(Trader):
                                   timeout=self.timeout, 
                                   exchange=exchange)
         elif self.position == 'long':
-          result = self.sell_taker(self._ws,
+          result = self.sell_market(self._ws,
                                    symbol=symbol,
                                    quantity=self.quantity, 
                                    is_base_quantity=self.is_base_quantity, 
@@ -1566,10 +1567,10 @@ class RLFastTrader(Trader):
     open_type='market', close_type='market', 
     open_buy_price='a_vwap', open_sell_price='b_vwap', 
     close_buy_price='a_vwap', close_sell_price='b_vwap',
-    precision=8, tick_size=0.01, open_d_price=0.0, close_d_price=0.0, min_d_price=0.0,
+    precision=8, tick_size=0.01, open_price_offset=0.0, close_price_offset=0.0, min_d_price=0.0,
     open_cancel_timeout=None, close_cancel_timeout=None, 
     do_check_ema=False,
-    ema_quant=1e9, ema_alpha=None, ema_length=None
+    ema_quant=1e9, ema_alpha=None, ema_length=None, post_only=False
   ):
     super().__init__(strategy=strategy, api_url=api_url, api_key=api_key, secret_key=secret_key)
     self.key = key
@@ -1605,8 +1606,8 @@ class RLFastTrader(Trader):
     self.horizon = horizon
     self.prediction = prediction
     self.emax_spread = max_spread
-    self.open_d_price = open_d_price 
-    self.close_d_price = close_d_price 
+    self.open_price_offset = open_price_offset 
+    self.close_price_offset = close_price_offset 
     self.is_max_spread_none_only = is_max_spread_none_only
     self.do_cancel_open_orders = do_cancel_open_orders
     self.do_log_account_status = do_log_account_status
@@ -1667,6 +1668,7 @@ class RLFastTrader(Trader):
     self.ema_alpha = 2/(ema_length + 1) if ema_alpha is None else ema_alpha
     self.ema_quant = ema_quant
     self.ema_cnt = 0
+    self.post_only = post_only
     
   def init_consumer(self):
     consumer = deepcopy(self.consumer)
@@ -1920,16 +1922,17 @@ class RLFastTrader(Trader):
         if order_side == 'BUY':
           print(f'Replacing buy order {order_id}')
           if self.position == 'none':  # Open long
-            price = (1.0 - self.open_d_price)*prices[self.open_buy_price]
+            price = (1.0 - self.open_price_offset)*prices[self.open_buy_price]
           elif self.position == 'short':  # Close short
-            price = (1.0 - self.close_d_price)*prices[self.close_buy_price]
+            price = (1.0 - self.close_price_offset)*prices[self.close_buy_price]
           else:
             raise ValueError(f"Position can't be {self.position}!")
           price = Trader.fn_round(price, self.tick_size, direction=floor)
-          result = self.cancel_replace_buy_maker(
+          result = self.cancel_replace_buy_limit(
             ws=self._ws,
             symbol=self.symbol,
             order_id=order_id,
+            post_only=self.post_only,
             cancel_replace_mode='STOP_ON_FAILURE',
             cancel_restrictions='ONLY_NEW',
             price=price,
@@ -1945,16 +1948,17 @@ class RLFastTrader(Trader):
         elif order_side == 'SELL':
           print(f'Replacing sell order {order_id}')
           if self.position == 'none':  # Open short
-            price = (1.0 + self.open_d_price)*prices[self.open_sell_price]
+            price = (1.0 + self.open_price_offset)*prices[self.open_sell_price]
           elif self.position == 'long':  # Close long
-            price = (1.0 + self.close_d_price)*prices[self.close_sell_price]
+            price = (1.0 + self.close_price_offset)*prices[self.close_sell_price]
           else:
             raise ValueError(f"Position can't be {self.position}!")
           price = Trader.fn_round(price, self.tick_size, direction=ceil)
-          result = self.cancel_replace_sell_maker(
+          result = self.cancel_replace_sell_limit(
             ws=self._ws,
             symbol=self.symbol,
             order_id=order_id,
+            post_only=self.post_only,
             cancel_replace_mode='STOP_ON_FAILURE',
             cancel_restrictions='ONLY_NEW',
             price=price,
@@ -2015,7 +2019,7 @@ class RLFastTrader(Trader):
         tp_t = self.sltp_t
         sl_t = -self.sltp_t*self.sltp_r
         if self.position == 'long':
-          pl = cur_b_vwap / order_a_vwap - 1.0  # Taker: Buy by Ask - Sell by Bid
+          pl = cur_b_vwap / order_a_vwap - 1.0  # Buy by Ask - Sell by Bid
           if pl > tp_t:
             print(f'tp long: pl {pl} > {tp_t} tp_t')
             do_tp_long = True
@@ -2023,7 +2027,7 @@ class RLFastTrader(Trader):
             print(f'sl long: pl {pl} < {sl_t} sl_t')
             do_sl_long = True
         elif self.position == 'short':
-          pl = order_b_vwap / cur_a_vwap - 1.0  # Taker: Sell by Bid - Buy by Ask
+          pl = order_b_vwap / cur_a_vwap - 1.0  # Sell by Bid - Buy by Ask
           if pl > tp_t:
             print(f'tp short: pl {pl} > {tp_t} tp_t')
             do_tp_short = True
@@ -2072,11 +2076,11 @@ class RLFastTrader(Trader):
           #     return new_order
       if self.position == 'none':  # Open
         if do_buy or do_sl_short or do_tp_short:
-          price = (1.0 - self.open_d_price)*prices[self.open_buy_price]
+          price = (1.0 - self.open_price_offset)*prices[self.open_buy_price]
           price = Trader.fn_round(price, self.tick_size, direction=floor)
           print(f'open buy {self.open_type} {self.open_buy_price} {price}')
           if self.open_type == 'market':
-            result = self.buy_taker(self._ws, 
+            result = self.buy_market(self._ws, 
                                     symbol=self.symbol, 
                                     quantity=self.quantity, 
                                     is_base_quantity=self.is_base_quantity, 
@@ -2084,9 +2088,10 @@ class RLFastTrader(Trader):
                                     timeout=self.timeout, 
                                     exchange=self.exchange)
           elif self.open_type == 'limit':
-            result = self.buy_maker(self._ws,
+            result = self.buy_limit(self._ws,
                                     symbol=self.symbol,
                                     price=price,
+                                    post_only=self.post_only,
                                     time_in_force=self.time_in_force,
                                     quantity=self.quantity, 
                                     is_base_quantity=self.is_base_quantity, 
@@ -2096,11 +2101,11 @@ class RLFastTrader(Trader):
           else:
             raise NotImplementedError(self.open_type)
         elif do_sell or do_sl_long or do_tp_long:
-          price = (1.0 + self.open_d_price)*prices[self.open_sell_price]
+          price = (1.0 + self.open_price_offset)*prices[self.open_sell_price]
           price = Trader.fn_round(price, self.tick_size, direction=ceil)
           print(f'open sell {self.open_type} {self.open_sell_price} {price}')
           if self.open_type == 'market':
-            result = self.sell_taker(self._ws,
+            result = self.sell_market(self._ws,
                                      symbol=self.symbol, 
                                      quantity=self.quantity, 
                                      is_base_quantity=self.is_base_quantity, 
@@ -2108,9 +2113,10 @@ class RLFastTrader(Trader):
                                      timeout=self.timeout,
                                      exchange=self.exchange)
           elif self.open_type == 'limit':
-            result = self.sell_maker(self._ws,
+            result = self.sell_limit(self._ws,
                                      symbol=self.symbol,
                                      price=price,
+                                     post_only=self.post_only,
                                      time_in_force=self.time_in_force,
                                      quantity=self.quantity, 
                                      is_base_quantity=self.is_base_quantity, 
@@ -2123,11 +2129,11 @@ class RLFastTrader(Trader):
           raise NotImplementedError()
       elif self.position in ['short', 'long']:  # Close
         if do_buy or do_sl_short or do_tp_short:
-          price = (1.0 - self.close_d_price)*prices[self.close_buy_price]
+          price = (1.0 - self.close_price_offset)*prices[self.close_buy_price]
           price = Trader.fn_round(price, self.tick_size, direction=floor)
           print(f'close buy {self.close_type} {self.close_buy_price} {price}')
           if self.close_type == 'market':
-            result = self.buy_taker(self._ws, 
+            result = self.buy_market(self._ws, 
                                     symbol=self.symbol, 
                                     quantity=self.quantity, 
                                     is_base_quantity=self.is_base_quantity, 
@@ -2135,9 +2141,10 @@ class RLFastTrader(Trader):
                                     timeout=self.timeout, 
                                     exchange=self.exchange)
           elif self.close_type == 'limit':
-            result = self.buy_maker(self._ws,
+            result = self.buy_limit(self._ws,
                                     symbol=self.symbol,
                                     price=price,
+                                    post_only=self.post_only,
                                     time_in_force=self.time_in_force,
                                     quantity=self.quantity, 
                                     is_base_quantity=self.is_base_quantity, 
@@ -2147,11 +2154,11 @@ class RLFastTrader(Trader):
           else:
             raise NotImplementedError(self.close_type)
         elif do_sell or do_sl_long or do_tp_long:
-          price = (1.0 + self.close_d_price)*prices[self.close_sell_price]
+          price = (1.0 + self.close_price_offset)*prices[self.close_sell_price]
           price = Trader.fn_round(price, self.tick_size, direction=ceil)
           print(f'close sell {self.close_type} {self.close_sell_price} {price}')
           if self.close_type == 'market':
-            result = self.sell_taker(self._ws,
+            result = self.sell_market(self._ws,
                                      symbol=self.symbol, 
                                      quantity=self.quantity, 
                                      is_base_quantity=self.is_base_quantity, 
@@ -2159,9 +2166,10 @@ class RLFastTrader(Trader):
                                      timeout=self.timeout,
                                      exchange=self.exchange)
           elif self.close_type == 'limit':
-            result = self.sell_maker(self._ws,
+            result = self.sell_limit(self._ws,
                                      symbol=self.symbol,
                                      price=price,
+                                     post_only=self.post_only,
                                      time_in_force=self.time_in_force,
                                      quantity=self.quantity, 
                                      is_base_quantity=self.is_base_quantity, 
@@ -2297,7 +2305,7 @@ class RLFastTrader(Trader):
       if self.position != 'none':
         print(f'Close open {self.position} position: trader {self.strategy}')
         if self.position == 'short':
-          result = self.buy_taker(self._ws, 
+          result = self.buy_market(self._ws, 
                                   symbol=self.symbol, 
                                   quantity=self.quantity, 
                                   is_base_quantity=self.is_base_quantity, 
@@ -2305,7 +2313,7 @@ class RLFastTrader(Trader):
                                   timeout=self.timeout, 
                                   exchange=self.exchange)
         elif self.position == 'long':
-          result = self.sell_taker(self._ws,
+          result = self.sell_market(self._ws,
                                    symbol=self.symbol,
                                    quantity=self.quantity, 
                                    is_base_quantity=self.is_base_quantity, 
