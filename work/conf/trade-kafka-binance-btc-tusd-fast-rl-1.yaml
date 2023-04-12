@@ -10,9 +10,9 @@ consumer:
 producer:
   bootstrap_servers: "kafka:9092"
 agents:
-  rl-fast-ticker-ppo-fees_1em4_last-olcl-gtc:
+  rl-fast-ticker-ppo-fees_1em4_v7-qb_4em4-olcl-gtc-ema_120:
     class: RLFastTrader
-    strategy: rl-fast-ticker-ppo-fees_1em4_last-olcl-gtc
+    strategy: rl-fast-ticker-ppo-fees_1em4_v7-qb_4em4-olcl-gtc-ema_120
     key: binance-btc-tusd
     model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
     version: 4
@@ -39,14 +39,19 @@ agents:
     do_check_order_placement_open: false
     do_check_order_placement_close: false
     max_spread: 1e-4
+    min_quantity: 1e-8
+    open_cancel_timeout: 1e9
+    close_cancel_timeout: 60e9
+    ema_length: 120
+    ema_quant: 1e9
+    do_check_ema: true
     # min_d_price: 3e-4
     # sltp_t: 3e-4
     # sltp_r: 1.0
     # open_d_price: 1e-4
     # close_d_price: 1e-4
-    quantity: 5e-4
-    min_quantity: 1e-8
+    quantity: 4e-4
     is_base_quantity: true
     kind_rl: 'none'  # 'auto_update'
-    model_name_rl: ppo-fees_1em4-last
-    model_version_rl: ~
+    model_name_rl: ppo-fees_1em4
+    model_version_rl: 7
