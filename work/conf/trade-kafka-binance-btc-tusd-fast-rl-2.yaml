@@ -10,9 +10,9 @@ consumer:
 producer:
   bootstrap_servers: "kafka:9092"
 agents:
-  rl-fast-ticker-ppo-fees_1em4_v7-qb_4em4-olcl-gtc-ema_180:
+  rl-fast-ticker-ppo-last_1d-qb_4em4-po_1em4-olcl-gtc:
     class: RLFastTrader
-    strategy: rl-fast-ticker-ppo-fees_1em4_v7-qb_4em4-olcl-gtc-ema_180
+    strategy: rl-fast-ticker-ppo-last_1d-qb_4em4-po_1em4-olcl-gtc
     key: binance-btc-tusd
     model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
     version: 4
@@ -23,6 +23,8 @@ agents:
     open_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
     close_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
     close_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+    open_price_offset: 1e-4
+    close_price_offset: 1e-4
     precision: 8
     tick_size: 0.01
     stream: ticker
@@ -40,18 +42,16 @@ agents:
     do_check_order_placement_close: false
     max_spread: 1e-4
     min_quantity: 1e-8
-    open_cancel_timeout: 1e9
-    close_cancel_timeout: 60e9
-    ema_length: 180
+    open_cancel_timeout: 3e9
+    close_cancel_timeout: 3e9
+    ema_length: 1800
     ema_quant: 1e9
-    do_check_ema: true
+    do_check_ema: false
     # min_d_price: 3e-4
     # sltp_t: 3e-4
     # sltp_r: 1.0
-    # open_d_price: 1e-4
-    # close_d_price: 1e-4
     quantity: 4e-4
     is_base_quantity: true
     kind_rl: 'none'  # 'auto_update'
-    model_name_rl: ppo-fees_1em4
-    model_version_rl: 7
+    model_name_rl: ppo-binance-btc-tusd-last_1d
+    model_version_rl: ~

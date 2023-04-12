@@ -10,9 +10,9 @@ consumer:
 producer:
   bootstrap_servers: "kafka:9092"
 agents:
-  rl-fast-ticker-ppo-fees_1em4_v7-qb_4em4-olcl-gtc-ema_180-occc:
+  rl-fast-ticker-ppo-fees_1em4_v7-qb_4em4-olcl-gtc-ema_3600-occc:
     class: RLFastTrader
-    strategy: rl-fast-ticker-ppo-fees_1em4_v7-qb_4em4-olcl-gtc-ema_180-occc
+    strategy: rl-fast-ticker-ppo-fees_1em4_v7-qb_4em4-olcl-gtc-ema_3600-occc
     key: binance-btc-tusd
     model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
     version: 4
@@ -42,7 +42,7 @@ agents:
     min_quantity: 1e-8
     open_cancel_timeout: 1e9
     close_cancel_timeout: 1e9
-    ema_length: 120
+    ema_length: 3600
     ema_quant: 1e9
     do_check_ema: true
     # min_d_price: 3e-4
