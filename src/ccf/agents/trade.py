@@ -230,7 +230,7 @@ class Trader(Agent):
     return direction(num*(10**places)) / float(10**places)
   
   @staticmethod
-  def calculate_vwap(orderbook, quantity, is_base_quantity=True):
+  def calculate_vwap(orderbook, quantity=None, is_base_quantity=True):
     if quantity is None:
       print(f'quantity is {quantity}')
       return None
@@ -246,7 +246,7 @@ class Trader(Agent):
         qs.append(q)
       else:
         qs.append(quantity - s_q)
-        print(f'Orderbook bid depth is {i}')
+        print(f'VWAP bid depth is {i}')
         break
       i += 1
     if sum(qs) < quantity:
@@ -265,7 +265,7 @@ class Trader(Agent):
         qs.append(q)
       else:
         qs.append(quantity - s_q)
-        print(f'Orderbook ask depth is {i}')
+        print(f'VWAP ask depth is {i}')
         break
       i += 1
     if sum(qs) < quantity:
@@ -389,14 +389,74 @@ class Trader(Agent):
                              timestamp=timestamp, recv_window=recv_window, 
                              timeout=timeout, exchange=exchange)
   
-  def cancel_order(self, ws, symbol, client_order_id, recv_window=5000, timeout=None, exchange=None):
+  def cancel_replace_buy_maker(self, ws, symbol, order_id, 
+                               price, quantity, time_in_force='GTC',
+                               cancel_restrictions=None,
+                               cancel_replace_mode='STOP_ON_FAILURE',
+                               is_base_quantity=True, is_test=False,
+                               recv_window=5000, timeout=None, exchange=None):
+    params = {
+        "symbol": symbol,
+        "side": "BUY",
+        "type": "LIMIT",
+        "price": price,
+        "cancelReplaceMode": cancel_replace_mode,
+        "timeInForce": time_in_force,
+        "cancelOrderId": order_id}
+    if cancel_restrictions is not None:
+      params['cancelRestrictions'] = cancel_restrictions
+    if is_base_quantity:
+      params['quantity'] = quantity
+    else:  # quote
+      params['quoteOrderQty'] = quantity
+    timestamp = int(time.time_ns()/1e6)
+    method = 'order.cancelReplace' if not is_test else 'order.test'
+    timestamp = int(time.time_ns()/1e6)
+    return self.send_request(ws, method, params,
+                             add_api_key=True, add_signature=True,
+                             timestamp=timestamp, recv_window=recv_window, 
+                             timeout=timeout, exchange=exchange)
+  
+  def cancel_replace_sell_maker(self, ws, symbol, order_id, 
+                                price, quantity, time_in_force='GTC',
+                                cancel_restrictions=None,
+                                cancel_replace_mode='STOP_ON_FAILURE',
+                                is_base_quantity=True, is_test=False,
+                                recv_window=5000, timeout=None, exchange=None):
+    params = {
+        "symbol": symbol,
+        "side": "SELL",
+        "type": "LIMIT",
+        "price": price,
+        "cancelReplaceMode": cancel_replace_mode,
+        "timeInForce": time_in_force,
+        "cancelOrderId": order_id}
+    if cancel_restrictions is not None:
+      params['cancelRestrictions'] = cancel_restrictions
+    if is_base_quantity:
+      params['quantity'] = quantity
+    else:  # quote
+      params['quoteOrderQty'] = quantity
+    timestamp = int(time.time_ns()/1e6)
+    method = 'order.cancelReplace' if not is_test else 'order.test'
+    timestamp = int(time.time_ns()/1e6)
+    return self.send_request(ws, method, params,
+                             add_api_key=True, add_signature=True,
+                             timestamp=timestamp, recv_window=recv_window, 
+                             timeout=timeout, exchange=exchange)
+
+  def cancel_order(self, ws, symbol, order_id, cancel_restrictions=None,
+                   recv_window=5000, timeout=None, exchange=None):
     params = {
       "symbol": symbol,
-      "origClientOrderId": client_order_id
+      "orderId": order_id
     }
+    if cancel_restrictions is not None:
+      params['cancelRestrictions'] = cancel_restrictions
     method = 'order.cancel'
     timestamp = int(time.time_ns()/1e6)
     return self.send_request(ws, method, params,
+                             add_api_key=True, add_signature=True,
                              timestamp=timestamp, recv_window=recv_window, 
                              timeout=timeout, exchange=exchange)
   
@@ -580,17 +640,17 @@ class MomentumTrader(KafkaWebsocketTrader):
     self.size = size
     self.watermark = int(watermark) if watermark is not None else watermark
     self.delay = delay
-    self.max_delay = max_delay
+    self.emax_delay = max_delay
     self.model = model
     self.version = version
     self.feature = feature
     self.target = target
     self.horizon = horizon
     self.prediction = prediction
-    self.max_spread = max_spread
+    self.emax_spread = max_spread
     self.do_cancel_open_orders = do_cancel_open_orders
     self.time_in_force = time_in_force
-    self.max_open_orders = max_open_orders
+    self.emax_open_orders = max_open_orders
     self.t_x = t_x
     self.t_v = t_v
     self.t_a = t_a
@@ -684,10 +744,10 @@ class MomentumTrader(KafkaWebsocketTrader):
           print(f'buffer:     {len(buffer)}')
           buffer = {k: v for k, v in buffer.items() if k > watermark_timestamp}
           print(f'new_buffer: {len(buffer)}')
-          if self.max_delay is not None:
+          if self.emax_delay is not None:
             delay = current_timestamp - prediction_timestamp
-            if delay > self.max_delay:
-              print(f'Skipping: delay {delay} > {self.max_delay}')
+            if delay > self.emax_delay:
+              print(f'Skipping: delay {delay} > {self.emax_delay}')
               continue
           df = pd.DataFrame(buffer.values())
           if len(df) == 0:
@@ -851,8 +911,8 @@ class MomentumTrader(KafkaWebsocketTrader):
               # print(f'Order {order_id} in process with status: {order_status}')
               # if do_a:  # act
               #   print(f'Cancel order {order_id}')
-              #   client_order_id = order['clientOrderId']
-              #   self.cancel_order(self._ws, symbol, client_order_id, 
+              #   order_id = order['clientOrderId']
+              #   self.cancel_order(self._ws, symbol, order_id, 
               #                     timeout=self.timeout, exchange=exchange)
               #   order, order_id = None, None
               # else:  # hold
@@ -860,17 +920,17 @@ class MomentumTrader(KafkaWebsocketTrader):
               #   order_type = order['type']
               #   if order_type == 'LIMIT':
               #     order_side = order['side']
-              #     client_order_id = order['clientOrderId']
+              #     order_id = order['clientOrderId']
               #     order_price = float(order['price'])
               #     current_bid = orderbook['b_p_0']
               #     current_ask = orderbook['a_p_0']
               #     if order_side == 'BUY' and order_price != current_bid:
-              #       self.cancel_order(self._ws, symbol, client_order_id, 
+              #       self.cancel_order(self._ws, symbol, order_id, 
               #                         timeout=self.timeout, exchange=exchange)
               #       order, order_id = None, None
               #       print(f'Cancel {order_side} order with price {order_price} != {current_bid} top bid')
               #     elif order_side == 'SELL' and order_price != current_ask:
-              #       self.cancel_order(self._ws, symbol, client_order_id, 
+              #       self.cancel_order(self._ws, symbol, order_id, 
               #                         timeout=self.timeout, exchange=exchange)
               #       order, order_id = None, None
               #       print(f'Cancel {order_side} order with price {order_price} != {current_ask} top ask')  
@@ -903,7 +963,7 @@ class MomentumTrader(KafkaWebsocketTrader):
               print('Skipping: bad vwap')
               continue
             pprint(vwap)
-            check_order_placement = vwap['s_m_vwap'] < self.max_spread
+            check_order_placement = vwap['s_m_vwap'] < self.emax_spread
             if not check_order_placement:
               if self.position == 'none' and self.do_check_order_placement_open:
                 print('Skipping: check order placement')
@@ -1035,21 +1095,21 @@ class RLTrader(Trader):
     self.size = size
     self.watermark = int(watermark) if watermark is not None else watermark
     self.delay = delay
-    self.max_delay = max_delay
+    self.emax_delay = max_delay
     self.model = model
     self.version = version
     self.feature = feature
     self.target = target
     self.horizon = horizon
     self.prediction = prediction
-    self.max_spread = max_spread
+    self.emax_spread = max_spread
     self.is_max_spread_none_only = is_max_spread_none_only
     self.do_cancel_open_orders = do_cancel_open_orders
     self.do_log_account_status = do_log_account_status
     self.do_check_order_placement_open = do_check_order_placement_open
     self.do_check_order_placement_close = do_check_order_placement_close
     self.time_in_force = time_in_force
-    self.max_open_orders = max_open_orders
+    self.emax_open_orders = max_open_orders
     self.window_size = window_size
     self.quantity = quantity
     self.is_base_quantity = is_base_quantity
@@ -1201,10 +1261,10 @@ class RLTrader(Trader):
           print(f'buffer:     {len(buffer)}')
           buffer = {k: v for k, v in buffer.items() if k > watermark_timestamp}
           print(f'new_buffer: {len(buffer)}')
-          if self.max_delay is not None:
+          if self.emax_delay is not None:
             delay = current_timestamp - prediction_timestamp
-            if delay > self.max_delay:
-              print(f'Skipping: delay {delay} > {self.max_delay}')
+            if delay > self.emax_delay:
+              print(f'Skipping: delay {delay} > {self.emax_delay}')
               continue
           df = pd.DataFrame(buffer.values())
           if len(df) == 0:
@@ -1355,7 +1415,7 @@ class RLTrader(Trader):
             print('Skipping: bad vwap')
             continue
           pprint(vwap)
-          check_order_placement = vwap['s_m_vwap'] < self.max_spread
+          check_order_placement = vwap['s_m_vwap'] < self.emax_spread
           if not check_order_placement:
             if self.position == 'none' and self.do_check_order_placement_open:
               print('Skipping: check order placement')
@@ -1506,7 +1566,10 @@ class RLFastTrader(Trader):
     open_type='market', close_type='market', 
     open_buy_price='a_vwap', open_sell_price='b_vwap', 
     close_buy_price='a_vwap', close_sell_price='b_vwap',
-    precision=8, tick_size=0.01
+    precision=8, tick_size=0.01, open_d_price=0.0, close_d_price=0.0, min_d_price=0.0,
+    open_cancel_timeout=None, close_cancel_timeout=None, 
+    do_check_ema=False,
+    ema_quant=1e9, ema_alpha=None, ema_length=None
   ):
     super().__init__(strategy=strategy, api_url=api_url, api_key=api_key, secret_key=secret_key)
     self.key = key
@@ -1534,21 +1597,23 @@ class RLFastTrader(Trader):
     self.size = size
     self.watermark = int(watermark) if watermark is not None else watermark
     self.delay = delay
-    self.max_delay = max_delay
+    self.emax_delay = max_delay
     self.model = model
     self.version = version
     self.feature = feature
     self.target = target
     self.horizon = horizon
     self.prediction = prediction
-    self.max_spread = max_spread
+    self.emax_spread = max_spread
+    self.open_d_price = open_d_price 
+    self.close_d_price = close_d_price 
     self.is_max_spread_none_only = is_max_spread_none_only
     self.do_cancel_open_orders = do_cancel_open_orders
     self.do_log_account_status = do_log_account_status
     self.do_check_order_placement_open = do_check_order_placement_open
     self.do_check_order_placement_close = do_check_order_placement_close
     self.time_in_force = time_in_force
-    self.max_open_orders = max_open_orders
+    self.emax_open_orders = max_open_orders
     self.window_size = window_size
     self.quantity = quantity
     self.is_base_quantity = is_base_quantity
@@ -1575,7 +1640,7 @@ class RLFastTrader(Trader):
     self.last_timestamp = time.time_ns()
     self.buffer = {}
     self.action = 0  # 0: HOLD, 1: BUY, 2: SELL
-    self.order_id = None
+    self.order = None
     self.order_prices = {}
     self.base_balance = 0.0
     self.quote_balance = 0.0
@@ -1592,6 +1657,16 @@ class RLFastTrader(Trader):
     self.close_sell_price = close_sell_price
     self.precision = precision
     self.tick_size = tick_size
+    self.min_d_price = min_d_price
+    self.dt = 0
+    self.open_cancel_timeout = open_cancel_timeout
+    self.close_cancel_timeout = close_cancel_timeout
+    self.ema = None 
+    self.do_check_ema = do_check_ema
+    self.ema_length = 2/ema_alpha - 1 if ema_length is None else ema_length
+    self.ema_alpha = 2/(ema_length + 1) if ema_alpha is None else ema_alpha
+    self.ema_quant = ema_quant
+    self.ema_cnt = 0
     
   def init_consumer(self):
     consumer = deepcopy(self.consumer)
@@ -1698,11 +1773,11 @@ class RLFastTrader(Trader):
     if self.prediction not in df:
       print(f'Skipping: no prediction {self.prediction} in df columns: {df.columns}')
       return
-    if self.max_delay is not None:
+    if self.emax_delay is not None:
       prediction_timestamp = df.index.max().value - self.horizon*self.quant
       delay = self.cur_timestamp - prediction_timestamp
-      if delay > self.max_delay:
-        print(f'Skipping: delay {delay} > {self.max_delay}')
+      if delay > self.emax_delay:
+        print(f'Skipping: delay {delay} > {self.emax_delay}')
         return
     if self.position == 'none':
       self.update_model_rl()
@@ -1716,16 +1791,23 @@ class RLFastTrader(Trader):
     print(f'Predicted action: {action}')
     return action
   
-  def update_order(self, symbol, order_id):
-    if order_id is None:
-      return order_id
-    order = self.query_order(self._ws, symbol, order_id, 
-                             timeout=self.timeout, 
-                             exchange=self.exchange)
-    pprint(order)
-    order_side = order['side']
-    order_status = order['status']
-    if order_status in ['FILLED']:
+  def update_order(self, order, prices):
+    if order is None:
+      print('No order to update!')
+      return order
+    order_id = order['orderId']
+    order_ = self.query_order(self._ws, 
+                              symbol=self.symbol, 
+                              order_id=order_id, 
+                              timeout=self.timeout, 
+                              exchange=self.exchange)
+    pprint(order_)
+    order_side = order_['side']
+    order_status = order_['status']
+    order_time = order_['time']*1e6  # ms -> ns
+    order_dt = self.cur_timestamp - order_time
+    if order_status == 'FILLED':
+      print(f'Order {order_side} {order_id} is filled with status: {order_status}')
       if order_side == 'BUY':
         if self.position == 'none':
           self.position = 'long'
@@ -1740,24 +1822,28 @@ class RLFastTrader(Trader):
           self.position = 'none'
         else:
           raise ValueError(f"Position can't be {self.position}!")
-      quote_quantity = float(order.get('cummulativeQuoteQty', 0.0))  # origQty
-      base_quantity = float(order.get('executedQty', 0.0))
+      base_quantity = float(order_.get('executedQty', 0.0))    
+      quote_quantity = float(order_.get('cummulativeQuoteQty', 0.0))  # origQty
       if order_side == 'BUY':
-        quote_quantity = -quote_quantity
-        base_quantity = -base_quantity
-      self.base_balance += base_quantity
-      self.quote_balance += quote_quantity
+        self.base_balance += base_quantity
+        self.quote_balance -= quote_quantity
+      else:  # SELL
+        self.base_balance -= base_quantity
+        self.quote_balance += quote_quantity
       if self.position == 'none':
         base_delta = self.base_balance - self.last_base_balance
         quote_delta = self.quote_balance - self.last_quote_balance
-        last_base_balance = self.base_balance
-        last_quote_balance = self.quote_balance
+        self.last_base_balance = self.base_balance
+        self.last_quote_balance = self.quote_balance
       else:
         base_delta = None
         quote_delta = None
+        order_dt = None
       value = {
         'metric': 'trade',
         'timestamp': self.cur_timestamp,
+        'dt': self.dt,
+        'order_dt': order_dt,
         'exchange': self.exchange,
         'base': self.base,
         'quote': self.quote,
@@ -1782,8 +1868,7 @@ class RLFastTrader(Trader):
         'base_delta': base_delta,
         'quote_delta': quote_delta,
         'model_rl': self.model_name_rl,
-        'version_rl': self.cur_model_version_rl
-      }
+        'version_rl': self.cur_model_version_rl}
       # Get status
       if self.do_log_account_status:
         account_status = self.get_account_status(
@@ -1799,49 +1884,129 @@ class RLFastTrader(Trader):
         pprint(value)
       if not self.is_test:
         self._producer.send(topic=self.metric_topic, key=self.key, value=value)
-      order_id = None
-    elif order_status in ['NEW', 'PARTIALLY_FILLED']:  # In process
-      print(f'Order {order_id} in process with status: {order_status}')
+      order = None
+      self.action = 0
+    elif order_status in ['PARTIALLY_FILLED']:  # In process
+      print(f'Order {order_side} {order_id} in process with status: {order_status}')
+    elif order_status in ['NEW']:  # In process
+      print(f'Order {order_side} {order_id} in process with status: {order_status}')
+      do_cancel = False
+      if self.position == 'none':  # Open
+        if self.open_cancel_timeout is not None:
+          if order_dt > self.open_cancel_timeout:
+            do_cancel = True
+            print(f'Order {order_side} {order_id} cancel timeout {self.open_cancel_timeout}')
+      elif self.position in ['short', 'long']:  # Close
+        if self.close_cancel_timeout is not None:  
+          if order_dt > self.close_cancel_timeout:
+            do_cancel = True
+            print(f'Order {order_side} {order_id} cancel timeout {self.close_cancel_timeout}')
+      else:
+        raise ValueError(f'Bad position {self.position}!')
+      if do_cancel:
+        print(f'Cancel order {order_id}')
+        result = self.cancel_order(
+          ws=self._ws,
+          symbol=self.symbol, 
+          order_id=order_id,
+          cancel_restrictions='ONLY_NEW',
+          timeout=self.timeout, 
+          exchange=self.exchange)
+        if result is not None:
+          order = None
+          self.action = 0
+      # self.open_cancel_timeout = open_cancel_timeout
+      # self.close_cancel_timeout = close_cancel_timeout
+      # 
+      # if order_side == 'BUY' and self.action != 2:
+      #   print(f'Replacing buy order {order_id}')
+      #   if self.position == 'none':  # Open long
+      #     price = (1.0 - self.open_d_price)*prices[self.open_buy_price]
+      #   elif self.position == 'short':  # Close short
+      #     price = (1.0 - self.close_d_price)*prices[self.close_buy_price]
+      #   else:
+      #     raise ValueError(f"Position can't be {self.position}!")
+      #   price = Trader.fn_round(price, self.tick_size, direction=floor)
+      #   result = self.cancel_replace_buy_maker(
+      #     ws=self._ws,
+      #     symbol=self.symbol,
+      #     order_id=order_id,
+      #     cancel_replace_mode='STOP_ON_FAILURE',
+      #     cancel_restrictions='ONLY_NEW',
+      #     price=price,
+      #     time_in_force=self.time_in_force,
+      #     quantity=self.quantity, 
+      #     is_base_quantity=self.is_base_quantity, 
+      #     is_test=self.is_test,
+      #     timeout=self.timeout,
+      #     exchange=self.exchange)
+      #   if result is not None:
+      #     order = result['newOrderResponse']
+      #     self.order_prices = deepcopy(prices)
+      # elif order_side == 'SELL' and self.action != 1:  # SELL
+      #   print(f'Replacing sell order {order_id}')
+      #   if self.position == 'none':  # Open short
+      #     price = (1.0 + self.open_d_price)*prices[self.open_sell_price]
+      #   elif self.position == 'long':  # Close long
+      #     price = (1.0 + self.close_d_price)*prices[self.close_sell_price]
+      #   else:
+      #     raise ValueError(f"Position can't be {self.position}!")
+      #   price = Trader.fn_round(price, self.tick_size, direction=ceil)
+      #   result = self.cancel_replace_sell_maker(
+      #     ws=self._ws,
+      #     symbol=self.symbol,
+      #     order_id=order_id,
+      #     cancel_replace_mode='STOP_ON_FAILURE',
+      #     cancel_restrictions='ONLY_NEW',
+      #     price=price,
+      #     time_in_force=self.time_in_force,
+      #     quantity=self.quantity, 
+      #     is_base_quantity=self.is_base_quantity, 
+      #     is_test=self.is_test,
+      #     timeout=self.timeout,
+      #     exchange=self.exchange)
+      #   if result is not None:
+      #     order = result['newOrderResponse']
+      #     self.order_prices = deepcopy(prices)
+      # else:
+      #   print(f'Cancel order {order_id}')
+      #   result = self.cancel_order(
+      #     ws=self._ws,
+      #     symbol=self.symbol, 
+      #     order_id=order_id,
+      #     cancel_restrictions='ONLY_NEW',
+      #     timeout=self.timeout, 
+      #     exchange=self.exchange)
+      #   if result is not None:
+      #     order = None
+    elif order_status in ['EXPIRED']:
+      print(f'Order {order_side} {order_id} expired with status: {order_status}')
+      order = None
     else:  # End
-      print(f'Order {order_id} ends with status: {order_status}')
-      order_id = None
-    return order_id
+      print(f'Order {order_side} {order_id} ends with status: {order_status}')
+      order = None
+      self.action = 0
+    return order
   
-  def place_order(self, orderbook):
-    if self.order_id is not None:
+  def place_order(self, prices):
+    if self.order is not None:
       print('Skipping: active order')
-      return self.order_id
-    new_order_id = None
+      return self.order
+    new_order = None
     do_buy = self.action == 1 and self.position != 'long'
     do_sell = self.action == 2 and self.position != 'short'
-    print(f'do_buy: {do_buy}, do_sell: {do_sell}')
-    if not do_buy and not do_sell:
-      print('Skipping: no actions')
-      return new_order_id
-    if orderbook is None:
-      print('Skipping: bad orderbook')
-      return new_order_id
-    # VWAP
-    vwap = Trader.calculate_vwap(
-      orderbook=orderbook, 
-      quantity=self.min_quantity, 
-      is_base_quantity=self.is_base_quantity)
-    if vwap is None:
-      print('Skipping: bad vwap')
-      return new_order_id
-    prices = {**orderbook, **vwap}
-    pprint(prices)
     # Check order placement
-    check_order_placement = prices['s_m_vwap'] < self.max_spread
-    if not check_order_placement:
-      if self.position == 'none' and self.do_check_order_placement_open:
-        print('Skipping: check order placement')
-        return new_order_id
-      elif self.position in ['long', 'short'] and self.do_check_order_placement_close:
-        print('Skipping: check order placement')
-        return new_order_id
-      else:
-        print(f'Order placement check is {check_order_placement} but not skipping')
+    if self.do_check_order_placement_open or self.do_check_order_placement_close:
+      check_order_placement = prices['s_m_vwap'] < self.emax_spread
+      if not check_order_placement:
+        if self.position == 'none' and self.do_check_order_placement_open:
+          print('Skipping: check order placement')
+          return new_order
+        elif self.position in ['long', 'short'] and self.do_check_order_placement_close:
+          print('Skipping: check order placement')
+          return new_order
+        else:
+          print(f'Order placement check is {check_order_placement} but not skipping')
     # Stop Loss / Take Profit
     do_sl_long = False
     do_tp_long = False
@@ -1878,13 +2043,48 @@ class RLFastTrader(Trader):
         else:
           print(f'Warning SL/TP: no prices!')
           pprint(prices)
-    if any([do_buy, do_sell,
-            do_sl_long, do_tp_long,
-            do_sl_short, do_tp_short]):
+    actions = {'do_buy': do_buy, 
+               'do_sell': do_sell,
+               'do_sl_long': do_sl_long,
+               'do_tp_long': do_tp_long,
+               'do_sl_short': do_sl_short,
+               'do_tp_short': do_tp_short}
+    pprint(actions)
+    if any(list(actions.values())):
+      # Check delta price
+      if len(self.order_prices) > 0 and self.min_d_price > 0:
+        cur_a_vwap = prices.get('a_vwap', None)
+        cur_b_vwap = prices.get('b_vwap', None)
+        order_a_vwap = self.order_prices.get('a_vwap', None)
+        order_b_vwap = self.order_prices.get('b_vwap', None)
+        if all([x is not None for x in [cur_a_vwap, cur_b_vwap, order_a_vwap, order_b_vwap]]):
+          if self.position == 'long':
+            stop_up = order_a_vwap*(1.0 + self.min_d_price)
+            stop_down = order_a_vwap*(1.0 - self.min_d_price)
+            if do_sell and stop_down < cur_b_vwap < stop_up:
+              print(f'Skipping long sell: stop down {stop_down} < {cur_b_vwap} cur bid < {stop_up} stop up')
+              return new_order
+          elif self.position == 'short':
+            stop_up = order_b_vwap*(1.0 + self.min_d_price)
+            stop_down = order_b_vwap*(1.0 - self.min_d_price)
+            if do_buy and stop_down < cur_a_vwap < stop_up:
+              print(f'Skipping short buy: stop down {stop_down} < {cur_a_vwap} cur ask < {stop_up} stop up')
+              return new_order
+          # if self.position == 'long':
+          #   stop_price = order_a_vwap*(1.0 + self.min_d_price)
+          #   if do_sell and order_a_vwap < cur_b_vwap < stop_price:
+          #     print(f'Skipping long sell: order ask {order_a_vwap} < {cur_b_vwap} cur bid < {stop_price} stop price')
+          #     return new_order
+          # elif self.position == 'short':
+          #   stop_price = order_b_vwap*(1.0 - self.min_d_price)
+          #   if do_buy and stop_price < cur_a_vwap < order_b_vwap:
+          #     print(f'Skipping short buy: stop price {stop_price} < {cur_a_vwap} cur ask < {order_b_vwap} order bid')
+          #     return new_order
       if self.position == 'none':  # Open
         if do_buy or do_sl_short or do_tp_short:
-          open_price = Trader.fn_round(prices[self.open_buy_price], self.tick_size)
-          print(f'open buy {self.open_type} {self.open_buy_price} {open_price}')
+          price = (1.0 - self.open_d_price)*prices[self.open_buy_price]
+          price = Trader.fn_round(price, self.tick_size, direction=floor)
+          print(f'open buy {self.open_type} {self.open_buy_price} {price}')
           if self.open_type == 'market':
             result = self.buy_taker(self._ws, 
                                     symbol=self.symbol, 
@@ -1896,7 +2096,7 @@ class RLFastTrader(Trader):
           elif self.open_type == 'limit':
             result = self.buy_maker(self._ws,
                                     symbol=self.symbol,
-                                    price=open_price,
+                                    price=price,
                                     time_in_force=self.time_in_force,
                                     quantity=self.quantity, 
                                     is_base_quantity=self.is_base_quantity, 
@@ -1906,8 +2106,9 @@ class RLFastTrader(Trader):
           else:
             raise NotImplementedError(self.open_type)
         elif do_sell or do_sl_long or do_tp_long:
-          open_price = Trader.fn_round(prices[self.open_sell_price], self.tick_size)
-          print(f'open sell {self.open_type} {self.open_sell_price} {open_price}')
+          price = (1.0 + self.open_d_price)*prices[self.open_sell_price]
+          price = Trader.fn_round(price, self.tick_size, direction=ceil)
+          print(f'open sell {self.open_type} {self.open_sell_price} {price}')
           if self.open_type == 'market':
             result = self.sell_taker(self._ws,
                                      symbol=self.symbol, 
@@ -1919,7 +2120,7 @@ class RLFastTrader(Trader):
           elif self.open_type == 'limit':
             result = self.sell_maker(self._ws,
                                      symbol=self.symbol,
-                                     price=open_price,
+                                     price=price,
                                      time_in_force=self.time_in_force,
                                      quantity=self.quantity, 
                                      is_base_quantity=self.is_base_quantity, 
@@ -1932,8 +2133,9 @@ class RLFastTrader(Trader):
           raise NotImplementedError()
       elif self.position in ['short', 'long']:  # Close
         if do_buy or do_sl_short or do_tp_short:
-          close_price = Trader.fn_round(prices[self.close_buy_price], self.tick_size)
-          print(f'close buy {self.close_type} {self.close_buy_price} {close_price}')
+          price = (1.0 - self.close_d_price)*prices[self.close_buy_price]
+          price = Trader.fn_round(price, self.tick_size, direction=floor)
+          print(f'close buy {self.close_type} {self.close_buy_price} {price}')
           if self.close_type == 'market':
             result = self.buy_taker(self._ws, 
                                     symbol=self.symbol, 
@@ -1945,7 +2147,7 @@ class RLFastTrader(Trader):
           elif self.close_type == 'limit':
             result = self.buy_maker(self._ws,
                                     symbol=self.symbol,
-                                    price=close_price,
+                                    price=price,
                                     time_in_force=self.time_in_force,
                                     quantity=self.quantity, 
                                     is_base_quantity=self.is_base_quantity, 
@@ -1955,8 +2157,9 @@ class RLFastTrader(Trader):
           else:
             raise NotImplementedError(self.close_type)
         elif do_sell or do_sl_long or do_tp_long:
-          close_price = Trader.fn_round(prices[self.close_sell_price], self.tick_size)
-          print(f'close sell {self.close_type} {self.close_sell_price} {close_price}')
+          price = (1.0 + self.close_d_price)*prices[self.close_sell_price]
+          price = Trader.fn_round(price, self.tick_size, direction=ceil)
+          print(f'close sell {self.close_type} {self.close_sell_price} {price}')
           if self.close_type == 'market':
             result = self.sell_taker(self._ws,
                                      symbol=self.symbol, 
@@ -1968,7 +2171,7 @@ class RLFastTrader(Trader):
           elif self.close_type == 'limit':
             result = self.sell_maker(self._ws,
                                      symbol=self.symbol,
-                                     price=close_price,
+                                     price=price,
                                      time_in_force=self.time_in_force,
                                      quantity=self.quantity, 
                                      is_base_quantity=self.is_base_quantity, 
@@ -1982,12 +2185,11 @@ class RLFastTrader(Trader):
       else:
         raise NotImplementedError(self.position)
       if result is not None:
+        new_order = result
         self.order_prices = deepcopy(prices)
-        new_order_id = result.get('orderId', None)
       else:
-        new_order_id = None
-      pprint(result)
-    return new_order_id
+        new_order = None
+    return new_order
       
   def on_open(self, ws, *args, **kwargs):
       print(f'Open {ws}')
@@ -2001,21 +2203,54 @@ class RLFastTrader(Trader):
       
   def on_message(self, ws, message):
     self.cur_timestamp = time.time_ns()
-    dt = (self.cur_timestamp - self.last_timestamp)/1e9
+    self.dt = self.cur_timestamp - self.last_timestamp
     print(f'\ntrade {self.strategy}')
     print(f'now:        {datetime.fromtimestamp(self.cur_timestamp/1e9, tz=timezone.utc)}')
-    print(f'dt:         {dt}')
+    print(f'dt:         {self.dt/1e9}')
     print(f'buffer:     {len(self.buffer)}')
     orderbook = Trader.message_to_orderbook(self.exchange, message, self.stream)
-    do_prediction = True
+    if orderbook is None:
+      self.last_timestamp = self.cur_timestamp
+      print('Skipping: bad orderbook')
+      return
+    # VWAP
+    vwap = Trader.calculate_vwap(
+      orderbook=orderbook, 
+      quantity=self.min_quantity, 
+      is_base_quantity=self.is_base_quantity)
+    if vwap is None:
+      self.last_timestamp = self.cur_timestamp
+      print('Skipping: bad vwap')
+      return
+    prices = {**orderbook, **vwap}
+    # Check EMA
+    m_p = prices['m_p']
+    ema_cur_cnt = self.cur_timestamp // self.ema_quant
+    print(f'ema_cnt:   {ema_cur_cnt}')
+    if self.ema is None:
+      self.ema = m_p
+      self.ema_cnt = ema_cur_cnt
+    else:
+      if ema_cur_cnt > self.ema_cnt:
+        self.ema = self.ema_alpha*m_p + self.ema*(1 - self.ema_alpha)
+        self.ema_cnt = ema_cur_cnt
+    prices['ema'] = self.ema
+    pprint(prices)
     result = self._consumer.poll(timeout_ms=0, max_records=None, update_offsets=True)
     if len(result) > 0:
       for topic_partition, messages in result.items():
         self.update_buffer(messages)
       self.action = self.update_action()
-    self.order_id = self.update_order(self.symbol, self.order_id)
-    self.order_id = self.place_order(orderbook) 
-    print(f'position: {self.position}, action: {self.action}, order_id: {self.order_id}')
+    if self.do_check_ema:
+      if self.position == 'none' and m_p < self.ema:
+        self.last_timestamp = self.cur_timestamp
+        print(f'Skipping: m_p {m_p} < {self.ema} ema')
+        return
+    # Predict
+    self.order = self.update_order(self.order, prices)
+    self.order = self.place_order(prices)
+    print(f'position: {self.position}, action: {self.action}')
+    print(self.order)
     self.last_timestamp = self.cur_timestamp
 
   def __call__(self):
@@ -2061,11 +2296,11 @@ class RLFastTrader(Trader):
     finally:
       print(f'Stop: trader {self.strategy}')
       self.init_ws()
-      if self.order_id is not None:
-        print(f'Cancel open order {self.order_id}: trader {self.strategy}')
+      if self.order is not None:
+        print(f'Cancel open order {self.order}: trader {self.strategy}')
         result = self.cancel_order(self._ws, 
                                    symbol=self.symbol, 
-                                   client_order_id=self.order_id, 
+                                   order_id=self.order.get('orderId', None), 
                                    timeout=self.timeout, 
                                    exchange=self.exchange)
         pprint(result)
