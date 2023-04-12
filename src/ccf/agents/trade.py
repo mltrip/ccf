@@ -1891,6 +1891,7 @@ class RLFastTrader(Trader):
     elif order_status in ['NEW']:  # In process
       print(f'Order {order_side} {order_id} in process with status: {order_status}')
       do_cancel = False
+      do_cancel_replace = False
       if self.position == 'none':  # Open
         if self.open_cancel_timeout is not None:
           if order_dt > self.open_cancel_timeout:
@@ -1899,7 +1900,7 @@ class RLFastTrader(Trader):
       elif self.position in ['short', 'long']:  # Close
         if self.close_cancel_timeout is not None:  
           if order_dt > self.close_cancel_timeout:
-            do_cancel = True
+            do_cancel_replace = True
             print(f'Order {order_side} {order_id} cancel timeout {self.close_cancel_timeout}')
       else:
         raise ValueError(f'Bad position {self.position}!')
@@ -1915,70 +1916,59 @@ class RLFastTrader(Trader):
         if result is not None:
           order = None
           self.action = 0
-      # self.open_cancel_timeout = open_cancel_timeout
-      # self.close_cancel_timeout = close_cancel_timeout
-      # 
-      # if order_side == 'BUY' and self.action != 2:
-      #   print(f'Replacing buy order {order_id}')
-      #   if self.position == 'none':  # Open long
-      #     price = (1.0 - self.open_d_price)*prices[self.open_buy_price]
-      #   elif self.position == 'short':  # Close short
-      #     price = (1.0 - self.close_d_price)*prices[self.close_buy_price]
-      #   else:
-      #     raise ValueError(f"Position can't be {self.position}!")
-      #   price = Trader.fn_round(price, self.tick_size, direction=floor)
-      #   result = self.cancel_replace_buy_maker(
-      #     ws=self._ws,
-      #     symbol=self.symbol,
-      #     order_id=order_id,
-      #     cancel_replace_mode='STOP_ON_FAILURE',
-      #     cancel_restrictions='ONLY_NEW',
-      #     price=price,
-      #     time_in_force=self.time_in_force,
-      #     quantity=self.quantity, 
-      #     is_base_quantity=self.is_base_quantity, 
-      #     is_test=self.is_test,
-      #     timeout=self.timeout,
-      #     exchange=self.exchange)
-      #   if result is not None:
-      #     order = result['newOrderResponse']
-      #     self.order_prices = deepcopy(prices)
-      # elif order_side == 'SELL' and self.action != 1:  # SELL
-      #   print(f'Replacing sell order {order_id}')
-      #   if self.position == 'none':  # Open short
-      #     price = (1.0 + self.open_d_price)*prices[self.open_sell_price]
-      #   elif self.position == 'long':  # Close long
-      #     price = (1.0 + self.close_d_price)*prices[self.close_sell_price]
-      #   else:
-      #     raise ValueError(f"Position can't be {self.position}!")
-      #   price = Trader.fn_round(price, self.tick_size, direction=ceil)
-      #   result = self.cancel_replace_sell_maker(
-      #     ws=self._ws,
-      #     symbol=self.symbol,
-      #     order_id=order_id,
-      #     cancel_replace_mode='STOP_ON_FAILURE',
-      #     cancel_restrictions='ONLY_NEW',
-      #     price=price,
-      #     time_in_force=self.time_in_force,
-      #     quantity=self.quantity, 
-      #     is_base_quantity=self.is_base_quantity, 
-      #     is_test=self.is_test,
-      #     timeout=self.timeout,
-      #     exchange=self.exchange)
-      #   if result is not None:
-      #     order = result['newOrderResponse']
-      #     self.order_prices = deepcopy(prices)
-      # else:
-      #   print(f'Cancel order {order_id}')
-      #   result = self.cancel_order(
-      #     ws=self._ws,
-      #     symbol=self.symbol, 
-      #     order_id=order_id,
-      #     cancel_restrictions='ONLY_NEW',
-      #     timeout=self.timeout, 
-      #     exchange=self.exchange)
-      #   if result is not None:
-      #     order = None
+      if do_cancel_replace:
+        if order_side == 'BUY':
+          print(f'Replacing buy order {order_id}')
+          if self.position == 'none':  # Open long
+            price = (1.0 - self.open_d_price)*prices[self.open_buy_price]
+          elif self.position == 'short':  # Close short
+            price = (1.0 - self.close_d_price)*prices[self.close_buy_price]
+          else:
+            raise ValueError(f"Position can't be {self.position}!")
+          price = Trader.fn_round(price, self.tick_size, direction=floor)
+          result = self.cancel_replace_buy_maker(
+            ws=self._ws,
+            symbol=self.symbol,
+            order_id=order_id,
+            cancel_replace_mode='STOP_ON_FAILURE',
+            cancel_restrictions='ONLY_NEW',
+            price=price,
+            time_in_force=self.time_in_force,
+            quantity=self.quantity, 
+            is_base_quantity=self.is_base_quantity, 
+            is_test=self.is_test,
+            timeout=self.timeout,
+            exchange=self.exchange)
+          if result is not None:
+            order = result['newOrderResponse']
+            self.order_prices = deepcopy(prices)
+        elif order_side == 'SELL':
+          print(f'Replacing sell order {order_id}')
+          if self.position == 'none':  # Open short
+            price = (1.0 + self.open_d_price)*prices[self.open_sell_price]
+          elif self.position == 'long':  # Close long
+            price = (1.0 + self.close_d_price)*prices[self.close_sell_price]
+          else:
+            raise ValueError(f"Position can't be {self.position}!")
+          price = Trader.fn_round(price, self.tick_size, direction=ceil)
+          result = self.cancel_replace_sell_maker(
+            ws=self._ws,
+            symbol=self.symbol,
+            order_id=order_id,
+            cancel_replace_mode='STOP_ON_FAILURE',
+            cancel_restrictions='ONLY_NEW',
+            price=price,
+            time_in_force=self.time_in_force,
+            quantity=self.quantity, 
+            is_base_quantity=self.is_base_quantity, 
+            is_test=self.is_test,
+            timeout=self.timeout,
+            exchange=self.exchange)
+          if result is not None:
+            order = result['newOrderResponse']
+            self.order_prices = deepcopy(prices)
+        else:
+          raise ValueError(f"Wrong order side {order_side}!")
     elif order_status in ['EXPIRED']:
       print(f'Order {order_side} {order_id} expired with status: {order_status}')
       order = None
