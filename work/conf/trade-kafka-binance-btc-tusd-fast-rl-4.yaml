@@ -9,10 +9,12 @@ consumer:
   bootstrap_servers: "kafka:9092"
 producer:
   bootstrap_servers: "kafka:9092"
+n_clones: 5
+delay: 300
 agents:
-  rl-fast-ticker-ppo-last_1d-qb_4em4-po_1em4-olcl_5em5-gtc:
+  rl-fast-ticker-ppo-fees_1em4_last_1d_tune-qb_4em4-po_1em4-olcl-gtc:
     class: RLFastTrader
-    strategy: rl-fast-ticker-ppo-last_1d-qb_4em4-po_1em4-olcl_5em5-gtc
+    strategy: rl-fast-ticker-ppo-fees_1em4_last_1d_tune-qb_4em4-po_1em4-olcl-gtc
     key: binance-btc-tusd
     model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
     version: 4
@@ -23,8 +25,8 @@ agents:
     open_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
     close_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
     close_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
-    open_price_offset: 5e-5
-    close_price_offset: 5e-5
+    open_price_offset: 1e-4
+    close_price_offset: 1e-4
     precision: 8
     tick_size: 0.01
     stream: ticker
@@ -53,5 +55,5 @@ agents:
     quantity: 4e-4
     is_base_quantity: true
     kind_rl: 'auto_update'  # 'auto_update'
-    model_name_rl: ppo-binance-btc-tusd-last_1d
+    model_name_rl: ppo-binance-btc-tusd-fees_1em4-last_1d-tune
     model_version_rl: ~

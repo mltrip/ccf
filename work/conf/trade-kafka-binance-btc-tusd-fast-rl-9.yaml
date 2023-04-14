@@ -10,9 +10,9 @@ consumer:
 producer:
   bootstrap_servers: "kafka:9092"
 agents:
-  rl-fast-ticker-ppo-last_1d-qb_4em4-po_1em4-olcl_5em5-gtc:
+  rl-fast-ticker-ppo-fees_1em4_last_1w-qb_4em4-po_1em4-olcl_5em5-gtc:
     class: RLFastTrader
-    strategy: rl-fast-ticker-ppo-last_1d-qb_4em4-po_1em4-olcl_5em5-gtc
+    strategy: rl-fast-ticker-ppo-fees_1em4_last_1w-qb_4em4-po_1em4-olcl_5em5-gtc
     key: binance-btc-tusd
     model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
     version: 4
@@ -53,5 +53,5 @@ agents:
     quantity: 4e-4
     is_base_quantity: true
     kind_rl: 'auto_update'  # 'auto_update'
-    model_name_rl: ppo-binance-btc-tusd-last_1d
+    model_name_rl: ppo-binance-btc-tusd-fees_1em4-last_1w
     model_version_rl: ~
