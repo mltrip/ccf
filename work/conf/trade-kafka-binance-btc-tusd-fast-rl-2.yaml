@@ -52,6 +52,6 @@ agents:
     # sltp_r: 1.0
     quantity: 4e-4
     is_base_quantity: true
-    kind_rl: 'none'  # 'auto_update'
+    kind_rl: 'auto_update'  # 'auto_update'
     model_name_rl: ppo-binance-btc-tusd-last_1d
     model_version_rl: ~

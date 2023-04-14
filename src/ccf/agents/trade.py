@@ -71,6 +71,28 @@ class Trader(Agent):
         status = response.get('status', {})
         if status == 200:
           result = response.get('result', {})
+          rate_limits = response.get('rateLimits', [])
+          # pprint(rate_limits)
+          for rate in rate_limits:
+            rate_type =rate['rateLimitType']
+            count = rate['count']
+            limit = rate['limit']
+            interval = rate['interval']
+            n_intervals = rate['intervalNum']
+            limit_pct = count / limit
+            print(f'Rate of {rate_type} = {count}/{limit} = {limit_pct} with interval {n_intervals} {interval}')
+            if limit_pct > 0.9:
+              if interval == 'SECOND':
+                dt = 1*n_intervals
+              elif interval == 'MINUTE':
+                dt = 60*n_intervals
+              elif intercal == 'HOUR':
+                dt = 3600*n_intervals
+              elif interval == 'DAY':
+                dt = 86400*n_intervals
+              sleep_time = 0.5*dt
+              print(f'Warning! {rate_type} = {count}/{limit} = {limit_pct} > 0.9 with interval {n_intervals} {interval} -> sleeping {sleep_time} seconds')
+              time.sleep(sleep_time)
           return result
         else:
           print(response)
@@ -1797,6 +1819,17 @@ class RLFastTrader(Trader):
     if order is None:
       print('No order to update!')
       return order
+    # Check transaction time to reduce number of queries
+    order_transact_time = order['transactTime']*1e6  # ms -> ns
+    order_transact_dt = self.cur_timestamp - order_transact_time
+    if self.open_cancel_timeout is not None and self.position == 'none':
+      if order_transact_dt < self.open_cancel_timeout:
+        print(f'Time from order transaction {order_transact_dt} < {self.open_cancel_timeout} open timeout')
+        return order
+    if self.close_cancel_timeout is not None and self.position != 'none':
+      if order_transact_dt < self.close_cancel_timeout:
+        print(f'Time from order transaction {order_transact_dt} < {self.close_cancel_timeout} close timeout')
+        return order
     order_id = order['orderId']
     order_ = self.query_order(self._ws, 
                               symbol=self.symbol, 

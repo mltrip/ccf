@@ -6,6 +6,7 @@ import psutil
 import signal
 import sys
 import time
+from copy import deepcopy
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
@@ -16,9 +17,19 @@ from ccf import agents as ccf_agents
 def trade(
   agents, executor=None, 
   consumer=None, producer=None, 
-  consumer_partitioner=None, producer_partitioner=None
+  consumer_partitioner=None, producer_partitioner=None,
+  n_clones=1, delay=0.0
 ):
   # Preprocess
+  if n_clones > 1:
+    new_agents = {}
+    for name, agent_kwargs in agents.items():
+      for i in range(n_clones):
+        new_agent_kwargs = deepcopy(agent_kwargs)
+        strategy = new_agent_kwargs['strategy']
+        new_agent_kwargs['strategy'] = f'{strategy}-{i+1}'
+        new_agents[f'{name}-{i+1}'] = new_agent_kwargs
+    agents = new_agents
   if executor is None:
     executor = {'class': 'ThreadPoolExecutor'}
   if 'max_workers' not in executor:
@@ -41,14 +52,16 @@ def trade(
     agents_[name] = getattr(ccf_agents, agent_class)(**agent_kwargs)
   # Run
   try:
-    if len(agents_) == 1:
+    if len(agents_) == 1:  # Run without executor
       for name, agent in agents_.items():
         print(name)
         agent()
     else:
       future_to_name = {}
       for name, agent in agents_.items():
+        print(name)
         future_to_name[executor_.submit(agent)] = name
+        time.sleep(delay)
       for f in concurrent.futures.as_completed(future_to_name):
         n = future_to_name[f]
         try:
