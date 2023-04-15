@@ -13,19 +13,19 @@ agents:
         flush_interval: 10000
     feature: rat-ema-qv-vwap_20
     kind: rat
-    verbose: false
-    start: "2022-08-30T00:00:00+00:00"
-    stop: "2022-11-01T00:00:00+00:00"
+    verbose: true
+    start: "2023-02-27T00:00:00+00:00"
+    stop: "2023-04-01T00:00:00+00:00"
     size: ~
     quant: 3.0e+9
     delay: 86400e+9  # 1 day
     # delay: 0.0
+    batch_size: 3600e+9
     watermark: 15.0e+9  # min 2*quant
     depth: 20
     topic_keys:
       lob: [ binance-btc-usdt ]
       trade: [ binance-btc-usdt ]
-    batch_size: 86400.0e+9  # day
     vwaps:
       - quantities: [ 0.001, 0.01, 0.1, 1, 10, ~ ]
         currency: base

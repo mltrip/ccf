@@ -8,7 +8,7 @@ agents:
   lob:
     class: InfluxdbCsv
     verbose: true
-    csv_path: data_binance_api_orderbook_BTCUSDT_100_1_202207.csv.xz
+    csv_path: data_binance_api_orderbook_BTCUSDT_100_1_202303.csv.xz
     topic: lob
     exchange: binance
     base: btc
