@@ -9,6 +9,8 @@ consumer:
   bootstrap_servers: "kafka:9092"
 producer:
   bootstrap_servers: "kafka:9092"
+# n_clones: 5
+# delay: 300
 agents:
   rl-fast-ticker-ppo-fees_1em4_last_1d-qb_4em4-po_1em4-olcl-gtc:
     class: RLFastTrader

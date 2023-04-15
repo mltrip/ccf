@@ -411,45 +411,16 @@ class Trader(Agent):
                              timestamp=timestamp, recv_window=recv_window, 
                              timeout=timeout, exchange=exchange)
   
-  def cancel_replace_buy_limit(self, ws, symbol, order_id, 
-                               price, quantity, time_in_force='GTC',
-                               cancel_restrictions=None,
-                               cancel_replace_mode='STOP_ON_FAILURE',
-                               is_base_quantity=True, is_test=False,
-                               post_only=False,
-                               recv_window=5000, timeout=None, exchange=None):
+  def cancel_replace_limit(self, ws, symbol, order_id, 
+                           price, quantity, side, time_in_force='GTC',
+                           cancel_restrictions=None,
+                           cancel_replace_mode='STOP_ON_FAILURE',
+                           is_base_quantity=True, is_test=False,
+                           post_only=False,
+                           recv_window=5000, timeout=None, exchange=None):
     params = {
         "symbol": symbol,
-        "side": "BUY",
-        "type": "LIMIT" if not post_only else "LIMIT_MAKER",
-        "price": price,
-        "cancelReplaceMode": cancel_replace_mode,
-        "timeInForce": time_in_force,
-        "cancelOrderId": order_id}
-    if cancel_restrictions is not None:
-      params['cancelRestrictions'] = cancel_restrictions
-    if is_base_quantity:
-      params['quantity'] = quantity
-    else:  # quote
-      params['quoteOrderQty'] = quantity
-    timestamp = int(time.time_ns()/1e6)
-    method = 'order.cancelReplace' if not is_test else 'order.test'
-    timestamp = int(time.time_ns()/1e6)
-    return self.send_request(ws, method, params,
-                             add_api_key=True, add_signature=True,
-                             timestamp=timestamp, recv_window=recv_window, 
-                             timeout=timeout, exchange=exchange)
-  
-  def cancel_replace_sell_limit(self, ws, symbol, order_id, 
-                                price, quantity, time_in_force='GTC',
-                                cancel_restrictions=None,
-                                cancel_replace_mode='STOP_ON_FAILURE',
-                                is_base_quantity=True, is_test=False,
-                                post_only=False,
-                                recv_window=5000, timeout=None, exchange=None):
-    params = {
-        "symbol": symbol,
-        "side": "SELL",
+        "side": side,
         "type": "LIMIT" if not post_only else "LIMIT_MAKER",
         "price": price,
         "cancelReplaceMode": cancel_replace_mode,
@@ -1592,7 +1563,9 @@ class RLFastTrader(Trader):
     precision=8, tick_size=0.01, open_price_offset=0.0, close_price_offset=0.0, min_d_price=0.0,
     open_cancel_timeout=None, close_cancel_timeout=None, 
     do_check_ema=False,
-    ema_quant=1e9, ema_alpha=None, ema_length=None, post_only=False
+    ema_quant=1e9, ema_alpha=None, ema_length=None, post_only=False,
+    open_cancel_price_offset=None, close_cancel_price_offset=None,
+    open_cancel_rule='all', close_cancel_rule='all'
   ):
     super().__init__(strategy=strategy, api_url=api_url, api_key=api_key, secret_key=secret_key)
     self.key = key
@@ -1678,12 +1651,16 @@ class RLFastTrader(Trader):
     self.close_buy_price = close_buy_price
     self.open_sell_price = open_sell_price
     self.close_sell_price = close_sell_price
+    self.open_cancel_rule = open_cancel_rule
+    self.close_cancel_rule = close_cancel_rule
     self.precision = precision
     self.tick_size = tick_size
     self.min_d_price = min_d_price
     self.dt = 0
     self.open_cancel_timeout = open_cancel_timeout
     self.close_cancel_timeout = close_cancel_timeout
+    self.open_cancel_price_offset = open_cancel_price_offset
+    self.close_cancel_price_offset = close_cancel_price_offset
     self.ema = None 
     self.do_check_ema = do_check_ema
     self.ema_length = 2/ema_alpha - 1 if ema_length is None else ema_length
@@ -1691,6 +1668,7 @@ class RLFastTrader(Trader):
     self.ema_quant = ema_quant
     self.ema_cnt = 0
     self.post_only = post_only
+    self.n_order_updates = 0
     
   def init_consumer(self):
     consumer = deepcopy(self.consumer)
@@ -1819,25 +1797,99 @@ class RLFastTrader(Trader):
     if order is None:
       print('No order to update!')
       return order
-    # Check transaction time to reduce number of queries
+    # Check to reduce number of queries
+    order_id = order['orderId']
+    order_side = order['side']
+    order_price = self.order_prices['order_price']
     order_transact_time = order['transactTime']*1e6  # ms -> ns
     order_transact_dt = self.cur_timestamp - order_transact_time
-    if self.open_cancel_timeout is not None and self.position == 'none':
-      if order_transact_dt < self.open_cancel_timeout:
-        print(f'Time from order transaction {order_transact_dt} < {self.open_cancel_timeout} open timeout')
-        return order
-    if self.close_cancel_timeout is not None and self.position != 'none':
-      if order_transact_dt < self.close_cancel_timeout:
-        print(f'Time from order transaction {order_transact_dt} < {self.close_cancel_timeout} close timeout')
-        return order
-    order_id = order['orderId']
+    # Evaluate current order price
+    if self.position == 'none' and order_side == 'BUY':  # Open long
+      cur_order_price = (1.0 - self.open_price_offset)*prices[self.open_buy_price]
+    elif self.position == 'none' and order_side == 'SELL':  # Open Short
+      cur_order_price = (1.0 + self.open_price_offset)*prices[self.open_sell_price]
+    elif self.position == 'short' and order_side == 'BUY':  # Close Short  
+      cur_order_price = (1.0 - self.close_price_offset)*prices[self.close_buy_price]
+    elif self.position == 'long' and order_side == 'SELL':  # Close Long
+      cur_order_price = (1.0 + self.close_price_offset)*prices[self.close_sell_price]
+    else:
+      raise ValueError(f"Position can't be {self.position} with {order_side} side!")
+    # Round price
+    if order_side == 'BUY':
+      cur_order_price = Trader.fn_round(cur_order_price, self.tick_size, direction=floor)
+    else:  # SELL
+      cur_order_price = Trader.fn_round(cur_order_price, self.tick_size, direction=ceil)
+    cur_price_offset = abs(cur_order_price / order_price - 1.0)
+    # Check
+    do_cancel_timeout = None
+    do_cancel_price_offset = None
+    if self.position == 'none':  # On open position
+      print(f'time from open transaction: {order_transact_dt} of {self.open_cancel_timeout}, price offset: {cur_price_offset} of {self.open_cancel_price_offset}')
+      if self.open_cancel_timeout is not None:
+        print(f'timeout open: {order_transact_dt/self.open_cancel_timeout:.2%}')
+        if order_transact_dt > self.open_cancel_timeout:
+          do_cancel_timeout = True
+        else:
+          do_cancel_timeout = False
+      if self.open_cancel_price_offset is not None:
+        print(f'price offset open: {cur_price_offset/self.open_cancel_price_offset:.2%}')
+        if cur_price_offset > self.open_cancel_price_offset:
+          do_cancel_price_offset = True
+        else:
+          do_cancel_price_offset = False
+    else:  # On close position
+      print(f'time from close transaction: {order_transact_dt} of {self.close_cancel_timeout}, price offset: {cur_price_offset} of {self.close_cancel_price_offset}')
+      if self.close_cancel_timeout is not None:
+        print(f'timeout close: {order_transact_dt/self.close_cancel_timeout:.2%}')
+        if order_transact_dt > self.close_cancel_timeout:
+          do_cancel_timeout = True
+        else:
+          do_cancel_timeout = False
+      if self.close_cancel_price_offset is not None:
+        print(f'price offset close: {cur_price_offset/self.close_cancel_price_offset:.2%}')
+        if cur_price_offset > self.close_cancel_price_offset:
+          do_cancel_price_offset = True
+        else:
+          do_cancel_price_offset = False
+    do_update = False
+    if self.position == 'none':  # On open
+      cancel_rule = self.open_cancel_rule
+      print(f'open cancel rule: {cancel_rule}')
+    else:  # On close
+      cancel_rule = self.close_cancel_rule
+      print(f'close cancel rule: {cancel_rule}')
+    if do_cancel_timeout is not None and do_cancel_price_offset is not None:
+      if cancel_rule == 'all':
+        if do_cancel_timeout and do_cancel_price_offset:
+          do_update = True
+      elif cancel_rule == 'any':
+        if do_cancel_timeout or do_cancel_price_offset:
+          do_update = True
+      else:
+        raise NotImplementedError(f'cancel_rule: {cancel_rule}')
+    elif do_cancel_timeout is not None:
+      if do_cancel_timeout:
+        do_update = True
+    elif do_cancel_price_offset is not None:
+      if do_cancel_price_offset:
+        do_update = True
+    else:
+      do_update = True
+    print(f'do_update: {do_update}, do_cancel_timeout = {do_cancel_timeout}, do_cancel_price_offset = {do_cancel_price_offset}')
+    if not do_update:
+      print(f'n_order_updates: {self.n_order_updates}')
+      print(f'Skipping: order update')
+      return order
+    else:
+      print(f'n_order_updates: {self.n_order_updates + 1}')
+    # Update
+    self.n_order_updates += 1
     order_ = self.query_order(self._ws, 
                               symbol=self.symbol, 
                               order_id=order_id, 
                               timeout=self.timeout, 
                               exchange=self.exchange)
     pprint(order_)
-    order_side = order_['side']
     order_status = order_['status']
     order_time = order_['time']*1e6  # ms -> ns
     order_dt = self.cur_timestamp - order_time
@@ -1878,6 +1930,7 @@ class RLFastTrader(Trader):
         'metric': 'trade',
         'timestamp': self.cur_timestamp,
         'dt': self.dt,
+        'n_order_updates': self.n_order_updates,
         'order_dt': order_dt,
         'exchange': self.exchange,
         'base': self.base,
@@ -1920,26 +1973,14 @@ class RLFastTrader(Trader):
       if not self.is_test:
         self._producer.send(topic=self.metric_topic, key=self.key, value=value)
       order = None
+      self.n_order_updates = 0
+      self.order_prices = {}
       self.action = 0
-    elif order_status in ['PARTIALLY_FILLED']:  # In process
+    elif order_status == 'PARTIALLY_FILLED':  # In process
       print(f'Order {order_side} {order_id} in process with status: {order_status}')
-    elif order_status in ['NEW']:  # In process
+    elif order_status == 'NEW':  # In process
       print(f'Order {order_side} {order_id} in process with status: {order_status}')
-      do_cancel = False
-      do_cancel_replace = False
-      if self.position == 'none':  # Open
-        if self.open_cancel_timeout is not None:
-          if order_dt > self.open_cancel_timeout:
-            do_cancel = True
-            print(f'Order {order_side} {order_id} cancel timeout {self.open_cancel_timeout}')
-      elif self.position in ['short', 'long']:  # Close
-        if self.close_cancel_timeout is not None:  
-          if order_dt > self.close_cancel_timeout:
-            do_cancel_replace = True
-            print(f'Order {order_side} {order_id} cancel timeout {self.close_cancel_timeout}')
-      else:
-        raise ValueError(f'Bad position {self.position}!')
-      if do_cancel:
+      if self.position == 'none':  # On open position
         print(f'Cancel order {order_id}')
         result = self.cancel_order(
           ws=self._ws,
@@ -1950,68 +1991,38 @@ class RLFastTrader(Trader):
           exchange=self.exchange)
         if result is not None:
           order = None
+          self.order_prices = {}
           self.action = 0
-      if do_cancel_replace:
-        if order_side == 'BUY':
-          print(f'Replacing buy order {order_id}')
-          if self.position == 'none':  # Open long
-            price = (1.0 - self.open_price_offset)*prices[self.open_buy_price]
-          elif self.position == 'short':  # Close short
-            price = (1.0 - self.close_price_offset)*prices[self.close_buy_price]
-          else:
-            raise ValueError(f"Position can't be {self.position}!")
-          price = Trader.fn_round(price, self.tick_size, direction=floor)
-          result = self.cancel_replace_buy_limit(
-            ws=self._ws,
-            symbol=self.symbol,
-            order_id=order_id,
-            post_only=self.post_only,
-            cancel_replace_mode='STOP_ON_FAILURE',
-            cancel_restrictions='ONLY_NEW',
-            price=price,
-            time_in_force=self.time_in_force,
-            quantity=self.quantity, 
-            is_base_quantity=self.is_base_quantity, 
-            is_test=self.is_test,
-            timeout=self.timeout,
-            exchange=self.exchange)
-          if result is not None:
-            order = result['newOrderResponse']
-            self.order_prices = deepcopy(prices)
-        elif order_side == 'SELL':
-          print(f'Replacing sell order {order_id}')
-          if self.position == 'none':  # Open short
-            price = (1.0 + self.open_price_offset)*prices[self.open_sell_price]
-          elif self.position == 'long':  # Close long
-            price = (1.0 + self.close_price_offset)*prices[self.close_sell_price]
-          else:
-            raise ValueError(f"Position can't be {self.position}!")
-          price = Trader.fn_round(price, self.tick_size, direction=ceil)
-          result = self.cancel_replace_sell_limit(
-            ws=self._ws,
-            symbol=self.symbol,
-            order_id=order_id,
-            post_only=self.post_only,
-            cancel_replace_mode='STOP_ON_FAILURE',
-            cancel_restrictions='ONLY_NEW',
-            price=price,
-            time_in_force=self.time_in_force,
-            quantity=self.quantity, 
-            is_base_quantity=self.is_base_quantity, 
-            is_test=self.is_test,
-            timeout=self.timeout,
-            exchange=self.exchange)
-          if result is not None:
-            order = result['newOrderResponse']
-            self.order_prices = deepcopy(prices)
-        else:
-          raise ValueError(f"Wrong order side {order_side}!")
-    elif order_status in ['EXPIRED']:
+      else:  # On close position
+        result = self.cancel_replace_limit(
+          ws=self._ws,
+          symbol=self.symbol,
+          order_id=order_id,
+          side=order_side,
+          post_only=self.post_only,
+          cancel_replace_mode='STOP_ON_FAILURE',
+          cancel_restrictions='ONLY_NEW',
+          price=cur_order_price,
+          time_in_force=self.time_in_force,
+          quantity=self.quantity, 
+          is_base_quantity=self.is_base_quantity, 
+          is_test=self.is_test,
+          timeout=self.timeout,
+          exchange=self.exchange)
+        if result is not None:
+          order = result['newOrderResponse']
+          prices['order_price'] = cur_order_price
+          self.order_prices = deepcopy(prices)
+    elif order_status == 'EXPIRED':
       print(f'Order {order_side} {order_id} expired with status: {order_status}')
       order = None
+      self.n_order_updates = 0
+      self.order_prices = {}
     else:  # End
       print(f'Order {order_side} {order_id} ends with status: {order_status}')
       order = None
+      self.n_order_updates = 0
+      self.order_prices = {}
       self.action = 0
     return order
   
@@ -2217,6 +2228,7 @@ class RLFastTrader(Trader):
         raise NotImplementedError(self.position)
       if result is not None:
         new_order = result
+        prices['order_price'] = price
         self.order_prices = deepcopy(prices)
       else:
         new_order = None
@@ -2319,10 +2331,10 @@ class RLFastTrader(Trader):
       app = websocket.WebSocketApp(**app)
       app.run_forever(**run)
     except KeyboardInterrupt:
-      print(f"Keyboard interrupt: trader {self.strategy}")
+      print(f"Keyboard interrupt trader {self.strategy}")
     except Exception as e:
-      print(f'Exception: trader {self.strategy}')
-      print(e)
+      print(f'Exception trader {self.strategy}: {e}')
+      # print(e)
       # raise e
     finally:
       print(f'Stop: trader {self.strategy}')

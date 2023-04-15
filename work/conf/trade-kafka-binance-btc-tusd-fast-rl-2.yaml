@@ -55,3 +55,238 @@ agents:
     kind_rl: 'auto_update'  # 'auto_update'
     model_name_rl: ppo-binance-btc-tusd-last_1d
     model_version_rl: ~
+  # rl-fast-ticker-ppo-last_1d-qb_4em4-po_1em4-olcl-gtc-ct_15em9:
+  #   class: RLFastTrader
+  #   strategy: rl-fast-ticker-ppo-last_1d-qb_4em4-po_1em4-olcl-gtc-ct_15em9
+  #   key: binance-btc-tusd
+  #   model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+  #   version: 4
+  #   time_in_force: GTC  # GTC, FOK, IOC
+  #   open_type: limit  # market
+  #   close_type: limit  # market
+  #   open_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   open_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   close_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   close_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   open_price_offset: 1e-4
+  #   close_price_offset: 1e-4
+  #   precision: 8
+  #   tick_size: 0.01
+  #   stream: ticker
+  #   depth: 20
+  #   speed: 100
+  #   is_test: false
+  #   verbose: false
+  #   do_log_account_status: false
+  #   horizon: 20
+  #   window_size: 20
+  #   prediction: value  # value, quantile_0.5
+  #   watermark: 60e9
+  #   max_delay: 30e9
+  #   do_check_order_placement_open: false
+  #   do_check_order_placement_close: false
+  #   max_spread: 1e-4
+  #   min_quantity: 1e-8
+  #   open_cancel_timeout: 3e9
+  #   close_cancel_timeout: 15e9
+  #   ema_length: 1800
+  #   ema_quant: 1e9
+  #   do_check_ema: false
+  #   # min_d_price: 3e-4
+  #   # sltp_t: 3e-4
+  #   # sltp_r: 1.0
+  #   quantity: 4e-4
+  #   is_base_quantity: true
+  #   kind_rl: 'auto_update'  # 'auto_update'
+  #   model_name_rl: ppo-binance-btc-tusd-last_1d
+  #   model_version_rl: ~
+  # rl-fast-ticker-ppo-last_1d-qb_4em4-po_1em4-olcl-gtc-ct_30em9:
+  #   class: RLFastTrader
+  #   strategy: rl-fast-ticker-ppo-last_1d-qb_4em4-po_1em4-olcl-gtc-ct_30em9
+  #   key: binance-btc-tusd
+  #   model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+  #   version: 4
+  #   time_in_force: GTC  # GTC, FOK, IOC
+  #   open_type: limit  # market
+  #   close_type: limit  # market
+  #   open_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   open_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   close_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   close_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   open_price_offset: 1e-4
+  #   close_price_offset: 1e-4
+  #   precision: 8
+  #   tick_size: 0.01
+  #   stream: ticker
+  #   depth: 20
+  #   speed: 100
+  #   is_test: false
+  #   verbose: false
+  #   do_log_account_status: false
+  #   horizon: 20
+  #   window_size: 20
+  #   prediction: value  # value, quantile_0.5
+  #   watermark: 60e9
+  #   max_delay: 30e9
+  #   do_check_order_placement_open: false
+  #   do_check_order_placement_close: false
+  #   max_spread: 1e-4
+  #   min_quantity: 1e-8
+  #   open_cancel_timeout: 3e9
+  #   close_cancel_timeout: 30e9
+  #   ema_length: 1800
+  #   ema_quant: 1e9
+  #   do_check_ema: false
+  #   # min_d_price: 3e-4
+  #   # sltp_t: 3e-4
+  #   # sltp_r: 1.0
+  #   quantity: 4e-4
+  #   is_base_quantity: true
+  #   kind_rl: 'auto_update'  # 'auto_update'
+  #   model_name_rl: ppo-binance-btc-tusd-last_1d
+  #   model_version_rl: ~
+  # rl-fast-ticker-ppo-last_1d-qb_4em4-po_1em4-olcl-gtc-cpo_1e-4:
+  #   class: RLFastTrader
+  #   strategy: rl-fast-ticker-ppo-last_1d-qb_4em4-po_1em4-olcl-gtc-cpo_1e-4
+  #   key: binance-btc-tusd
+  #   model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+  #   version: 4
+  #   time_in_force: GTC  # GTC, FOK, IOC
+  #   open_type: limit  # market
+  #   close_type: limit  # market
+  #   open_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   open_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   close_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   close_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+  #   open_price_offset: 1e-4
+  #   close_price_offset: 1e-4
+  #   precision: 8
+  #   tick_size: 0.01
+  #   stream: ticker
+  #   depth: 20
+  #   speed: 100
+  #   is_test: false
+  #   verbose: false
+  #   do_log_account_status: false
+  #   horizon: 20
+  #   window_size: 20
+  #   prediction: value  # value, quantile_0.5
+  #   watermark: 60e9
+  #   max_delay: 30e9
+  #   do_check_order_placement_open: false
+  #   do_check_order_placement_close: false
+  #   max_spread: 1e-4
+  #   min_quantity: 1e-8
+  #   open_cancel_timeout: 3e9
+  #   close_cancel_timeout: 3e9
+  #   open_cancel_price_offset: ~
+  #   close_cancel_price_offset: 1e-4
+  #   ema_length: 1800
+  #   ema_quant: 1e9
+  #   do_check_ema: false
+  #   # min_d_price: 3e-4
+  #   # sltp_t: 3e-4
+  #   # sltp_r: 1.0
+  #   quantity: 4e-4
+  #   is_base_quantity: true
+  #   kind_rl: 'auto_update'  # 'auto_update'
+  #   model_name_rl: ppo-binance-btc-tusd-last_1d
+  #   model_version_rl: ~
+  rl-fast-ticker-ppo-last_1d-qb_4em4-po_1em4-olcl-gtc-cpo_1e-4_all:
+    class: RLFastTrader
+    strategy: rl-fast-ticker-ppo-last_1d-qb_4em4-po_1em4-olcl-gtc-cpo_1e-4_all
+    key: binance-btc-tusd
+    model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+    version: 4
+    time_in_force: GTC  # GTC, FOK, IOC
+    open_type: limit  # market
+    close_type: limit  # market
+    open_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+    open_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+    close_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+    close_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+    open_price_offset: 1e-4
+    close_price_offset: 1e-4
+    precision: 8
+    tick_size: 0.01
+    stream: ticker
+    depth: 20
+    speed: 100
+    is_test: false
+    verbose: false
+    do_log_account_status: false
+    horizon: 20
+    window_size: 20
+    prediction: value  # value, quantile_0.5
+    watermark: 60e9
+    max_delay: 30e9
+    do_check_order_placement_open: false
+    do_check_order_placement_close: false
+    max_spread: 1e-4
+    min_quantity: 1e-8
+    open_cancel_timeout: 3e9
+    close_cancel_timeout: 3e9
+    open_cancel_price_offset: ~
+    close_cancel_price_offset: 1e-4
+    open_cancel_rule: all
+    close_cancel_rule: all
+    ema_length: 1800
+    ema_quant: 1e9
+    do_check_ema: false
+    # min_d_price: 3e-4
+    # sltp_t: 3e-4
+    # sltp_r: 1.0
+    quantity: 4e-4
+    is_base_quantity: true
+    kind_rl: 'auto_update'  # 'auto_update'
+    model_name_rl: ppo-binance-btc-tusd-last_1d
+    model_version_rl: ~
+  rl-fast-ticker-ppo-last_1d-qb_4em4-po_1em4-olcl-gtc-cpo_1e-4_any:
+    class: RLFastTrader
+    strategy: rl-fast-ticker-ppo-last_1d-qb_4em4-po_1em4-olcl-gtc-cpo_1e-4_any
+    key: binance-btc-tusd
+    model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+    version: 4
+    time_in_force: GTC  # GTC, FOK, IOC
+    open_type: limit  # market
+    close_type: limit  # market
+    open_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+    open_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+    close_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+    close_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
+    open_price_offset: 1e-4
+    close_price_offset: 1e-4
+    precision: 8
+    tick_size: 0.01
+    stream: ticker
+    depth: 20
+    speed: 100
+    is_test: false
+    verbose: false
+    do_log_account_status: false
+    horizon: 20
+    window_size: 20
+    prediction: value  # value, quantile_0.5
+    watermark: 60e9
+    max_delay: 30e9
+    do_check_order_placement_open: false
+    do_check_order_placement_close: false
+    max_spread: 1e-4
+    min_quantity: 1e-8
+    open_cancel_timeout: 3e9
+    close_cancel_timeout: 3e9
+    open_cancel_price_offset: ~
+    close_cancel_price_offset: 1e-4
+    open_cancel_rule: all
+    close_cancel_rule: any
+    ema_length: 1800
+    ema_quant: 1e9
+    do_check_ema: false
+    # min_d_price: 3e-4
+    # sltp_t: 3e-4
+    # sltp_r: 1.0
+    quantity: 4e-4
+    is_base_quantity: true
+    kind_rl: 'auto_update'  # 'auto_update'
+    model_name_rl: ppo-binance-btc-tusd-last_1d
+    model_version_rl: ~
