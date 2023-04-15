@@ -1,0 +1,40 @@
+version: '3.3'
+
+services:
+  trade-kafka-binance-btc-tusd-fast-rl-10:
+    image: ccf
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    stop_signal: SIGTERM
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+    networks:
+      - db
+      - mlflow
+    working_dir: /app/work
+    entrypoint: [ python ]
+    command: [ ../src/ccf/trade.py, -cd, conf, -cn, trade-kafka-binance-btc-tusd-fast-rl-10 ]
+    env_file:
+      - .env.secret.trade.binance.mainnet
+    environment:
+      PYTHONPATH: /app/src
+      PYTHONUNBUFFERED: 1
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_TRACKING_USERNAME: ccf
+    volumes:
+    # - binance_btc_usdt:/app/work
+      - ../work:/app/work
+    restart: always
+      
+networks:
+  db:
+    driver: bridge
+  mlflow:
+    driver: bridge
+    
+# volumes:
+#   binance_btc_usdt:

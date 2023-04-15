@@ -73,12 +73,11 @@ def trade(
           print(f'Result of {n}: {r}')
           raise RuntimeError(f'Result of {n}: {r}')
   except KeyboardInterrupt:
-    print("Keyboard interrupt: trade")
+    print("Keyboard interrupt trade")
     print(f'Executor shutdown with wait')
     executor_.shutdown(wait=True, cancel_futures=True)
   except Exception as e:
-    print("Exception: trade")
-    print(e)
+    print(f"Exception trade {e}")
     print(f'Executor shutdown without wait')
     executor_.shutdown(wait=False, cancel_futures=True)
     pid = os.getpid()
