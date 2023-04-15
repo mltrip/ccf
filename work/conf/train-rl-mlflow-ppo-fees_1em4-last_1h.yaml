@@ -1,5 +1,5 @@
 n_envs: 32
-seed: 0
+seed: ~
 verbose: 0
 do_train: true
 do_backtest: true
@@ -43,7 +43,7 @@ model_kwargs:
   gamma: 0.99 
   gae_lambda: 0.95
   clip_range: 0.2
-  seed: 0
+  seed: ~
   device: cuda
   clip_range_vf: ~ 
   normalize_advantage: True

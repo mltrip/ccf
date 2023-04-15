@@ -1,5 +1,5 @@
 n_envs: 32
-seed: 0
+seed: ~
 verbose: 0
 do_train: true
 do_backtest: true
@@ -10,7 +10,7 @@ parent_name: ppo-fees_1em5
 parent_version: ~  # last
 learn_kwargs:
   # tb_log_name: ppo-fees_1em5
-  total_timesteps: 1024000  # number of rollouts (epochs) = total_timesteps / (n_steps * n_envs)
+  total_timesteps: 10240000  # number of rollouts (epochs) = total_timesteps / (n_steps * n_envs)
   reset_num_timesteps: false
   callback: ~ 
   log_interval: 1  #  The number of rollouts before logging
@@ -35,13 +35,13 @@ model_kwargs:
   class: PPO
   policy: MlpPolicy
   learning_rate: 0.0003
-  n_steps: 1024  # The number of steps to run for each environment per update (i.e. rollout buffer size is n_steps * n_envs where n_envs is number of environment copies running in parallel) NOTE: n_steps * n_envs must be greater than 1 (because of the advantage normalization)
-  batch_size: 32
+  n_steps: 2048  # The number of steps to run for each environment per update (i.e. rollout buffer size is n_steps * n_envs where n_envs is number of environment copies running in parallel) NOTE: n_steps * n_envs must be greater than 1 (because of the advantage normalization)
+  batch_size: 64
   n_epochs: 10  # Number of epoch when optimizing the surrogate loss
   gamma: 0.99 
   gae_lambda: 0.95
   clip_range: 0.2
-  seed: 0
+  seed: ~
   device: cuda
   clip_range_vf: ~ 
   normalize_advantage: True

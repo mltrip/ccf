@@ -4,7 +4,7 @@ defaults:
  
 kind: ~  # set ~ to constant model
 model_name: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
-model_version: 3
+model_version: 4
 model_stage: ~
 verbose: false
 horizons: [ 5, 10, 15, 20 ]
@@ -17,8 +17,8 @@ interpret_attention: True
 interpret_importance: True
 create_dataset_kwargs:
   verbose: false
-  start: "2023-03-22T23:00:00+00:00"
-  stop: "2023-03-24T00:00:00+00:00"
+  start: "2022-10-07T23:00:00+00:00"
+  stop: "2022-10-15T00:00:00+00:00"
   quant: 3e9
   watermark: 120e9
   replace_nan: ~  # FIXME could change target and rely on metrics
