@@ -26,12 +26,14 @@ from ccf.train_rl_mlflow import preprocess_data
 
 
 class Trader(Agent):
-  def __init__(self, strategy, api_url=None, api_key=None, secret_key=None):
+  def __init__(self, strategy, api_url=None, api_key=None, secret_key=None,
+               max_rate=0.95):
     super().__init__()
     self.strategy = strategy
     self.api_url = os.getenv('TRADE_API_URL', api_url)
     self.api_key = os.getenv('TRADE_API_KEY', api_key)
     self.secret_key = os.getenv('TRADE_SECRET_KEY', secret_key)
+    self.max_rate = max_rate
     
   def compute_signature(self, exchange, params):
     if exchange == 'binance':
@@ -80,19 +82,20 @@ class Trader(Agent):
             interval = rate['interval']
             n_intervals = rate['intervalNum']
             limit_pct = count / limit
-            print(f'Rate of {rate_type} = {count}/{limit} = {limit_pct} with interval {n_intervals} {interval}')
-            if limit_pct > 0.9:
+            print(f'Rate of {rate_type} per {n_intervals} {interval} = {count}/{limit} = {limit_pct:.2%} ({self.max_rate:.2%} max)')
+            if limit_pct > self.max_rate:
+              now = datetime.now(timezone.utc)
               if interval == 'SECOND':
-                dt = 1*n_intervals
+                reset_time = (now + timedelta(seconds=n_intervals)).replace(microsecond=0)
               elif interval == 'MINUTE':
-                dt = 60*n_intervals
-              elif intercal == 'HOUR':
-                dt = 3600*n_intervals
+                reset_time = (now + timedelta(minutes=n_intervals)).replace(microsecond=0, second=0)
+              elif interval == 'HOUR':
+                reset_time = (now + timedelta(hours=n_intervals)).replace(microsecond=0, second=0, minute=0)
               elif interval == 'DAY':
-                dt = 86400*n_intervals
-              sleep_time = 0.5*dt
-              print(f'Warning! {rate_type} = {count}/{limit} = {limit_pct} > 0.9 with interval {n_intervals} {interval} -> sleeping {sleep_time} seconds')
-              time.sleep(sleep_time)
+                reset_time = (now + timedelta(days=n_intervals)).replace(microsecond=0, second=0, minute=0, hour=0)
+              wait_time = reset_time - now
+              print(f'Warning! Rate of {rate_type} per {n_intervals} {interval} = {count}/{limit} = {limit_pct:.2%} > {self.max_rate:.2%} max rate -> waiting for {wait_time} from {now} till {reset_time}')
+              time.sleep(wait_time.total_seconds())
           return result
         else:
           print(response)
@@ -1539,6 +1542,7 @@ class RLFastTrader(Trader):
     strategy, 
     key, 
     api_url=None, api_key=None, secret_key=None,
+    max_rate=0.95,
     prediction_topic='prediction',
     metric_topic='metric',
     consumer_partitioner=None, consumer=None, 
@@ -1565,9 +1569,9 @@ class RLFastTrader(Trader):
     do_check_ema=False,
     ema_quant=1e9, ema_alpha=None, ema_length=None, post_only=False,
     open_cancel_price_offset=None, close_cancel_price_offset=None,
-    open_cancel_rule='all', close_cancel_rule='all'
+    open_cancel_rule='any', close_cancel_rule='any'
   ):
-    super().__init__(strategy=strategy, api_url=api_url, api_key=api_key, secret_key=secret_key)
+    super().__init__(strategy=strategy, api_url=api_url, api_key=api_key, secret_key=secret_key, max_rate=max_rate)
     self.key = key
     exchange, base, quote = self.key.split('-')
     self.exchange = exchange
@@ -1819,7 +1823,8 @@ class RLFastTrader(Trader):
       cur_order_price = Trader.fn_round(cur_order_price, self.tick_size, direction=floor)
     else:  # SELL
       cur_order_price = Trader.fn_round(cur_order_price, self.tick_size, direction=ceil)
-    cur_price_offset = abs(cur_order_price / order_price - 1.0)
+    cur_price_offset = cur_order_price / order_price - 1.0
+    print(f'order price: {order_price}, cur_order_price: {cur_order_price}')
     # Check
     do_cancel_timeout = None
     do_cancel_price_offset = None
@@ -1833,7 +1838,7 @@ class RLFastTrader(Trader):
           do_cancel_timeout = False
       if self.open_cancel_price_offset is not None:
         print(f'price offset open: {cur_price_offset/self.open_cancel_price_offset:.2%}')
-        if cur_price_offset > self.open_cancel_price_offset:
+        if abs(cur_price_offset) > self.open_cancel_price_offset:
           do_cancel_price_offset = True
         else:
           do_cancel_price_offset = False
@@ -1847,7 +1852,7 @@ class RLFastTrader(Trader):
           do_cancel_timeout = False
       if self.close_cancel_price_offset is not None:
         print(f'price offset close: {cur_price_offset/self.close_cancel_price_offset:.2%}')
-        if cur_price_offset > self.close_cancel_price_offset:
+        if abs(cur_price_offset) > self.close_cancel_price_offset:
           do_cancel_price_offset = True
         else:
           do_cancel_price_offset = False
