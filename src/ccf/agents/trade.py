@@ -1565,11 +1565,12 @@ class RLFastTrader(Trader):
     open_buy_price='a_vwap', open_sell_price='b_vwap', 
     close_buy_price='a_vwap', close_sell_price='b_vwap',
     precision=8, tick_size=0.01, open_price_offset=0.0, close_price_offset=0.0, min_d_price=0.0,
-    open_cancel_timeout=None, close_cancel_timeout=None, 
+    open_update_timeout=None, close_update_timeout=None, 
     do_check_ema=False,
     ema_quant=1e9, ema_alpha=None, ema_length=None, post_only=False,
-    open_cancel_price_offset=None, close_cancel_price_offset=None,
-    open_cancel_rule='any', close_cancel_rule='any'
+    open_update_price_offset=None, close_update_price_offset=None,
+    open_update_rule='all', close_update_rule='all',
+    open_act_rule='all', close_act_rule='all'
   ):
     super().__init__(strategy=strategy, api_url=api_url, api_key=api_key, secret_key=secret_key, max_rate=max_rate)
     self.key = key
@@ -1622,17 +1623,17 @@ class RLFastTrader(Trader):
     self.position = position
     self.is_test = is_test
     self.verbose = verbose
-    self.kind_rl = kind_rl
-    self.model_name_rl = model_name_rl
-    self.model_version_rl = model_version_rl
-    self.cur_model_version_rl = model_version_rl
-    self.model_stage_rl = model_stage_rl
-    self.cur_model_stage_rl = model_stage_rl
+    self.model_name_rl = model_name_rl if isinstance(model_name_rl, list) else [model_name_rl]
+    self.kind_rl = kind_rl if isinstance(kind_rl, list) else [kind_rl for _ in model_name_rl]
+    self.model_version_rl = model_version_rl if isinstance(model_version_rl, list) else [model_version_rl for _ in model_name_rl]
+    self.cur_model_version_rl = model_version_rl if isinstance(model_version_rl, list) else [model_version_rl for _ in model_name_rl]
+    self.model_stage_rl = model_stage_rl if isinstance(model_stage_rl, list) else [model_stage_rl for _ in model_name_rl]
+    self.cur_model_stage_rl = model_stage_rl if isinstance(model_stage_rl, list) else [model_stage_rl for _ in model_name_rl]
     self.sltp_t = sltp_t  # StopLoss-TakeProfit threshold
     self.sltp_r = sltp_r  # StopLoss/TakeProfit
     self._consumer = None
     self._producer = None
-    self._model_rl = None
+    self._model_rl = [None for _ in self.model_name_rl]
     self._ws = None
     self.app = {} if app is None else app
     self.run = {} if run is None else run
@@ -1655,16 +1656,16 @@ class RLFastTrader(Trader):
     self.close_buy_price = close_buy_price
     self.open_sell_price = open_sell_price
     self.close_sell_price = close_sell_price
-    self.open_cancel_rule = open_cancel_rule
-    self.close_cancel_rule = close_cancel_rule
+    self.open_update_rule = open_update_rule
+    self.close_update_rule = close_update_rule
     self.precision = precision
     self.tick_size = tick_size
     self.min_d_price = min_d_price
     self.dt = 0
-    self.open_cancel_timeout = open_cancel_timeout
-    self.close_cancel_timeout = close_cancel_timeout
-    self.open_cancel_price_offset = open_cancel_price_offset
-    self.close_cancel_price_offset = close_cancel_price_offset
+    self.open_update_timeout = open_update_timeout
+    self.close_update_timeout = close_update_timeout
+    self.open_update_price_offset = open_update_price_offset
+    self.close_update_price_offset = close_update_price_offset
     self.ema = None 
     self.do_check_ema = do_check_ema
     self.ema_length = 2/ema_alpha - 1 if ema_length is None else ema_length
@@ -1673,6 +1674,8 @@ class RLFastTrader(Trader):
     self.ema_cnt = 0
     self.post_only = post_only
     self.n_order_updates = 0
+    self.open_act_rule = open_act_rule 
+    self.close_act_rule = close_act_rule
     
   def init_consumer(self):
     consumer = deepcopy(self.consumer)
@@ -1703,28 +1706,30 @@ class RLFastTrader(Trader):
     self._ws.connect(self.api_url, timeout=self.timeout)
     
   def update_model_rl(self):
-    if self._model_rl is None:
-      print('Initalizing model')
-      last_model, last_version, last_stage = load_model(
-          self.model_name_rl, self.model_version_rl, self.model_stage_rl)
-      self._model_rl = last_model.unwrap_python_model().model
-      self.cur_model_version_rl = last_version
-      self.cur_model_stage_rl = last_stage
-    elif self.kind_rl == 'auto_update':
-      print('Auto-updating model')
-      _, last_version, last_stage = load_model(self.model_name_rl, 
-                                               self.model_version_rl, 
-                                               self.model_stage_rl,
-                                               metadata_only=True)
-      if int(last_version) > int(self.cur_model_version_rl):
-        print(f'Updating model from {self.cur_model_version_rl} to {last_version} version')
-        last_model, last_version, last_stage = load_model(
-          self.model_name_rl, self.model_version_rl, self.model_stage_rl)
-        self._model_rl = last_model.unwrap_python_model().model
-        self.cur_model_version_rl = last_version
-        self.cur_model_stage_rl = last_stage
-    else:
-      pass
+    for i, model_rl in enumerate(self._model_rl):
+      kind_rl = self.kind_rl[i]
+      model_name = self.model_name_rl[i]
+      model_version = self.model_version_rl[i]
+      model_stage = self.model_stage_rl[i]
+      if model_rl is None:
+        print(f'Initalizing model {i+1}/{len(self._model_rl)}: {model_name} {model_version} {model_stage}')
+        last_model, last_version, last_stage = load_model(model_name, model_version, model_stage)
+        self._model_rl[i] = last_model.unwrap_python_model().model
+        self.cur_model_version_rl[i] = last_version
+        self.cur_model_stage_rl[i] = last_stage
+      elif kind_rl == 'auto_update':
+        print(f'Auto-updating model {i+1}/{len(self._model_rl)}: {model_name} {model_version} {model_stage}')
+        _, last_version, last_stage = load_model(
+          model_name, model_version, model_stage, metadata_only=True)
+        if int(last_version) > int(self.cur_model_version_rl[i]):
+          print(f'Updating model from {self.cur_model_version_rl[i]} to {last_version} version')
+          last_model, last_version, last_stage = load_model(
+            model_name, model_version, model_stage)
+          self._model_rl[i] = last_model.unwrap_python_model().model
+          self.cur_model_version_rl[i] = last_version
+          self.cur_model_stage_rl[i] = last_stage
+      else:
+        pass
     
   def update_buffer(self, messages):
     for message in messages:
@@ -1793,8 +1798,28 @@ class RLFastTrader(Trader):
                           price_column='last')
     if self.verbose > 1:
       print(obs)
-    action, _ = self._model_rl.predict(obs)  # 0: HOLD, 1: BUY, 2: SELL
-    print(f'Predicted action: {action}')
+    # Act action
+    actions = []
+    for i, (model_name, model_version, model) in enumerate(zip(self.model_name_rl, self.model_version_rl, self._model_rl)):
+      action, _ = model.predict(obs)  # 0: HOLD, 1: BUY, 2: SELL
+      print(f'Predicted action {i+1}/{len(self._model_rl)} of {model_name} {model_version}: {action}')
+      actions.append(action)
+    if self.position == 'none':
+      act_rule = self.open_act_rule
+    else:
+      act_rule = self.close_act_rule
+    # Choose action
+    if act_rule == 'all':
+      if len(actions) > 0:
+        if all(x == actions[0] for x in actions):
+          action = actions[0]
+        else:
+          action = 0
+      else:
+        action = 0
+    else:
+      raise NotImplementedError(f'act rule: {act_rule}')
+    print(f'action with rule {act_rule}: {action}')
     return action
   
   def update_order(self, order, prices):
@@ -1826,61 +1851,56 @@ class RLFastTrader(Trader):
     cur_price_offset = cur_order_price / order_price - 1.0
     print(f'order price: {order_price}, cur_order_price: {cur_order_price}')
     # Check
-    do_cancel_timeout = None
-    do_cancel_price_offset = None
+    do_update_timeout = None
+    do_update_price_offset = None
     if self.position == 'none':  # On open position
-      print(f'time from open transaction: {order_transact_dt} of {self.open_cancel_timeout}, price offset: {cur_price_offset} of {self.open_cancel_price_offset}')
-      if self.open_cancel_timeout is not None:
-        print(f'timeout open: {order_transact_dt/self.open_cancel_timeout:.2%}')
-        if order_transact_dt > self.open_cancel_timeout:
-          do_cancel_timeout = True
-        else:
-          do_cancel_timeout = False
-      if self.open_cancel_price_offset is not None:
-        print(f'price offset open: {cur_price_offset/self.open_cancel_price_offset:.2%}')
-        if abs(cur_price_offset) > self.open_cancel_price_offset:
-          do_cancel_price_offset = True
-        else:
-          do_cancel_price_offset = False
+      update_timeout = self.open_update_timeout
+      update_price_offset = self.open_update_price_offset
+      print(f'open timeout: {update_timeout}')
+      print(f'open price offset: {update_price_offset}')
     else:  # On close position
-      print(f'time from close transaction: {order_transact_dt} of {self.close_cancel_timeout}, price offset: {cur_price_offset} of {self.close_cancel_price_offset}')
-      if self.close_cancel_timeout is not None:
-        print(f'timeout close: {order_transact_dt/self.close_cancel_timeout:.2%}')
-        if order_transact_dt > self.close_cancel_timeout:
-          do_cancel_timeout = True
-        else:
-          do_cancel_timeout = False
-      if self.close_cancel_price_offset is not None:
-        print(f'price offset close: {cur_price_offset/self.close_cancel_price_offset:.2%}')
-        if abs(cur_price_offset) > self.close_cancel_price_offset:
-          do_cancel_price_offset = True
-        else:
-          do_cancel_price_offset = False
+      update_timeout = self.close_update_timeout
+      update_price_offset = self.close_update_price_offset
+      print(f'close timeout: {update_timeout}')
+      print(f'close price offset: {update_price_offset}')
+    print(f'time from transaction: {order_transact_dt} of {update_timeout}, price offset: {cur_price_offset} of {update_price_offset}')
+    if update_timeout is not None:
+      print(f'timeout: {order_transact_dt/update_timeout:.2%}')
+      if order_transact_dt > update_timeout:
+        do_update_timeout = True
+      else:
+        do_update_timeout = False
+    if update_price_offset is not None:
+      print(f'price offset: {cur_price_offset/update_price_offset:.2%}')
+      if abs(cur_price_offset) > update_price_offset:
+        do_update_price_offset = True
+      else:
+        do_update_price_offset = False
     do_update = False
     if self.position == 'none':  # On open
-      cancel_rule = self.open_cancel_rule
-      print(f'open cancel rule: {cancel_rule}')
+      update_rule = self.open_update_rule
+      print(f'open update rule: {update_rule}')
     else:  # On close
-      cancel_rule = self.close_cancel_rule
-      print(f'close cancel rule: {cancel_rule}')
-    if do_cancel_timeout is not None and do_cancel_price_offset is not None:
-      if cancel_rule == 'all':
-        if do_cancel_timeout and do_cancel_price_offset:
+      update_rule = self.close_update_rule
+      print(f'close update rule: {update_rule}')
+    if do_update_timeout is not None and do_update_price_offset is not None:
+      if update_rule == 'all':
+        if do_update_timeout and do_update_price_offset:
           do_update = True
-      elif cancel_rule == 'any':
-        if do_cancel_timeout or do_cancel_price_offset:
+      elif update_rule == 'any':
+        if do_update_timeout or do_update_price_offset:
           do_update = True
       else:
-        raise NotImplementedError(f'cancel_rule: {cancel_rule}')
-    elif do_cancel_timeout is not None:
-      if do_cancel_timeout:
+        raise NotImplementedError(f'update_rule: {update_rule}')
+    elif do_update_timeout is not None:
+      if do_update_timeout:
         do_update = True
-    elif do_cancel_price_offset is not None:
-      if do_cancel_price_offset:
+    elif do_update_price_offset is not None:
+      if do_update_price_offset:
         do_update = True
     else:
       do_update = True
-    print(f'do_update: {do_update}, do_cancel_timeout = {do_cancel_timeout}, do_cancel_price_offset = {do_cancel_price_offset}')
+    print(f'do_update: {do_update}, do_update_timeout = {do_update_timeout}, do_update_price_offset = {do_update_price_offset}')
     if not do_update:
       print(f'n_order_updates: {self.n_order_updates}')
       print(f'Skipping: order update')
@@ -2313,8 +2333,7 @@ class RLFastTrader(Trader):
         self.init_producer()
       if self._ws is None:
         self.init_ws()
-      if self._model_rl is None:
-        self.update_model_rl()
+      self.update_model_rl()
       app = deepcopy(self.app)
       run = deepcopy(self.run)
       if self.exchange == 'binance':
