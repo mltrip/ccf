@@ -42,8 +42,8 @@ agents:
     do_check_order_placement_close: false
     max_spread: 1e-4
     min_quantity: 1e-8
-    open_cancel_timeout: 3e9
-    close_cancel_timeout: 3e9
+    open_update_timeout: 3e9
+    close_update_timeout: 3e9
     ema_length: 1800
     ema_quant: 1e9
     do_check_ema: false
