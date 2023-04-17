@@ -23,8 +23,18 @@ agents:
     open_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
     close_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
     close_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
-    open_price_offset: 1e-4
-    close_price_offset: 1e-4
+    open_price_offset: 1.0
+    close_price_offset: 1.0
+    open_price_offset_kind: s_p-m_p
+    close_price_offset_kind: s_p-m_p
+    open_price_offset_agg: max
+    close_price_offset_agg: max
+    open_price_offset_min: 5e-5
+    close_price_offset_min: 5e-5
+    open_price_offset_max: ~
+    close_price_offset_max: ~
+    open_price_offset_len: 60e9
+    close_price_offset_len: 60e9
     precision: 8
     tick_size: 0.01
     stream: ticker
@@ -36,7 +46,7 @@ agents:
     horizon: 20
     window_size: 20
     prediction: value  # value, quantile_0.5
-    watermark: 60e9
+    watermark: 120e9
     max_delay: 30e9
     do_check_order_placement_open: false
     do_check_order_placement_close: false
