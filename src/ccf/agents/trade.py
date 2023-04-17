@@ -1570,7 +1570,12 @@ class RLFastTrader(Trader):
     ema_quant=1e9, ema_alpha=None, ema_length=None, post_only=False,
     open_update_price_offset=None, close_update_price_offset=None,
     open_update_rule='all', close_update_rule='all',
-    open_act_rule='all', close_act_rule='all'
+    open_act_rule='all', close_act_rule='all',
+    open_price_offset_kind='pct', close_price_offset_kind='pct',
+    open_price_offset_len=None, close_price_offset_len=None,
+    open_price_offset_agg='max', close_price_offset_agg='max',
+    open_price_offset_min=None, close_price_offset_min=None,
+    open_price_offset_max=None, close_price_offset_max=None,
   ):
     super().__init__(strategy=strategy, api_url=api_url, api_key=api_key, secret_key=secret_key, max_rate=max_rate)
     self.key = key
@@ -1676,6 +1681,17 @@ class RLFastTrader(Trader):
     self.n_order_updates = 0
     self.open_act_rule = open_act_rule 
     self.close_act_rule = close_act_rule
+    self.open_price_offset_kind = open_price_offset_kind
+    self.close_price_offset_kind = close_price_offset_kind
+    self.open_price_offset_len = open_price_offset_len
+    self.close_price_offset_len = close_price_offset_len
+    self.open_price_offset_agg = open_price_offset_agg
+    self.close_price_offset_agg = close_price_offset_agg
+    self.open_price_offset_min = open_price_offset_min
+    self.close_price_offset_min = close_price_offset_min
+    self.open_price_offset_max = open_price_offset_max
+    self.close_price_offset_max = close_price_offset_max
+    self.prices_buffer = {}
     
   def init_consumer(self):
     consumer = deepcopy(self.consumer)
@@ -1822,6 +1838,96 @@ class RLFastTrader(Trader):
     print(f'action with rule {act_rule}: {action}')
     return action
   
+  @staticmethod
+  def buffer2df(buffer):
+    df = pd.DataFrame(buffer.values())
+    if len(df) == 0:
+      return None
+    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ns')
+    df = df.set_index('timestamp').sort_index()
+    return df
+  
+  def calculate_price(self, prices):
+    # Evaluate side
+    if self.order is not None:  # Current order
+      side = self.order['side']
+    else:  # New order
+      if self.position == 'none':  # Open
+        if self.action == 1:
+          side = 'BUY'
+        elif self.action == 2:
+          side = 'SELL'
+        else:  # HOLD
+          return None
+      elif self.position == 'short':  # Close short
+        if self.action == 1:
+          side = 'BUY'
+        elif self.action == 2:  # HOLD
+          return None
+        else:  # HOLD
+          return None
+      elif self.position == 'long':  # Close long
+        if self.action == 1:  # HOLD
+          return None
+        elif self.action == 2:
+          side = 'SELL'
+        else:  # HOLD
+          return None
+      else:
+        raise ValueError(f'Bad position: {self.position}!')
+    # Evaluate offset
+    if self.position == 'none':  # Open position
+      offset_kind = self.open_price_offset_kind
+      offset = self.open_price_offset
+      offset_len = self.open_price_offset_len 
+      offset_agg = self.open_price_offset_agg
+      offset_min = self.open_price_offset_min
+      offset_max = self.open_price_offset_max
+    else:  # Close position
+      offset_kind = self.close_price_offset_kind
+      offset = self.close_price_offset
+      offset_len = self.close_price_offset_len 
+      offset_agg = self.close_price_offset_agg
+      offset_min = self.close_price_offset_min
+      offset_max = self.close_price_offset_max
+    if offset_kind == 'pct':
+      offset_ = offset
+    elif offset_kind in prices:
+      df = RLFastTrader.buffer2df(self.prices_buffer)
+      if df is None:
+        print('Empty df')
+        return None
+      if offset_len is not None:
+        watermark = pd.to_datetime(self.cur_timestamp - offset_len, unit='ns')
+        df = df[watermark:]
+      if len(df) == 0:
+        print('Empty df')
+        return None
+      value = df[offset_kind].aggregate(offset_agg)
+      offset_ = offset*value
+      if offset_min is not None or offset_max is not None:
+        offset_ = np.clip(offset_, offset_min, offset_max)
+    else:
+      raise NotImplementedError(offset_kind)
+    # Evaluate price
+    if self.position == 'none' and side == 'BUY':  # Open long
+      price = (1.0 - offset_)*prices[self.open_buy_price]
+    elif self.position == 'none' and side == 'SELL':  # Open Short
+      price = (1.0 + offset_)*prices[self.open_sell_price]
+    elif self.position == 'short' and side == 'BUY':  # Close Short  
+      price = (1.0 - offset_)*prices[self.close_buy_price]
+    elif self.position == 'long' and side == 'SELL':  # Close Long
+      price = (1.0 + offset_)*prices[self.close_sell_price]
+    else:
+      raise ValueError(f"Position can't be {self.position} with {side} side!")
+    # Round price
+    if side == 'BUY':
+      price = Trader.fn_round(price, self.tick_size, direction=floor)
+    else:  # SELL
+      price = Trader.fn_round(price, self.tick_size, direction=ceil)
+    print(f'Price {price} with offset {offset_kind} {offset} and {offset_agg} value {value} and len {offset_len} = {offset_min} < {offset_} < {offset_max}')
+    return price
+  
   def update_order(self, order, prices):
     if order is None:
       print('No order to update!')
@@ -1833,21 +1939,7 @@ class RLFastTrader(Trader):
     order_transact_time = order['transactTime']*1e6  # ms -> ns
     order_transact_dt = self.cur_timestamp - order_transact_time
     # Evaluate current order price
-    if self.position == 'none' and order_side == 'BUY':  # Open long
-      cur_order_price = (1.0 - self.open_price_offset)*prices[self.open_buy_price]
-    elif self.position == 'none' and order_side == 'SELL':  # Open Short
-      cur_order_price = (1.0 + self.open_price_offset)*prices[self.open_sell_price]
-    elif self.position == 'short' and order_side == 'BUY':  # Close Short  
-      cur_order_price = (1.0 - self.close_price_offset)*prices[self.close_buy_price]
-    elif self.position == 'long' and order_side == 'SELL':  # Close Long
-      cur_order_price = (1.0 + self.close_price_offset)*prices[self.close_sell_price]
-    else:
-      raise ValueError(f"Position can't be {self.position} with {order_side} side!")
-    # Round price
-    if order_side == 'BUY':
-      cur_order_price = Trader.fn_round(cur_order_price, self.tick_size, direction=floor)
-    else:  # SELL
-      cur_order_price = Trader.fn_round(cur_order_price, self.tick_size, direction=ceil)
+    cur_order_price = prices['order_price']
     cur_price_offset = cur_order_price / order_price - 1.0
     print(f'order price: {order_price}, cur_order_price: {cur_order_price}')
     # Check
@@ -2036,7 +2128,6 @@ class RLFastTrader(Trader):
           exchange=self.exchange)
         if result is not None:
           order = result['newOrderResponse']
-          prices['order_price'] = cur_order_price
           self.order_prices = deepcopy(prices)
     elif order_status == 'EXPIRED':
       print(f'Order {order_side} {order_id} expired with status: {order_status}')
@@ -2115,39 +2206,38 @@ class RLFastTrader(Trader):
     pprint(actions)
     if any(list(actions.values())):
       # Check delta price
-      if len(self.order_prices) > 0 and self.min_d_price > 0:
-        cur_a_vwap = prices.get('a_vwap', None)
-        cur_b_vwap = prices.get('b_vwap', None)
-        order_a_vwap = self.order_prices.get('a_vwap', None)
-        order_b_vwap = self.order_prices.get('b_vwap', None)
-        if all([x is not None for x in [cur_a_vwap, cur_b_vwap, order_a_vwap, order_b_vwap]]):
-          if self.position == 'long':
-            stop_up = order_a_vwap*(1.0 + self.min_d_price)
-            stop_down = order_a_vwap*(1.0 - self.min_d_price)
-            if do_sell and stop_down < cur_b_vwap < stop_up:
-              print(f'Skipping long sell: stop down {stop_down} < {cur_b_vwap} cur bid < {stop_up} stop up')
-              return new_order
-          elif self.position == 'short':
-            stop_up = order_b_vwap*(1.0 + self.min_d_price)
-            stop_down = order_b_vwap*(1.0 - self.min_d_price)
-            if do_buy and stop_down < cur_a_vwap < stop_up:
-              print(f'Skipping short buy: stop down {stop_down} < {cur_a_vwap} cur ask < {stop_up} stop up')
-              return new_order
-          # if self.position == 'long':
-          #   stop_price = order_a_vwap*(1.0 + self.min_d_price)
-          #   if do_sell and order_a_vwap < cur_b_vwap < stop_price:
-          #     print(f'Skipping long sell: order ask {order_a_vwap} < {cur_b_vwap} cur bid < {stop_price} stop price')
-          #     return new_order
-          # elif self.position == 'short':
-          #   stop_price = order_b_vwap*(1.0 - self.min_d_price)
-          #   if do_buy and stop_price < cur_a_vwap < order_b_vwap:
-          #     print(f'Skipping short buy: stop price {stop_price} < {cur_a_vwap} cur ask < {order_b_vwap} order bid')
-          #     return new_order
+      # if len(self.order_prices) > 0 and self.min_d_price > 0:
+      #   cur_a_vwap = prices.get('a_vwap', None)
+      #   cur_b_vwap = prices.get('b_vwap', None)
+      #   order_a_vwap = self.order_prices.get('a_vwap', None)
+      #   order_b_vwap = self.order_prices.get('b_vwap', None)
+      #   if all([x is not None for x in [cur_a_vwap, cur_b_vwap, order_a_vwap, order_b_vwap]]):
+      #     if self.position == 'long':
+      #       stop_up = order_a_vwap*(1.0 + self.min_d_price)
+      #       stop_down = order_a_vwap*(1.0 - self.min_d_price)
+      #       if do_sell and stop_down < cur_b_vwap < stop_up:
+      #         print(f'Skipping long sell: stop down {stop_down} < {cur_b_vwap} cur bid < {stop_up} stop up')
+      #         return new_order
+      #     elif self.position == 'short':
+      #       stop_up = order_b_vwap*(1.0 + self.min_d_price)
+      #       stop_down = order_b_vwap*(1.0 - self.min_d_price)
+      #       if do_buy and stop_down < cur_a_vwap < stop_up:
+      #         print(f'Skipping short buy: stop down {stop_down} < {cur_a_vwap} cur ask < {stop_up} stop up')
+      #         return new_order
+      # if self.position == 'long':
+      #   stop_price = order_a_vwap*(1.0 + self.min_d_price)
+      #   if do_sell and order_a_vwap < cur_b_vwap < stop_price:
+      #     print(f'Skipping long sell: order ask {order_a_vwap} < {cur_b_vwap} cur bid < {stop_price} stop price')
+      #     return new_order
+      # elif self.position == 'short':
+      #   stop_price = order_b_vwap*(1.0 - self.min_d_price)
+      #   if do_buy and stop_price < cur_a_vwap < order_b_vwap:
+      #     print(f'Skipping short buy: stop price {stop_price} < {cur_a_vwap} cur ask < {order_b_vwap} order bid')
+      #     return new_order
+      price = prices['order_price']
       if self.position == 'none':  # Open
         if do_buy or do_sl_short or do_tp_short:
-          price = (1.0 - self.open_price_offset)*prices[self.open_buy_price]
-          price = Trader.fn_round(price, self.tick_size, direction=floor)
-          print(f'open buy {self.open_type} {self.open_buy_price} {price}')
+          print(f'open buy {price}')
           if self.open_type == 'market':
             result = self.buy_market(self._ws, 
                                     symbol=self.symbol, 
@@ -2170,9 +2260,7 @@ class RLFastTrader(Trader):
           else:
             raise NotImplementedError(self.open_type)
         elif do_sell or do_sl_long or do_tp_long:
-          price = (1.0 + self.open_price_offset)*prices[self.open_sell_price]
-          price = Trader.fn_round(price, self.tick_size, direction=ceil)
-          print(f'open sell {self.open_type} {self.open_sell_price} {price}')
+          print(f'open sell {price}')
           if self.open_type == 'market':
             result = self.sell_market(self._ws,
                                      symbol=self.symbol, 
@@ -2198,9 +2286,7 @@ class RLFastTrader(Trader):
           raise NotImplementedError()
       elif self.position in ['short', 'long']:  # Close
         if do_buy or do_sl_short or do_tp_short:
-          price = (1.0 - self.close_price_offset)*prices[self.close_buy_price]
-          price = Trader.fn_round(price, self.tick_size, direction=floor)
-          print(f'close buy {self.close_type} {self.close_buy_price} {price}')
+          print(f'close buy {price}')
           if self.close_type == 'market':
             result = self.buy_market(self._ws, 
                                     symbol=self.symbol, 
@@ -2223,9 +2309,7 @@ class RLFastTrader(Trader):
           else:
             raise NotImplementedError(self.close_type)
         elif do_sell or do_sl_long or do_tp_long:
-          price = (1.0 + self.close_price_offset)*prices[self.close_sell_price]
-          price = Trader.fn_round(price, self.tick_size, direction=ceil)
-          print(f'close sell {self.close_type} {self.close_sell_price} {price}')
+          print(f'close sell {price}')
           if self.close_type == 'market':
             result = self.sell_market(self._ws,
                                      symbol=self.symbol, 
@@ -2253,7 +2337,6 @@ class RLFastTrader(Trader):
         raise NotImplementedError(self.position)
       if result is not None:
         new_order = result
-        prices['order_price'] = price
         self.order_prices = deepcopy(prices)
       else:
         new_order = None
@@ -2272,10 +2355,14 @@ class RLFastTrader(Trader):
   def on_message(self, ws, message):
     self.cur_timestamp = time.time_ns()
     self.dt = self.cur_timestamp - self.last_timestamp
+    # Update prices buffer
+    watermark_timestamp = self.cur_timestamp - self.watermark
+    self.prices_buffer = {k: v for k, v in self.prices_buffer.items() if k > watermark_timestamp}
     print(f'\ntrade {self.strategy}')
-    print(f'now:        {datetime.fromtimestamp(self.cur_timestamp/1e9, tz=timezone.utc)}')
-    print(f'dt:         {self.dt/1e9}')
-    print(f'buffer:     {len(self.buffer)}')
+    print(f'now:           {datetime.fromtimestamp(self.cur_timestamp/1e9, tz=timezone.utc)}')
+    print(f'dt:            {self.dt/1e9}')
+    print(f'buffer:        {len(self.buffer)}')
+    print(f'prices buffer: {len(self.prices_buffer)}')
     orderbook = Trader.message_to_orderbook(self.exchange, message, self.stream)
     if orderbook is None:
       self.last_timestamp = self.cur_timestamp
@@ -2291,33 +2378,42 @@ class RLFastTrader(Trader):
       print('Skipping: bad vwap')
       return
     prices = {**orderbook, **vwap}
+    prices['timestamp'] = self.cur_timestamp
     # Check EMA
-    m_p = prices['m_p']
-    ema_cur_cnt = self.cur_timestamp // self.ema_quant
-    print(f'ema_cnt:   {ema_cur_cnt}')
-    if self.ema is None:
-      self.ema = m_p
-      self.ema_cnt = ema_cur_cnt
-    else:
-      if ema_cur_cnt > self.ema_cnt:
-        self.ema = self.ema_alpha*m_p + self.ema*(1 - self.ema_alpha)
-        self.ema_cnt = ema_cur_cnt
-    prices['ema'] = self.ema
-    pprint(prices)
+    # m_p = prices['m_p']
+    # ema_cur_cnt = self.cur_timestamp // self.ema_quant
+    # print(f'ema_cnt:   {ema_cur_cnt}')
+    # if self.ema is None:
+    #   self.ema = m_p
+    #   self.ema_cnt = ema_cur_cnt
+    # else:
+    #   if ema_cur_cnt > self.ema_cnt:
+    #     self.ema = self.ema_alpha*m_p + self.ema*(1 - self.ema_alpha)
+    #     self.ema_cnt = ema_cur_cnt
+    # prices['ema'] = self.ema
     result = self._consumer.poll(timeout_ms=0, max_records=None, update_offsets=True)
     if len(result) > 0:
       for topic_partition, messages in result.items():
         self.update_buffer(messages)
       self.action = self.update_action()
-    if self.do_check_ema:
-      if self.position == 'none' and m_p < self.ema:
-        self.last_timestamp = self.cur_timestamp
-        print(f'Skipping: m_p {m_p} < {self.ema} ema')
-        return
+    # if self.do_check_ema:
+    #   if self.position == 'none' and m_p < self.ema:
+    #     self.last_timestamp = self.cur_timestamp
+    #     print(f'Skipping: m_p {m_p} < {self.ema} ema')
+    #     return
     # Predict
-    self.order = self.update_order(self.order, prices)
-    self.order = self.place_order(prices)
     print(f'position: {self.position}, action: {self.action}')
+    prices['order_price'] = None
+    self.prices_buffer[self.cur_timestamp] = prices
+    if self.order is not None:
+      prices['order_price'] = self.calculate_price(prices=prices)
+      self.order = self.update_order(self.order, prices)
+    print(f'position: {self.position}, action: {self.action}')
+    if self.order is None and self.action != 0:
+      prices['order_price'] = self.calculate_price(prices=prices)
+      self.order = self.place_order(prices)
+    self.prices_buffer[self.cur_timestamp] = prices
+    pprint(prices)
     print(self.order)
     self.last_timestamp = self.cur_timestamp
 
