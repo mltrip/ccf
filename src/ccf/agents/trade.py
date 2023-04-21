@@ -61,6 +61,7 @@ class Trader(Agent):
         params['signature'] = signature
       if len(params) > 0:
         request["params"] = params
+      # pprint(request)
       ws.send(json.dumps(request))
       try:
         # if timestamp < server_time + 1000 and server_time - timestamp < recv_window:  # process request
@@ -421,21 +422,62 @@ class Trader(Agent):
                            is_base_quantity=True, is_test=False,
                            post_only=False,
                            recv_window=5000, timeout=None, exchange=None):
+    
+#     Rate of REQUEST_WEIGHT per 1 MINUTE = 115/1200 = 9.58% (95.00% max)
+# {'clientOrderId': 'V32RCYkSHr1rvu0DkoUQ7o',
+#  'cummulativeQuoteQty': '0.00000000',
+#  'executedQty': '0.00000000',
+#  'icebergQty': '0.00000000',
+#  'isWorking': True,
+#  'orderId': 541511791,
+#  'orderListId': -1,
+#  'origQty': '0.00040000',
+#  'origQuoteOrderQty': '0.00000000',
+#  'price': '29868.85000000',
+#  'selfTradePreventionMode': 'NONE',
+#  'side': 'BUY',
+#  'status': 'NEW',
+#  'stopPrice': '0.00000000',
+#  'symbol': 'BTCTUSD',
+#  'time': 1681810320332,
+#  'timeInForce': 'GTC',
+#  'type': 'LIMIT',
+#  'updateTime': 1681810320332,
+#  'workingTime': 1681810320332}
+# Order BUY 541511791 in process with status: NEW
+# Cancel replace order 541511791
+# {'id': '885b0b1c-cfb5-4e3c-b849-0fda6542784f',
+#  'method': 'order.cancelReplace',
+#  'params': {'apiKey': 'N85TRjlywrpZvyskHkmlsJPVMMLhzs71M7Af7dWUV3cHnB0eJ6HMtib70H67P1Zg',
+#             'cancelOrderId': 541511791,
+#             'cancelReplaceMode': 'STOP_ON_FAILURE',
+#             'cancelRestrictions': 'ONLY_NEW',
+#             'price': None,
+#             'quantity': 0.0004,
+#             'recvWindow': 5000,
+#             'side': 'BUY',
+#             'signature': 'f346f828ba477222566b168a6a72237dcd6ea728fbb79970d8479543b46fc648',
+#             'symbol': 'BTCTUSD',
+#             'timeInForce': 'GTC',
+#             'timestamp': 1681810335211,
+#             'type': 'LIMIT'}}
+# {'id': '885b0b1c-cfb5-4e3c-b849-0fda6542784f', 'status': 400, 'error': {'code': -1104, 'msg': "Not all sent parameters were read; read '12' parameter(s) but was sent '13'."}, 'rateLimits': [{'rateLimitType': 'REQUEST_WEIGHT', 'interval': 'MINUTE', 'intervalNum': 1, 'limit': 1200, 'count': 116}]}
+    
     params = {
         "symbol": symbol,
+        "cancelReplaceMode": cancel_replace_mode,
+        "cancelOrderId": order_id,
         "side": side,
         "type": "LIMIT" if not post_only else "LIMIT_MAKER",
         "price": price,
-        "cancelReplaceMode": cancel_replace_mode,
         "timeInForce": time_in_force,
-        "cancelOrderId": order_id}
+        }
     if cancel_restrictions is not None:
       params['cancelRestrictions'] = cancel_restrictions
     if is_base_quantity:
       params['quantity'] = quantity
     else:  # quote
       params['quoteOrderQty'] = quantity
-    timestamp = int(time.time_ns()/1e6)
     method = 'order.cancelReplace' if not is_test else 'order.test'
     timestamp = int(time.time_ns()/1e6)
     return self.send_request(ws, method, params,
@@ -613,7 +655,7 @@ class MomentumTrader(KafkaWebsocketTrader):
     consumer_partitioner=None, consumer=None, 
     producer_partitioner=None, producer=None, 
     timeout=None, 
-    start=None, stop=None, quant=None, size=None, watermark=None, delay=None, max_delay=None,
+    start=None, stop=None, quant=None, size=None, watermark=None, delay=None, max_delay=None, 
     feature=None, target=None, model=None, version=None, horizon=None, prediction=None,
     max_spread=None, is_max_spread_none_only=False, time_in_force='GTC', max_open_orders=None,
     do_cancel_open_orders=False,
@@ -637,7 +679,7 @@ class MomentumTrader(KafkaWebsocketTrader):
     self.size = size
     self.watermark = int(watermark) if watermark is not None else watermark
     self.delay = delay
-    self.emax_delay = max_delay
+    self.max_delay = max_delay
     self.model = model
     self.version = version
     self.feature = feature
@@ -741,10 +783,10 @@ class MomentumTrader(KafkaWebsocketTrader):
           print(f'buffer:     {len(buffer)}')
           buffer = {k: v for k, v in buffer.items() if k > watermark_timestamp}
           print(f'new_buffer: {len(buffer)}')
-          if self.emax_delay is not None:
+          if self.max_delay is not None:
             delay = current_timestamp - prediction_timestamp
-            if delay > self.emax_delay:
-              print(f'Skipping: delay {delay} > {self.emax_delay}')
+            if delay > self.max_delay:
+              print(f'Skipping: delay {delay} > {self.max_delay}')
               continue
           df = pd.DataFrame(buffer.values())
           if len(df) == 0:
@@ -1092,7 +1134,7 @@ class RLTrader(Trader):
     self.size = size
     self.watermark = int(watermark) if watermark is not None else watermark
     self.delay = delay
-    self.emax_delay = max_delay
+    self.max_delay = max_delay
     self.model = model
     self.version = version
     self.feature = feature
@@ -1258,10 +1300,10 @@ class RLTrader(Trader):
           print(f'buffer:     {len(buffer)}')
           buffer = {k: v for k, v in buffer.items() if k > watermark_timestamp}
           print(f'new_buffer: {len(buffer)}')
-          if self.emax_delay is not None:
+          if self.max_delay is not None:
             delay = current_timestamp - prediction_timestamp
-            if delay > self.emax_delay:
-              print(f'Skipping: delay {delay} > {self.emax_delay}')
+            if delay > self.max_delay:
+              print(f'Skipping: delay {delay} > {self.max_delay}')
               continue
           df = pd.DataFrame(buffer.values())
           if len(df) == 0:
@@ -1576,6 +1618,7 @@ class RLFastTrader(Trader):
     open_price_offset_agg='max', close_price_offset_agg='max',
     open_price_offset_min=None, close_price_offset_min=None,
     open_price_offset_max=None, close_price_offset_max=None,
+    max_model_rl_delay=None
   ):
     super().__init__(strategy=strategy, api_url=api_url, api_key=api_key, secret_key=secret_key, max_rate=max_rate)
     self.key = key
@@ -1603,7 +1646,7 @@ class RLFastTrader(Trader):
     self.size = size
     self.watermark = int(watermark) if watermark is not None else watermark
     self.delay = delay
-    self.emax_delay = max_delay
+    self.max_delay = max_delay
     self.model = model
     self.version = version
     self.feature = feature
@@ -1691,6 +1734,8 @@ class RLFastTrader(Trader):
     self.close_price_offset_min = close_price_offset_min
     self.open_price_offset_max = open_price_offset_max
     self.close_price_offset_max = close_price_offset_max
+    self.max_model_rl_delay = max_model_rl_delay
+    self.last_model_rl_update = self.cur_timestamp
     self.prices_buffer = {}
     
   def init_consumer(self):
@@ -1733,6 +1778,7 @@ class RLFastTrader(Trader):
         self._model_rl[i] = last_model.unwrap_python_model().model
         self.cur_model_version_rl[i] = last_version
         self.cur_model_stage_rl[i] = last_stage
+        self.last_model_rl_update = self.cur_timestamp
       elif kind_rl == 'auto_update':
         print(f'Auto-updating model {i+1}/{len(self._model_rl)}: {model_name} {model_version} {model_stage}')
         _, last_version, last_stage = load_model(
@@ -1744,6 +1790,7 @@ class RLFastTrader(Trader):
           self._model_rl[i] = last_model.unwrap_python_model().model
           self.cur_model_version_rl[i] = last_version
           self.cur_model_stage_rl[i] = last_stage
+          self.last_model_rl_update = self.cur_timestamp
       else:
         pass
     
@@ -1790,24 +1837,31 @@ class RLFastTrader(Trader):
     df = df.set_index('timestamp').sort_index()
     if self.verbose > 1:
       print(df)
-    print(f'min:        {df.index.min()}')
-    print(f'max:        {df.index.max()}')
-    print(f'rows:       {len(df)}')
-    print(f'columns:    {len(df.columns)}')
+    print(f'min:           {df.index.min()}')
+    print(f'max:           {df.index.max()}')
+    print(f'rows:          {len(df)}')
+    print(f'columns:       {len(df.columns)}')
     if len(df) < self.window_size:
       print(f'Skipping: data length {len(df)} < window size {self.window_size}')
       return
     if self.prediction not in df:
       print(f'Skipping: no prediction {self.prediction} in df columns: {df.columns}')
       return
-    if self.emax_delay is not None:
+    if self.max_delay is not None:
       prediction_timestamp = df.index.max().value - self.horizon*self.quant
       delay = self.cur_timestamp - prediction_timestamp
-      if delay > self.emax_delay:
-        print(f'Skipping: delay {delay} > {self.emax_delay}')
+      print(f'ml delay:      {delay/1e9}')
+      if delay > self.max_delay:
+        print(f'Skipping: delay {delay} > {self.max_delay}')
         return
     if self.position == 'none':
       self.update_model_rl()
+      if self.max_model_rl_delay is not None:
+        delay = self.cur_timestamp - self.last_model_rl_update
+        print(f'rl delay:      {delay/1e9}')
+        if delay > self.max_model_rl_delay:
+          print(f'Skipping: model rl delay {delay} > {self.max_model_rl_delay}')
+          return
     obs = preprocess_data(df=df,  
                           window_size=self.window_size,
                           forecast_column=self.prediction, 
@@ -1928,46 +1982,58 @@ class RLFastTrader(Trader):
     print(f'Price {price} with offset {offset_kind} {offset} and {offset_agg} value {value} and len {offset_len} = {offset_min} < {offset_} < {offset_max}')
     return price
   
-  def update_order(self, order, prices):
+  def check_update_timeout(self, order):
+    do_update = False
     if order is None:
-      print('No order to update!')
-      return order
-    # Check to reduce number of queries
-    order_id = order['orderId']
-    order_side = order['side']
-    order_price = self.order_prices['order_price']
+      print('No order to check timeout!')
+      return do_update
     order_transact_time = order['transactTime']*1e6  # ms -> ns
     order_transact_dt = self.cur_timestamp - order_transact_time
-    # Evaluate current order price
-    cur_order_price = prices['order_price']
-    cur_price_offset = cur_order_price / order_price - 1.0
-    print(f'order price: {order_price}, cur_order_price: {cur_order_price}')
-    # Check
-    do_update_timeout = None
-    do_update_price_offset = None
     if self.position == 'none':  # On open position
       update_timeout = self.open_update_timeout
-      update_price_offset = self.open_update_price_offset
-      print(f'open timeout: {update_timeout}')
-      print(f'open price offset: {update_price_offset}')
+      update_position = 'open'
     else:  # On close position
       update_timeout = self.close_update_timeout
+      update_position = 'close'
+    if update_timeout is None:
+      do_update = True
+    else:
+      update_timeout_pct = order_transact_dt/update_timeout
+      print(f'{update_position} update timeout = {order_transact_dt}/{update_timeout} = {update_timeout_pct:.2%}')
+      if update_timeout_pct >= 1:
+        do_update = True
+    return do_update
+  
+  def check_update_price_offset(self, order, prices):
+    do_update = False
+    if order is None:
+      print('No order to check price offset!')
+      return do_update
+    if self.position == 'none':  # On open position
+      update_price_offset = self.open_update_price_offset
+      update_position = 'open'
+    else:  # On close position
       update_price_offset = self.close_update_price_offset
-      print(f'close timeout: {update_timeout}')
-      print(f'close price offset: {update_price_offset}')
-    print(f'time from transaction: {order_transact_dt} of {update_timeout}, price offset: {cur_price_offset} of {update_price_offset}')
-    if update_timeout is not None:
-      print(f'timeout: {order_transact_dt/update_timeout:.2%}')
-      if order_transact_dt > update_timeout:
-        do_update_timeout = True
-      else:
-        do_update_timeout = False
-    if update_price_offset is not None:
-      print(f'price offset: {cur_price_offset/update_price_offset:.2%}')
-      if abs(cur_price_offset) > update_price_offset:
-        do_update_price_offset = True
-      else:
-        do_update_price_offset = False
+      update_position = 'close'
+    if update_price_offset is None:
+      do_update = True
+    else:
+      order_price = self.order_prices['order_price']
+      if prices['order_price'] is None:
+        prices['order_price'] = self.calculate_price(prices=prices)
+      cur_order_price = prices['order_price']
+      if cur_order_price is None:
+        raise ValueError(f'cur_order_price: {cur_order_price}')
+      cur_price_offset = cur_order_price / order_price - 1.0
+      offset_pct = abs(cur_price_offset) / update_price_offset
+      print(f'{update_position} update price offset = {cur_order_price}/{order_price} = {cur_price_offset} ({update_price_offset} max, {offset_pct:.2%})')
+      if offset_pct >= 1:
+        do_update = True
+    return do_update
+  
+  def check_update(self, order, prices):
+    do_update_timeout = self.check_update_timeout(order) 
+    do_update_price_offset = self.check_update_price_offset(order, prices) 
     do_update = False
     if self.position == 'none':  # On open
       update_rule = self.open_update_rule
@@ -1975,37 +2041,36 @@ class RLFastTrader(Trader):
     else:  # On close
       update_rule = self.close_update_rule
       print(f'close update rule: {update_rule}')
-    if do_update_timeout is not None and do_update_price_offset is not None:
-      if update_rule == 'all':
-        if do_update_timeout and do_update_price_offset:
-          do_update = True
-      elif update_rule == 'any':
-        if do_update_timeout or do_update_price_offset:
-          do_update = True
-      else:
-        raise NotImplementedError(f'update_rule: {update_rule}')
-    elif do_update_timeout is not None:
-      if do_update_timeout:
+    if update_rule == 'all':
+      if do_update_timeout and do_update_price_offset:
         do_update = True
-    elif do_update_price_offset is not None:
-      if do_update_price_offset:
+    elif update_rule == 'any':
+      if do_update_timeout or do_update_price_offset:
         do_update = True
     else:
-      do_update = True
-    print(f'do_update: {do_update}, do_update_timeout = {do_update_timeout}, do_update_price_offset = {do_update_price_offset}')
-    if not do_update:
-      print(f'n_order_updates: {self.n_order_updates}')
-      print(f'Skipping: order update')
+      raise NotImplementedError(f'update_rule: {update_rule}')
+    print(f'do_update: {do_update}, do_update_timeout: {do_update_timeout}, do_update_price_offset: {do_update_price_offset}')
+    return do_update
+  
+  def update_order(self, order, prices):
+    if order is None:
+      print('No order to update!')
       return order
-    else:
-      print(f'n_order_updates: {self.n_order_updates + 1}')
-    # Update
+    order_id = order['orderId']
+    order_side = order['side']
+    order_price = self.order_prices['order_price']
+    if prices['order_price'] is None:
+      prices['order_price'] = self.calculate_price(prices=prices)
+    cur_order_price = prices['order_price']
+    if cur_order_price is None:
+      raise ValueError(f'cur_order_price: {cur_order_price}')
     self.n_order_updates += 1
     order_ = self.query_order(self._ws, 
                               symbol=self.symbol, 
                               order_id=order_id, 
                               timeout=self.timeout, 
                               exchange=self.exchange)
+    print('Query order')
     pprint(order_)
     order_status = order_['status']
     order_time = order_['time']*1e6  # ms -> ns
@@ -2111,6 +2176,7 @@ class RLFastTrader(Trader):
           self.order_prices = {}
           self.action = 0
       else:  # On close position
+        print(f'Cancel replace order {order_id}')
         result = self.cancel_replace_limit(
           ws=self._ws,
           symbol=self.symbol,
@@ -2234,7 +2300,10 @@ class RLFastTrader(Trader):
       #   if do_buy and stop_price < cur_a_vwap < order_b_vwap:
       #     print(f'Skipping short buy: stop price {stop_price} < {cur_a_vwap} cur ask < {order_b_vwap} order bid')
       #     return new_order
+      prices['order_price'] = self.calculate_price(prices=prices)
       price = prices['order_price']
+      if price is None:
+        raise ValueError(f'cur_order_price: {price}')
       if self.position == 'none':  # Open
         if do_buy or do_sl_short or do_tp_short:
           print(f'open buy {price}')
@@ -2406,15 +2475,18 @@ class RLFastTrader(Trader):
     prices['order_price'] = None
     self.prices_buffer[self.cur_timestamp] = prices
     if self.order is not None:
-      prices['order_price'] = self.calculate_price(prices=prices)
-      self.order = self.update_order(self.order, prices)
+      do_update = self.check_update(order=self.order, prices=prices)
+      if do_update:
+        self.order = self.update_order(self.order, prices)
+      print(f'n_order_updates: {self.n_order_updates}')
     print(f'position: {self.position}, action: {self.action}')
-    if self.order is None and self.action != 0:
-      prices['order_price'] = self.calculate_price(prices=prices)
+    if self.order is None:
       self.order = self.place_order(prices)
     self.prices_buffer[self.cur_timestamp] = prices
+    print('Current prices')
     pprint(prices)
-    print(self.order)
+    print('Current open order')
+    pprint(self.order)
     self.last_timestamp = self.cur_timestamp
 
   def __call__(self):
