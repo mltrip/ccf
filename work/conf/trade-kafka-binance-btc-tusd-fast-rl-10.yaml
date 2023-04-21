@@ -29,12 +29,14 @@ agents:
     close_price_offset_kind: s_p-m_p
     open_price_offset_agg: max
     close_price_offset_agg: max
-    open_price_offset_min: 1e-4
-    close_price_offset_min: 1e-4
+    open_price_offset_min: ~
+    close_price_offset_min: ~
     open_price_offset_max: ~
     close_price_offset_max: ~
     open_price_offset_len: 60e9
     close_price_offset_len: 60e9
+    open_update_timeout: 3e9
+    close_update_timeout: 30e9
     precision: 8
     tick_size: 0.01
     stream: ticker
@@ -52,8 +54,6 @@ agents:
     do_check_order_placement_close: false
     max_spread: 1e-4
     min_quantity: 1e-8
-    open_update_timeout: 3e9
-    close_update_timeout: 3e9
     ema_length: 1800
     ema_quant: 1e9
     do_check_ema: false
