@@ -1797,6 +1797,8 @@ class RLFastTrader(Trader):
   def update_buffer(self, messages):
     for message in messages:
       value = message.value
+      if self.verbose > 1:
+        print(value)
       if value['exchange'] != self.exchange:
         continue
       if value['base'] != self.base:
@@ -1823,7 +1825,9 @@ class RLFastTrader(Trader):
         self.feature = value['feature']
       if self.target is None:
         self.target = value['target']
-      timestamp = value['timestamp']
+      if self.verbose > 1:
+        print(value)
+      timestamp = value['timestamp']  # timestamp of forecast
       self.buffer.setdefault(timestamp, {}).update(value)
     watermark_timestamp = self.cur_timestamp - self.watermark
     self.buffer = {k: v for k, v in self.buffer.items() if k > watermark_timestamp}
