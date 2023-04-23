@@ -139,7 +139,10 @@ class Dataset:
       min_len = max_enc_len + max_pred_len
       if dataset_kwargs.get('predict_mode', False) and len(df) > 1:  # 2 timesteps min
         new_rows = [df]
-        last_dt = df.index.to_series().diff().dt.total_seconds().iloc[-1]
+        if self.quant is not None:
+          last_dt = self.quant/1e9  # ns -> s
+        else:
+          last_dt = df.index.to_series().diff().dt.total_seconds().iloc[-1]
         last_row = df.iloc[[-1]]
         for _ in range(max_pred_len):
           last_row.index = last_row.index + timedelta(seconds=last_dt)
