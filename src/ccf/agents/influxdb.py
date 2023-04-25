@@ -7,7 +7,6 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 import pandas as pd
 
 from ccf.agents.base import Agent
-from ccf.utils import initialize_time
 
 
 class InfluxDB(Agent):
@@ -20,7 +19,7 @@ class InfluxDB(Agent):
     self.client.setdefault('org', os.getenv('INFLUXDB_V2_ORG', 'mltrip'))
     self.client.setdefault('timeout', os.getenv('INFLUXDB_V2_TIMEOUT', None))
     self.client.setdefault('verify_ssl', os.getenv(
-      'INFLUXDB_V2_VERIFY_SSL', 'true').lower() in ['yes', 'true', '1'])
+      'INFLUXDB_V2_VERIFY_SSL', 'no').lower() in ['yes', 'true', '1'])
     self.client.setdefault('proxy', os.getenv('INFLUXDB_V2_PROXY', None))
     self.bucket = os.getenv('INFLUXDB_V2_BUCKET', 'ccf') if bucket is None else bucket
     self.query_api = query_api
@@ -211,6 +210,28 @@ class InfluxDB(Agent):
       print(df.columns)
       print(df.dtypes)
     return df
+  
+  @staticmethod
+  def read_dataframe_by_topic(
+    topic, query_api, batch_size, bucket='ccf',
+    start=None, stop=None,
+    exchange=None, base=None, quote=None, 
+    verbose=False, **kwargs
+  ):
+    topic2func = {
+      'lob': InfluxDB.read_lob_dataframe,
+      'trade': InfluxDB.read_trade_dataframe,
+      'news': InfluxDB.read_news_dataframe,
+      'feature': InfluxDB.read_feature_dataframe,
+      'prediction': InfluxDB.read_prediction_dataframe,
+      'metric': InfluxDB.read_metric_dataframe
+    }
+    func = topic2func[topic]
+    return func(query_api=query_api, 
+                batch_size=batch_size, bucket=bucket,
+                start=start, stop=stop,
+                exchange=exchange, base=base, quote=quote, 
+                verbose=verbose, **kwargs)
   
   @staticmethod
   def get_batch_stream(query_api, subquery, batch_size, bucket='ccf',

@@ -28,17 +28,21 @@ class Dataset:
                start=None, stop=None, executor=None, replace_nan=None,
                split=None, target_prefix='tgt', replace_dot=' ',
                default_group_column='group_id',
-               df_only=False, watermark=None, verbose=False):
-    start = os.getenv('CCF_DATASET_START', None) if start is None else start
-    stop = os.getenv('CCF_DATASET_STOP', None) if stop is None else stop
-    size = os.getenv('CCF_DATASET_SIZE', None) if size is None else size
-    quant = os.getenv('CCF_DATASET_QUANT', None) if quant is None else quant
+               df_only=False, watermark=None, verbose=False, 
+               merge_features=False, sep='-'):
+    # Preinit
+    if executor is None:
+      executor = {'class': 'ThreadPoolExecutor'}
+    if 'max_workers' not in executor:
+      executor['max_workers'] = len(agents)
+    # Init
     start, stop, size, quant = initialize_time(start, stop, size, quant)
     self.start = start
     self.stop = stop
     self.size = size
     self.quant = quant
     self.watermark = int(watermark) if watermark is not None else watermark
+    self.verbose = verbose
     for name, kwargs in agents.items():
       if 'quant' not in kwargs and self.quant is not None:
         kwargs['quant'] = self.quant
@@ -50,6 +54,8 @@ class Dataset:
         kwargs['stop'] = self.stop
       if 'watermark' not in kwargs and self.watermark is not None:
         kwargs['watermark'] = self.watermark
+      if 'verbose' not in kwargs and self.verbose is not None:
+        kwargs['verbose'] = self.verbose
       class_name = kwargs.pop('class')
       agents[name] = getattr(ccf_agents, class_name)(**kwargs)
     self.agents = agents
@@ -68,24 +74,42 @@ class Dataset:
     self.split = split
     self.target_prefix = target_prefix
     self.df_only = df_only
-    self.verbose = verbose
     self.buffer = {}
+    self.merge_features = merge_features
+    self.sep = sep
     
   def get_features(self):
     features = {}
-    if len(self.agents) == 1:
+    if len(self.agents) == 1:  # Run without executor
       for name, agent in self.agents.items():
-        agent_features = agent()
-        features.update(agent_features)
+        print(name)
+        r = agent()
+        if isinstance(r, dict):
+          features.update(r)
+        else:
+          features[name] = r
     else:
-      f2c = {}
+      future_to_name = {}
       for name, agent in self.agents.items():
-        future_kwargs = {}
-        future = self.executor.submit(agent, **future_kwargs)
-        f2c[future] = [agent, future_kwargs]
-      for future in concurrent.futures.as_completed(f2c):
-        result = future.result()
-        features.update(result)
+        print(name)
+        future_to_name[self.executor.submit(agent)] = name
+      for f in concurrent.futures.as_completed(future_to_name):
+        n = future_to_name[f]
+        try:
+          r = f.result()
+        except Exception as e:
+          print(f'Exception of {n}: {e}')
+          raise e
+        else:
+          print(f'Result of {n}: {r}')
+          if isinstance(r, dict):
+            features.update(r)
+          else:
+            features[n] = r
+    if self.merge_features:
+      all_features = pd.concat([v.add_prefix(f'{k}{self.sep}')
+                                for k, v in features.items()], axis=1)
+      features = {'all': all_features}
     return features
   
   def __call__(self):
@@ -193,12 +217,12 @@ class Dataset:
       cs = expand_columns(df.columns, cs)
       if key == 'target':  # rename target with prefix
         for i, c in enumerate(cs):
-          cc = f'{self.target_prefix}-{c}'
+          cc = f'{self.target_prefix}{self.sep}{c}'
           df[cc] = df[c]
           cs[i] = cc
         dataset_kwargs[key] = cs if len(cs) != 1 else cs[0]
       else:
-        dataset_kwargs[key] = cs
+        dataset_kwargs[key] = [x for x in cs if not x.startswith(self.target_prefix)]
       columns.update(cs)
       if self.verbose:
         print(key)

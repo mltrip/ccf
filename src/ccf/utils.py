@@ -135,11 +135,13 @@ def initialize_time(start, stop, size, quant):
       start = time.time_ns() + start*quant
     elif isinstance(start, datetime):
       start = int(start.timestamp())*int(10**9)
+    stop = time.time_ns()
   elif start is not None and stop is None and size is None and quant is None:
     if isinstance(start, int) and start < 0:
       start = time.time_ns() + start
     elif isinstance(start, datetime):
       start = int(start.timestamp())*int(10**9)
+    stop = time.time_ns()
   elif start is not None and stop is not None and size is None and quant is not None:
     if isinstance(start, int) and start < 0:
       start = time.time_ns() + start

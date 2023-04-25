@@ -513,3 +513,78 @@ class StreamDatasetInfluxDB(InfluxDB):
   
   def __call__(self):
     return next(self)
+  
+  
+class InfluxDBDataset2(InfluxDB):  
+  def __init__(
+    self, 
+    quant, size=None, start=None, stop=None, 
+    client=None, query_api=None, write_api=None,
+    bucket=None, topic=None, key=None, filters=None, 
+    batch_size=None, watermark=None, delay=0,
+    pivot=None, resample=None, aggregate=None, interpolate=None,
+    verbose=False, ratios=None, ratio_prefix='rat', ratio_fill=1.0, sep='-'
+  ):
+    super().__init__(client, bucket, query_api, write_api, verbose)
+    self.quant = quant
+    self.size = size
+    self.start = start
+    self.stop = stop
+    self.delay = delay
+    self.watermark = watermark
+    self.topic = topic
+    self.key = key
+    self.filters = {}
+    self.verbose = verbose
+    self.pivot = pivot
+    self.resample = resample
+    if aggregate is None:
+      aggregate = {'func': {'.*': 'last'}}
+    self.aggregate = aggregate
+    if interpolate is None:
+      interpolate = {'method': 'pad'}
+    self.interpolate = interpolate
+    self.batch_size = batch_size
+    self.ratios = {} if ratios is None else ratios
+    self.ratio_prefix = ratio_prefix
+    self.ratio_fill = ratio_fill
+    self.sep = sep
+    self._client = None
+  
+  def __next__(self):
+    return None
+  
+  def __call__(self):
+    if self._client is None:
+      client = InfluxDB.init_client(self.client)
+    start, stop, size, quant = initialize_time(
+      self.start, self.stop, self.size, self.quant)
+    query_api = InfluxDB.get_query_api(client, self.query_api)
+    exchange, base, quote = self.key.split('-')
+    df = InfluxDB.read_dataframe_by_topic(topic=self.topic, 
+                                          query_api=query_api,
+                                          batch_size=self.batch_size, 
+                                          bucket=self.bucket,
+                                          start=start, stop=stop,
+                                          exchange=exchange, base=base, quote=quote, 
+                                          verbose=self.verbose, **self.filters)
+    for n, d in self.ratios.items():
+      r = self.sep.join([self.ratio_prefix, n, d])
+      df[r] = df[n].div(df[d], fill_value=self.ratio_fill)
+      df[r] = df[r].replace([np.inf, -np.inf, np.nan], self.ratio_fill)
+    if self.pivot is not None:
+      df = df.reset_index()
+      df = df.pivot_table(**self.pivot).reset_index()
+      df.columns = [self.sep.join(y for y in x if y).strip() for x in df.columns.values]
+      df = df.set_index('timestamp')
+      df = df.sort_index()
+    if self.resample is not None:
+      resample = deepcopy(self.resample)
+      resample['rule'] = pd.Timedelta(self.quant, unit='ns')
+      aggregate = deepcopy(self.aggregate)
+      if isinstance(aggregate.get('func', None), dict):
+        aggregate['func'] = {kk: v for k, v in aggregate.get('func', {}).items() 
+                             for kk in expand_columns(df.columns, [k])}
+      interpolate = deepcopy(self.interpolate)
+      df = df.resample(**resample).aggregate(**aggregate).interpolate(**interpolate)
+    return df

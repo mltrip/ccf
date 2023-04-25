@@ -451,7 +451,11 @@ def evaluate_ema_df(df, columns, alphas, old_ema=None, skipna=True):
         isna = value is None or np.isnan(value)
         if len(n2c[ema_col]) == 0:
           if old_ema is not None:
-            prev_ema = old_ema.head(1)[ema_col].item()
+            if ema_col in old_ema:
+              prev_ema = old_ema.head(1)[ema_col].item()
+            else:
+              print(f'Warning! No EMA {ema_col} in {old_ema} -> EMA = {value} value')
+              ema = value
             if skipna and isna:
               ema = prev_ema
             else:
