@@ -29,7 +29,7 @@ class Dataset:
                split=None, target_prefix='tgt', replace_dot=' ',
                default_group_column='group_id',
                df_only=False, watermark=None, verbose=False, 
-               merge_features=False, sep='-'):
+               merge_features=False, sep='-', new_only=False):
     # Preinit
     if executor is None:
       executor = {'class': 'ThreadPoolExecutor'}
@@ -77,6 +77,7 @@ class Dataset:
     self.buffer = {}
     self.merge_features = merge_features
     self.sep = sep
+    self.new_only = new_only
     
   def get_features(self):
     features = {}
@@ -84,10 +85,14 @@ class Dataset:
       for name, agent in self.agents.items():
         print(name)
         r = agent()
-        if isinstance(r, dict):
-          features.update(r)
+        if r is None:
+          if self.new_only:
+            return None
         else:
-          features[name] = r
+          if isinstance(r, dict):
+            features.update(r)
+          else:
+            features[name] = r
     else:
       future_to_name = {}
       for name, agent in self.agents.items():
@@ -102,10 +107,14 @@ class Dataset:
           raise e
         else:
           print(f'Result of {n}: {r}')
-          if isinstance(r, dict):
-            features.update(r)
+          if r is None:
+            if self.new_only:
+              return None
           else:
-            features[n] = r
+            if isinstance(r, dict):
+              features.update(r)
+            else:
+              features[n] = r
     if self.merge_features:
       all_features = pd.concat([v.add_prefix(f'{k}{self.sep}')
                                 for k, v in features.items()], axis=1)
@@ -123,6 +132,8 @@ class Dataset:
   def __next__(self):  # TODO async?
     t0 = time.time()
     features = self.get_features()
+    if features is None:
+      return self.create_dataset(features)
     for feature, df in features.items():
       old_df = self.buffer.get(feature, None)
       if old_df is not None:
@@ -153,6 +164,8 @@ class Dataset:
 
   def create_dataset(self, features):
     t0 = time.time()
+    if features is None:
+      return None, None, None, None
     dataset_kwargs = deepcopy(self.dataset_kwargs)
     time_idx = dataset_kwargs['time_idx']
     max_enc_len = dataset_kwargs['max_encoder_length']
@@ -220,9 +233,9 @@ class Dataset:
           cc = f'{self.target_prefix}{self.sep}{c}'
           df[cc] = df[c]
           cs[i] = cc
-        dataset_kwargs[key] = cs if len(cs) != 1 else cs[0]
+        dataset_kwargs[key] = sorted(cs) if len(cs) != 1 else cs[0]
       else:
-        dataset_kwargs[key] = [x for x in cs if not x.startswith(self.target_prefix)]
+        dataset_kwargs[key] = sorted([x for x in cs if not x.startswith(self.target_prefix)])
       columns.update(cs)
       if self.verbose:
         print(key)

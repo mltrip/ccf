@@ -50,6 +50,7 @@ agents:
     prediction: value  # value, quantile_0.5
     watermark: 60e9
     max_delay: 30e9
+    max_model_rl_delay: 86400e9
     do_check_order_placement_open: false
     do_check_order_placement_close: false
     max_spread: 1e-4

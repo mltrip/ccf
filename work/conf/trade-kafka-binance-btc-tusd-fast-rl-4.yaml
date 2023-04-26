@@ -1,8 +1,10 @@
 defaults:
   - partitioner@consumer_partitioner: prediction
   - partitioner@producer_partitioner: metric
+  - dataset@agents.rl-fast-ticker-ppo-binance-btc-tusd-20-h_20-v-a-last_30m-tune-qb_4em4-olcl-gtc.create_dataset_kwargs.dataset_kwargs: rl-mel_20-mpl_20-h_20-v-a
+  - partitioner@agents.rl-fast-ticker-ppo-binance-btc-tusd-20-h_20-v-a-last_30m-tune-qb_4em4-olcl-gtc.create_dataset_kwargs.agents.tusd.partitioner: prediction
   - _self_
- 
+
 executor:
   class: ProcessPoolExecutor
 consumer:
@@ -10,9 +12,39 @@ consumer:
 producer:
   bootstrap_servers: "kafka:9092"
 agents:
-  rl-fast-ticker-ppo-last_10m-qb_4em4-olcl-gtc:
+  rl-fast-ticker-ppo-binance-btc-tusd-20-h_20-v-a-last_30m-tune-qb_4em4-olcl-gtc:
     class: RLFastTrader
-    strategy: rl-fast-ticker-ppo-last_10m-qb_4em4-olcl-gtc
+    strategy: rl-fast-ticker-ppo-binance-btc-tusd-20-h_20-v-a-last_30m-tune-qb_4em4-olcl-gtc
+    create_dataset_kwargs:
+      quant: 3e+9
+      # start: "2023-04-13T00:00:00+00:00"
+      # stop: "2023-04-13T00:30:00+00:00"
+      start: ~  # number of quants
+      stop: ~  # now
+      watermark: 120e9
+      replace_nan: ~
+      split: ~
+      new_only: true
+      merge_features: false
+      verbose: true
+      dataset_kwargs:
+        predict_mode: true
+      agents:
+        tusd:
+          class: KafkaDataset2
+          consumer:
+            bootstrap_servers: "kafka:9092"
+          topic: prediction
+          key: binance-btc-tusd
+          filters:
+            model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+            version: 4
+          ratios:
+            value: last
+          pivot:
+            index: ['timestamp', 'exchange', 'base', 'quote', 'quant', 'feature', 'target', 'model', 'version']
+            columns: ['horizon']
+          resample: {}
     key: binance-btc-tusd
     model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
     version: 4
@@ -43,7 +75,7 @@ agents:
     depth: 20
     speed: 100
     is_test: false
-    verbose: false
+    verbose: true
     do_log_account_status: false
     horizon: 20
     window_size: 20
@@ -64,7 +96,7 @@ agents:
     quantity: 4e-4
     is_base_quantity: true
     kind_rl: 'auto_update'  # 'auto_update'
-    model_name_rl: ppo-binance-btc-tusd-last_10m
+    model_name_rl: ppo-binance-btc-tusd-20-h_20-v-a-last_30m-tune
     model_version_rl: ~
   # rl-fast-ticker-ppo-4M_last_1d-qb_4em4-olcl-gtc:
   #   class: RLFastTrader
