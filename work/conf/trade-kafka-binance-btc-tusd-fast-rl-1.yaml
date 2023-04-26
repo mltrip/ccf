@@ -43,7 +43,7 @@ agents:
     depth: 20
     speed: 100
     is_test: false
-    verbose: false
+    verbose: 2
     do_log_account_status: false
     horizon: 20
     window_size: 20

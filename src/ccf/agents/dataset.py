@@ -513,8 +513,8 @@ class StreamDatasetInfluxDB(InfluxDB):
   
   def __call__(self):
     return next(self)
-  
-  
+    
+
 class InfluxDBDataset2(InfluxDB):  
   def __init__(
     self, 
@@ -534,7 +534,7 @@ class InfluxDBDataset2(InfluxDB):
     self.watermark = watermark
     self.topic = topic
     self.key = key
-    self.filters = {}
+    self.filters = {} if filters is None else filters
     self.verbose = verbose
     self.pivot = pivot
     self.resample = resample
@@ -588,3 +588,107 @@ class InfluxDBDataset2(InfluxDB):
       interpolate = deepcopy(self.interpolate)
       df = df.resample(**resample).aggregate(**aggregate).interpolate(**interpolate)
     return df
+  
+  
+class KafkaDataset2(Agent):      
+  def __init__(
+    self,
+    quant=None, size=None, start=None, stop=None, watermark=None, delay=0,
+    consumer=None, partitioner=None, topic=None, key=None, filters=None,
+    pivot=None, resample=None, aggregate=None, interpolate=None,
+    verbose=False, 
+    ratios=None, ratio_prefix='rat', ratio_fill=1.0, sep='-'
+  ):
+    super().__init__()
+    self.quant = quant
+    self.size = size
+    self.start = start
+    self.stop = stop
+    self.delay = delay
+    self.watermark = watermark
+    self.consumer = consumer
+    self.partitioner = partitioner
+    self.topic = topic
+    self.key = key
+    self.filters = {} if filters is None else filters
+    self.verbose = verbose
+    self.pivot = pivot
+    self.resample = resample
+    if aggregate is None:
+      aggregate = {'func': {'.*': 'last'}}
+    self.aggregate = aggregate
+    if interpolate is None:
+      interpolate = {'method': 'pad'}
+    self.interpolate = interpolate
+    self.ratios = {} if ratios is None else ratios
+    self.ratio_prefix = ratio_prefix
+    self.ratio_fill = ratio_fill
+    self.sep = sep
+    self._consumer = None
+    self.buffer = []
+  
+  def __next__(self):
+    return None
+  
+  def init_consumer(self):
+    consumer = deepcopy(self.consumer)
+    partitioner = deepcopy(self.partitioner)
+    partitioner_class = partitioner.pop('class')
+    partitioner_ = getattr(ccf_partitioners, partitioner_class)(**partitioner)
+    partitioner_.update()
+    consumer['key_deserializer'] = partitioner_.deserialize_key
+    consumer['value_deserializer'] = partitioner_.deserialize_value
+    self._consumer = KafkaConsumer(**consumer)
+    partitions = partitioner_[self.key]
+    self._consumer.assign([TopicPartition(self.topic, x) for x in partitions])
+  
+  def __call__(self):
+    # logger = logging.getLogger('kafka')
+    # logger.setLevel(logging.CRITICAL)
+    if self._consumer is None:
+      self.init_consumer()
+    result = self._consumer.poll(timeout_ms=0, max_records=None, update_offsets=True)
+    if len(result) > 0:
+      # Update buffer
+      for topic_partition, messages in result.items():
+        for message in messages:
+          value = message.value
+          for fk, fv in self.filters.items():
+            vv = value.get(fk, None)
+            if vv != fv and str(vv) != str(fv):
+              continue
+          self.buffer.append(value)
+      # print(self.buffer)
+      if self.watermark is not None:
+        watermark = time.time_ns() - self.watermark
+        self.buffer = [x for x in self.buffer if x['timestamp'] > watermark]
+      # print(self.buffer)
+      # Create DataFrame
+      df = pd.DataFrame(self.buffer)
+      df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ns')
+      df = df.set_index('timestamp')
+      df = df.sort_index()
+      # print(df)
+      for n, d in self.ratios.items():
+        r = self.sep.join([self.ratio_prefix, n, d])
+        df[r] = df[n].div(df[d], fill_value=self.ratio_fill)
+        df[r] = df[r].replace([np.inf, -np.inf, np.nan], self.ratio_fill)
+      if self.pivot is not None:
+        df = df.reset_index()
+        df = df.pivot_table(**self.pivot).reset_index()
+        df.columns = [self.sep.join(str(y) for y in x if y).strip() for x in df.columns.values]
+        df = df.set_index('timestamp')
+        df = df.sort_index()
+      if self.resample is not None:
+        resample = deepcopy(self.resample)
+        resample['rule'] = pd.Timedelta(self.quant, unit='ns')
+        aggregate = deepcopy(self.aggregate)
+        if isinstance(aggregate.get('func', None), dict):
+          aggregate['func'] = {kk: v for k, v in aggregate.get('func', {}).items() 
+                               for kk in expand_columns(df.columns, [k])}
+        interpolate = deepcopy(self.interpolate)
+        df = df.resample(**resample).aggregate(**aggregate).interpolate(**interpolate)
+      # print(df)
+      return df
+    else:
+      return None

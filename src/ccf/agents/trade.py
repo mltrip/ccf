@@ -23,6 +23,7 @@ from ccf import partitioners as ccf_partitioners
 from ccf.utils import loop_futures
 from ccf.model_mlflow import CCFRLModel, load_model
 from ccf.train_rl_mlflow import preprocess_data
+from ccf.create_dataset import Dataset
 
 
 class Trader(Agent):
@@ -1618,7 +1619,8 @@ class RLFastTrader(Trader):
     open_price_offset_agg='max', close_price_offset_agg='max',
     open_price_offset_min=None, close_price_offset_min=None,
     open_price_offset_max=None, close_price_offset_max=None,
-    max_model_rl_delay=None
+    max_model_rl_delay=None,
+    create_dataset_kwargs=None
   ):
     super().__init__(strategy=strategy, api_url=api_url, api_key=api_key, secret_key=secret_key, max_rate=max_rate)
     self.key = key
@@ -1737,6 +1739,8 @@ class RLFastTrader(Trader):
     self.max_model_rl_delay = max_model_rl_delay
     self.last_model_rl_update = self.cur_timestamp
     self.prices_buffer = {}
+    self.create_dataset_kwargs = create_dataset_kwargs
+    self._dataset = None
     
   def init_consumer(self):
     consumer = deepcopy(self.consumer)
@@ -1763,9 +1767,17 @@ class RLFastTrader(Trader):
     self._producer = KafkaProducer(**producer)
   
   def init_ws(self):
+    print('Initalizing websocket')
     self._ws = websocket.WebSocket()
     self._ws.connect(self.api_url, timeout=self.timeout)
-    
+    print('Websocket initalized')
+   
+  def init_dataset(self):
+    print('Initalizing dataset')
+    pprint(self.create_dataset_kwargs)
+    self._dataset = Dataset(**self.create_dataset_kwargs)
+    print('Dataset initalized')
+
   def update_model_rl(self):
     for i, model_rl in enumerate(self._model_rl):
       kind_rl = self.kind_rl[i]
@@ -1833,31 +1845,62 @@ class RLFastTrader(Trader):
     self.buffer = {k: v for k, v in self.buffer.items() if k > watermark_timestamp}
     
   def update_action(self):
-    df = pd.DataFrame(self.buffer.values())
-    if len(df) == 0:
-      print(f'Skipping: empty data')
+    # Get observation
+    if self.create_dataset_kwargs is None:
+      df = pd.DataFrame(self.buffer.values())
+      if len(df) == 0:
+        print(f'Skipping: empty data')
+        return
+      df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ns')
+      df = df.set_index('timestamp').sort_index()
+      if self.verbose > 1:
+        print(df)
+      print(f'min:           {df.index.min()}')
+      print(f'max:           {df.index.max()}')
+      print(f'rows:          {len(df)}')
+      print(f'columns:       {len(df.columns)}')
+      if len(df) < self.window_size:
+        print(f'Skipping: data length {len(df)} < window size {self.window_size}')
+        return
+      if self.prediction not in df:
+        print(f'Skipping: no prediction {self.prediction} in df columns: {df.columns}')
+        return
+      obs = preprocess_data(df=df,  
+                            window_size=self.window_size,
+                            forecast_column=self.prediction, 
+                            price_column='last')
+      last_timestamp = df.index.max().value - self.quant*self.horizon
+    else:
+      if self._dataset is None:
+        self.init_dataset()
+      ds_t, ds_v, df_t, df_v = self._dataset()
+      if ds_t is None:
+        print('Skipping: bad dataset')
+        obs = None
+      else:
+        if self.verbose:
+          print(df_t)
+        dl_t = iter(ds_t.to_dataloader(
+          train=False, batch_size=1, batch_sampler='synchronized'))
+        x, y = next(dl_t)
+        obs = x['encoder_cont'][0]
+        last_index = -2*ds_t.min_prediction_length  # from horizon and dummy from prediction mode
+        if len(df_t) > abs(last_index):
+          last_timestamp = df_t.index[last_index].value
+        else:
+          last_timestamp = df_t.index.max().value
+    if obs is None:
+      print('Skipping: no observation')
       return
-    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ns')
-    df = df.set_index('timestamp').sort_index()
-    if self.verbose > 1:
-      print(df)
-    print(f'min:           {df.index.min()}')
-    print(f'max:           {df.index.max()}')
-    print(f'rows:          {len(df)}')
-    print(f'columns:       {len(df.columns)}')
-    if len(df) < self.window_size:
-      print(f'Skipping: data length {len(df)} < window size {self.window_size}')
-      return
-    if self.prediction not in df:
-      print(f'Skipping: no prediction {self.prediction} in df columns: {df.columns}')
-      return
+    if self.verbose:
+      print(obs)
     if self.max_delay is not None:
-      prediction_timestamp = df.index.max().value - self.horizon*self.quant
-      delay = self.cur_timestamp - prediction_timestamp
+      delay = self.cur_timestamp - last_timestamp
       print(f'ml delay:      {delay/1e9}')
       if delay > self.max_delay:
         print(f'Skipping: delay {delay} > {self.max_delay}')
         return
+    # Update model
     if self.position == 'none':
       self.update_model_rl()
       if self.max_model_rl_delay is not None:
@@ -1866,13 +1909,7 @@ class RLFastTrader(Trader):
         if delay > self.max_model_rl_delay:
           print(f'Skipping: model rl delay {delay} > {self.max_model_rl_delay}')
           return
-    obs = preprocess_data(df=df,  
-                          window_size=self.window_size,
-                          forecast_column=self.prediction, 
-                          price_column='last')
-    if self.verbose > 1:
-      print(obs)
-    # Act action
+    # Predict action
     actions = []
     for i, (model_name, model_version, model) in enumerate(zip(self.model_name_rl, self.model_version_rl, self._model_rl)):
       action, _ = model.predict(obs)  # 0: HOLD, 1: BUY, 2: SELL
@@ -1894,6 +1931,7 @@ class RLFastTrader(Trader):
     else:
       raise NotImplementedError(f'act rule: {act_rule}')
     print(f'action with rule {act_rule}: {action}')
+    # action = 0
     return action
   
   @staticmethod
@@ -2452,28 +2490,15 @@ class RLFastTrader(Trader):
       return
     prices = {**orderbook, **vwap}
     prices['timestamp'] = self.cur_timestamp
-    # Check EMA
-    # m_p = prices['m_p']
-    # ema_cur_cnt = self.cur_timestamp // self.ema_quant
-    # print(f'ema_cnt:   {ema_cur_cnt}')
-    # if self.ema is None:
-    #   self.ema = m_p
-    #   self.ema_cnt = ema_cur_cnt
-    # else:
-    #   if ema_cur_cnt > self.ema_cnt:
-    #     self.ema = self.ema_alpha*m_p + self.ema*(1 - self.ema_alpha)
-    #     self.ema_cnt = ema_cur_cnt
-    # prices['ema'] = self.ema
-    result = self._consumer.poll(timeout_ms=0, max_records=None, update_offsets=True)
-    if len(result) > 0:
-      for topic_partition, messages in result.items():
-        self.update_buffer(messages)
+    # Update action
+    if self.create_dataset_kwargs is None:
+      result = self._consumer.poll(timeout_ms=0, max_records=None, update_offsets=True)
+      if len(result) > 0:
+        for topic_partition, messages in result.items():
+          self.update_buffer(messages)
+        self.action = self.update_action()
+    else:
       self.action = self.update_action()
-    # if self.do_check_ema:
-    #   if self.position == 'none' and m_p < self.ema:
-    #     self.last_timestamp = self.cur_timestamp
-    #     print(f'Skipping: m_p {m_p} < {self.ema} ema')
-    #     return
     # Predict
     print(f'position: {self.position}, action: {self.action}')
     prices['order_price'] = None
