@@ -9,7 +9,7 @@ kind: auto_update  # set ~ to constant model
 model_name: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
 model_version: ~
 model_stage: ~
-verbose: true
+verbose: false
 horizons: [ 5, 10, 15, 20 ]
 predict_kwargs:
   return_index: true

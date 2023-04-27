@@ -19,7 +19,7 @@ from sqlalchemy import create_engine
 import yaml
 
 from ccf.utils import expand_columns, initialize_time
-from ccf import agents as ccf_agents
+from ccf.agents import dataset as ccf_agents
 from ccf import transformations as ccf_transformations
 
 

@@ -11,7 +11,7 @@ from copy import deepcopy
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from ccf import agents as ccf_agents
+from ccf.agents import trade as ccf_agents
 
 
 def trade(

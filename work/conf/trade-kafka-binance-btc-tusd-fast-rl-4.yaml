@@ -1,8 +1,8 @@
 defaults:
   - partitioner@consumer_partitioner: prediction
   - partitioner@producer_partitioner: metric
-  - dataset@agents.rl-fast-ticker-ppo-binance-btc-tusd-20-h_20-v-a-last_30m-tune-qb_4em4-olcl-gtc.create_dataset_kwargs.dataset_kwargs: rl-mel_20-mpl_20-h_20-v-a
-  - partitioner@agents.rl-fast-ticker-ppo-binance-btc-tusd-20-h_20-v-a-last_30m-tune-qb_4em4-olcl-gtc.create_dataset_kwargs.agents.tusd.partitioner: prediction
+  - dataset@agents.rl-fast-ticker-ppo-binance-btc-tusd-20-h_20-r-last_30m-qb_4em4-olcl-gtc.create_dataset_kwargs.dataset_kwargs: rl-mel_20-mpl_20-h_20-r
+  - partitioner@agents.rl-fast-ticker-ppo-binance-btc-tusd-20-h_20-r-last_30m-qb_4em4-olcl-gtc.create_dataset_kwargs.agents.tusd.partitioner: prediction
   - _self_
 
 executor:
@@ -12,16 +12,16 @@ consumer:
 producer:
   bootstrap_servers: "kafka:9092"
 agents:
-  rl-fast-ticker-ppo-binance-btc-tusd-20-h_20-v-a-last_30m-tune-qb_4em4-olcl-gtc:
+  rl-fast-ticker-ppo-binance-btc-tusd-20-h_20-r-last_30m-qb_4em4-olcl-gtc:
     class: RLFastTrader
-    strategy: rl-fast-ticker-ppo-binance-btc-tusd-20-h_20-v-a-last_30m-tune-qb_4em4-olcl-gtc
+    strategy: rl-fast-ticker-ppo-binance-btc-tusd-20-h_20-r-last_30m-qb_4em4-olcl-gtc
     create_dataset_kwargs:
       quant: 3e+9
       # start: "2023-04-13T00:00:00+00:00"
       # stop: "2023-04-13T00:30:00+00:00"
       start: ~  # number of quants
       stop: ~  # now
-      watermark: 120e9
+      watermark: 90e9
       replace_nan: ~
       split: ~
       new_only: true
@@ -82,7 +82,7 @@ agents:
     prediction: value  # value, quantile_0.5
     watermark: 120e9
     max_delay: 30e9
-    max_model_rl_delay: 1200e9
+    max_model_rl_delay: 1800e9
     do_check_order_placement_open: false
     do_check_order_placement_close: false
     max_spread: 1e-4
@@ -96,7 +96,7 @@ agents:
     quantity: 4e-4
     is_base_quantity: true
     kind_rl: 'auto_update'  # 'auto_update'
-    model_name_rl: ppo-binance-btc-tusd-20-h_20-v-a-last_30m-tune
+    model_name_rl: ppo-binance-btc-tusd-20-h_20-r-last_30m
     model_version_rl: ~
   # rl-fast-ticker-ppo-4M_last_1d-qb_4em4-olcl-gtc:
   #   class: RLFastTrader

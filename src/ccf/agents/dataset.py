@@ -570,7 +570,7 @@ class InfluxDBDataset2(InfluxDB):
                                           verbose=self.verbose, **self.filters)
     for n, d in self.ratios.items():
       r = self.sep.join([self.ratio_prefix, n, d])
-      df[r] = df[n].div(df[d], fill_value=self.ratio_fill)
+      df[r] = df[n].div(df[d].replace({0: np.nan}), fill_value=self.ratio_fill)
       df[r] = df[r].replace([np.inf, -np.inf, np.nan], self.ratio_fill)
     if self.pivot is not None:
       df = df.reset_index()
@@ -653,11 +653,13 @@ class KafkaDataset2(Agent):
       for topic_partition, messages in result.items():
         for message in messages:
           value = message.value
+          skip = False
           for fk, fv in self.filters.items():
             vv = value.get(fk, None)
             if vv != fv and str(vv) != str(fv):
-              continue
-          self.buffer.append(value)
+              skip = True
+          if not skip:
+            self.buffer.append(value)
       # print(self.buffer)
       if self.watermark is not None:
         watermark = time.time_ns() - self.watermark
@@ -671,7 +673,7 @@ class KafkaDataset2(Agent):
       # print(df)
       for n, d in self.ratios.items():
         r = self.sep.join([self.ratio_prefix, n, d])
-        df[r] = df[n].div(df[d], fill_value=self.ratio_fill)
+        df[r] = df[n].div(df[d].replace({0: np.nan}), fill_value=self.ratio_fill)
         df[r] = df[r].replace([np.inf, -np.inf, np.nan], self.ratio_fill)
       if self.pivot is not None:
         df = df.reset_index()
