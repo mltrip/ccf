@@ -5,6 +5,7 @@ import json
 import uuid
 import os
 import socket
+import errno
 import time
 from pprint import pprint
 import hmac
@@ -20,7 +21,6 @@ import stable_baselines3
 
 from ccf.agents.base import Agent
 from ccf import partitioners as ccf_partitioners
-from ccf.utils import loop_futures
 from ccf.model_mlflow import CCFRLModel, load_model
 from ccf.train_rl_mlflow import preprocess_data
 from ccf.create_dataset import Dataset
@@ -28,13 +28,21 @@ from ccf.create_dataset import Dataset
 
 class Trader(Agent):
   def __init__(self, strategy, api_url=None, api_key=None, secret_key=None,
-               max_rate=0.95):
+               max_rate=0.95, ws_timeout=None):
     super().__init__()
     self.strategy = strategy
     self.api_url = os.getenv('TRADE_API_URL', api_url)
     self.api_key = os.getenv('TRADE_API_KEY', api_key)
     self.secret_key = os.getenv('TRADE_SECRET_KEY', secret_key)
     self.max_rate = max_rate
+    self.ws_timeout = ws_timeout
+    self.ws = None
+    
+  def init_ws(self):
+    print('Initalizing websocket')
+    self.ws = websocket.WebSocket()
+    self.ws.connect(self.api_url, timeout=self.ws_timeout)
+    print('Websocket initalized') 
     
   def compute_signature(self, exchange, params):
     if exchange == 'binance':
@@ -44,7 +52,7 @@ class Trader(Agent):
       raise NotImplementedError(exchange)
     return signature
   
-  def send_request(self, ws, method, params=None,
+  def send_request(self, method, params=None,
                    add_api_key=True, add_signature=True,
                    timestamp=None, recv_window=None, timeout=None, exchange=None):
     if exchange == 'binance':
@@ -62,13 +70,32 @@ class Trader(Agent):
         params['signature'] = signature
       if len(params) > 0:
         request["params"] = params
-      # pprint(request)
-      ws.send(json.dumps(request))
+      if self.ws is None:
+        self.init_ws()
+      # Send
+      try:
+        self.ws.send(json.dumps(request))
+      except socket.error as e:
+        print('Websocket error send')
+        print(e)
+        if e.errno == errno.EPIPE:  # EPIPE error ([Errno 32] Broken pipe)
+          self.init_ws()
+          self.ws.send(json.dumps(request))
+        else:  # Other socket error
+          self.init_ws()
+          self.ws.send(json.dumps(request))
+      except IOError as e:
+        print('Websocket error send')
+        print(e)
+        self.init_ws()
+        self.ws.send(json.dumps(request))
+      # Recv
       try:
         # if timestamp < server_time + 1000 and server_time - timestamp < recv_window:  # process request
         # else: # reject request
-        response = json.loads(ws.recv())
+        response = json.loads(self.ws.recv())
       except Exception as e:
+        print('Websocket error recv')
         print(e)
         return None
       else:
@@ -105,22 +132,22 @@ class Trader(Agent):
     else:
       raise NotImplementedError(exchange)
       
-  def get_server_time(self, ws, timeout=None, exchange=None):
-    response = self.send_request(ws, 'time', timeout=timeout)
+  def get_server_time(self, timeout=None, exchange=None):
+    response = self.send_request('time', timeout=timeout)
     if response is not None:
       server_time = response.get('serverTime', None)
     else:
       server_time = None
     return server_time
   
-  def ping_server(self, ws, timeout=None, exchange=None):
-    response = self.send_request(ws, 'ping', timeout=timeout)
+  def ping_server(self, timeout=None, exchange=None):
+    response = self.send_request('ping', timeout=timeout)
     if response is not None:
       return True
     else:
       return False
   
-  def exchange_info(self, ws, symbols=None, timeout=None, exchange=None):
+  def exchange_info(self, symbols=None, timeout=None, exchange=None):
     if symbols is not None:
       if isinstance(symbols, str):
         params = {"symbol": symbols}
@@ -130,14 +157,14 @@ class Trader(Agent):
         raise ValueError(symbols)
     else:
       params = None
-    return self.send_request(ws, 'exchangeInfo', params, timeout=timeout)
+    return self.send_request('exchangeInfo', params, timeout=timeout)
   
-  def get_account_status(self, ws, timeout=None, exchange=None):
+  def get_account_status(self, timeout=None, exchange=None):
     timestamp = int(time.time_ns()/1e6)
-    return self.send_request(ws, 'account.status', None,
-                               timestamp=timestamp, timeout=timeout, exchange=exchange)
+    return self.send_request('account.status', None,
+                             timestamp=timestamp, timeout=timeout, exchange=exchange)
 
-  def get_ticker_orderbook(self, ws, symbols=None, timeout=None, exchange=None):
+  def get_ticker_orderbook(self, symbols=None, timeout=None, exchange=None):
     if exchange == 'binance':
       key_map = {'bidPrice': 'b_p_0', 
                  'bidQty': 'b_q_0', 
@@ -152,7 +179,7 @@ class Trader(Agent):
           raise ValueError(symbols)
       else:
         params = None
-      result = self.send_request(ws, 'ticker.book', params, 
+      result = self.send_request('ticker.book', params, 
                                  add_api_key=False, add_signature=False, 
                                  timeout=timeout, exchange=exchange)
       if result is not None:
@@ -168,7 +195,7 @@ class Trader(Agent):
       result['s_p-m_p'] = result['s_p'] / result['m_p'] if result['m_p'] != 0 else None
     return result
   
-  def get_ticker_price(self, ws, symbols=None, timeout=None, exchange=None):
+  def get_ticker_price(self, symbols=None, timeout=None, exchange=None):
     if symbols is not None:
       if isinstance(symbols, str):
         params = {"symbol": symbols}
@@ -178,17 +205,17 @@ class Trader(Agent):
         raise ValueError(symbols)
     else:
       params = None
-    return self.send_request(ws, 'ticker.price', params,
+    return self.send_request('ticker.price', params,
                              add_api_key=False, add_signature=False, 
                              timeout=timeout, exchange=exchange)
   
-  def get_orderbook(self, ws, symbol, limit=100, timeout=None, exchange=None):
+  def get_orderbook(self, symbol, limit=100, timeout=None, exchange=None):
     if exchange == 'binance': 
       method = 'depth'
       params = {'symbol': symbol}
       if limit is not None:
         params['limit'] = limit
-      result = self.send_request(ws=ws, method=method, params=params,
+      result = self.send_request(method=method, params=params,
                                  add_api_key=False, add_signature=False,
                                  timestamp=None, recv_window=None,
                                  timeout=timeout, exchange=exchange)
@@ -312,7 +339,7 @@ class Trader(Agent):
       's_m_vwap': s_m_vwap}
     return vwap
   
-  def buy_market(self, ws, symbol, quantity, exchange, is_base_quantity=True, 
+  def buy_market(self, symbol, quantity, exchange, is_base_quantity=True, 
                 is_test=False, recv_window=5000, timeout=None):
     if exchange == 'binance':
       params = {
@@ -328,13 +355,13 @@ class Trader(Agent):
       method = 'order.place' if not is_test else 'order.test'
     else:
       raise NotImplementedError(exchange)
-    response = self.send_request(ws=ws, method=method, params=params,
+    response = self.send_request(method=method, params=params,
                                  add_api_key=True, add_signature=True,
                                  timestamp=timestamp, timeout=timeout,
                                  recv_window=recv_window, exchange=exchange)
     return response
   
-  def sell_market(self, ws, symbol, quantity, exchange, is_base_quantity=True, 
+  def sell_market(self, symbol, quantity, exchange, is_base_quantity=True, 
                  is_test=False, recv_window=5000, timeout=None):
     if exchange == 'binance':
       params = {
@@ -350,13 +377,13 @@ class Trader(Agent):
       method = 'order.place' if not is_test else 'order.test'
     else:
       raise NotImplementedError(exchange)
-    response = self.send_request(ws=ws, method=method, params=params,
+    response = self.send_request(method=method, params=params,
                                  add_api_key=True, add_signature=True,
                                  timestamp=timestamp, timeout=timeout,
                                  recv_window=recv_window, exchange=exchange)
     return response
   
-  def buy_limit(self, ws, symbol, price, quantity, time_in_force='GTC', 
+  def buy_limit(self, symbol, price, quantity, time_in_force='GTC', 
                 is_base_quantity=True, is_test=False, post_only=False,
                 recv_window=5000, timeout=None, exchange=None):
     params = {
@@ -372,12 +399,12 @@ class Trader(Agent):
       params['quoteOrderQty'] = quantity
     timestamp = int(time.time_ns()/1e6)
     method = 'order.place' if not is_test else 'order.test'
-    return self.send_request(ws=ws, method=method, params=params,
+    return self.send_request(method=method, params=params,
                              add_api_key=True, add_signature=True,
                              timestamp=timestamp, 
                              recv_window=recv_window, timeout=timeout, exchange=exchange)
   
-  def sell_limit(self, ws, symbol, price, quantity, time_in_force='GTC', 
+  def sell_limit(self, symbol, price, quantity, time_in_force='GTC', 
                  is_base_quantity=True, is_test=False, post_only=False,
                  recv_window=5000, timeout=None, exchange=None):
     params = {
@@ -393,30 +420,30 @@ class Trader(Agent):
       params['quoteOrderQty'] = quantity
     timestamp = int(time.time_ns()/1e6)
     method = 'order.place' if not is_test else 'order.test'
-    return self.send_request(ws, method, params,
+    return self.send_request(method, params,
                              timestamp=timestamp, recv_window=recv_window, 
                              timeout=timeout, exchange=exchange)
   
-  def current_open_orders(self, ws, symbol, recv_window=5000, timeout=None, exchange=None):
+  def current_open_orders(self, symbol, recv_window=5000, timeout=None, exchange=None):
     params = {"symbol": symbol}
     method = 'openOrders.status'
     timestamp = int(time.time_ns()/1e6)
-    return self.send_request(ws, method, params,
+    return self.send_request(method, params,
                              timestamp=timestamp, recv_window=recv_window, 
                              timeout=timeout, exchange=exchange)
   
-  def query_order(self, ws, symbol, order_id, recv_window=5000, timeout=None, exchange=None):
+  def query_order(self, symbol, order_id, recv_window=5000, timeout=None, exchange=None):
     params = {
       "symbol": symbol,
       "orderId": order_id
     }
     method = 'order.status'
     timestamp = int(time.time_ns()/1e6)
-    return self.send_request(ws, method, params,
+    return self.send_request(method, params,
                              timestamp=timestamp, recv_window=recv_window, 
                              timeout=timeout, exchange=exchange)
   
-  def cancel_replace_limit(self, ws, symbol, order_id, 
+  def cancel_replace_limit(self, symbol, order_id, 
                            price, quantity, side, time_in_force='GTC',
                            cancel_restrictions=None,
                            cancel_replace_mode='STOP_ON_FAILURE',
@@ -481,12 +508,12 @@ class Trader(Agent):
       params['quoteOrderQty'] = quantity
     method = 'order.cancelReplace' if not is_test else 'order.test'
     timestamp = int(time.time_ns()/1e6)
-    return self.send_request(ws, method, params,
+    return self.send_request(method, params,
                              add_api_key=True, add_signature=True,
                              timestamp=timestamp, recv_window=recv_window, 
                              timeout=timeout, exchange=exchange)
 
-  def cancel_order(self, ws, symbol, order_id, cancel_restrictions=None,
+  def cancel_order(self, symbol, order_id, cancel_restrictions=None,
                    recv_window=5000, timeout=None, exchange=None):
     params = {
       "symbol": symbol,
@@ -496,20 +523,20 @@ class Trader(Agent):
       params['cancelRestrictions'] = cancel_restrictions
     method = 'order.cancel'
     timestamp = int(time.time_ns()/1e6)
-    return self.send_request(ws, method, params,
+    return self.send_request(method, params,
                              add_api_key=True, add_signature=True,
                              timestamp=timestamp, recv_window=recv_window, 
                              timeout=timeout, exchange=exchange)
   
-  def cancel_open_orders(self, ws, symbol, recv_window=5000, timeout=None, exchange=None):
+  def cancel_open_orders(self, symbol, recv_window=5000, timeout=None, exchange=None):
     params = {"symbol": symbol}
     method = 'openOrders.cancelAll'
     timestamp = int(time.time_ns()/1e6)
-    return self.send_request(ws, method, params,
+    return self.send_request(method, params,
                              timestamp=timestamp, recv_window=recv_window, 
                              timeout=timeout, exchange=exchange)
   
-  def buy_oco(self, ws, symbol, quantity, price, stop_price, stop_limit_price,
+  def buy_oco(self, symbol, quantity, price, stop_price, stop_limit_price,
               time_in_force='GTC', new_order_resp_type='RESULT',
               recv_window=5000, timeout=None, exchange=None):
     # newOrderRespType Select response format: ACK, RESULT, FULL.
@@ -532,10 +559,10 @@ class Trader(Agent):
         "newOrderRespType": new_order_resp_type
     }
     timestamp = int(time.time_ns()/1e6)
-    return self.send_request(ws, 'orderList.place', params,
-                               timestamp, recv_window, timeout, exchange=exchange)
+    return self.send_request('orderList.place', params,
+                             timestamp, recv_window, timeout, exchange=exchange)
   
-  def sell_oco(self, ws,
+  def sell_oco(self,
                symbol, quantity, price, stop_price, stop_limit_price,
                time_in_force='GTC', new_order_resp_type='RESULT',
                recv_window=5000, timeout=None, exchange=None):
@@ -550,10 +577,10 @@ class Trader(Agent):
         "newOrderRespType": new_order_resp_type
     }
     timestamp = int(time.time_ns()/1e6)
-    return self.send_request(ws, 'orderList.place', params,
-                               timestamp, recv_window, timeout, exchange=exchange)
+    return self.send_request('orderList.place', params,
+                             timestamp, recv_window, timeout, exchange=exchange)
   
-  def close_position(self, ws, position, exchange, symbol, quantity, is_base_quantity,
+  def close_position(self, position, exchange, symbol, quantity, is_base_quantity,
                      recv_window=5000, timeout=None, is_test=False, max_attempts=1000):
     result = None
     i = 0
@@ -561,23 +588,21 @@ class Trader(Agent):
       i += 1
       print(f'Closing {position} position attempt {i}/{max_attempts}')
       if position == 'short':
-        result = self.buy_market(ws=ws, 
-                                exchange=exchange,
-                                symbol=symbol, 
-                                quantity=quantity, 
-                                is_base_quantity=is_base_quantity, 
-                                is_test=is_test,
-                                recv_window=recv_window,
-                                timeout=timeout)
-      elif position == 'long':
-        result = self.sell_market(ws=ws,
-                                 exchange=exchange,
-                                 symbol=symbol,
+        result = self.buy_market(exchange=exchange,
+                                 symbol=symbol, 
                                  quantity=quantity, 
                                  is_base_quantity=is_base_quantity, 
                                  is_test=is_test,
                                  recv_window=recv_window,
                                  timeout=timeout)
+      elif position == 'long':
+        result = self.sell_market(exchange=exchange,
+                                  symbol=symbol,
+                                  quantity=quantity, 
+                                  is_base_quantity=is_base_quantity, 
+                                  is_test=is_test,
+                                  recv_window=recv_window,
+                                  timeout=timeout)
       elif position == 'none':
         result = {}
       else:
@@ -612,7 +637,6 @@ class KafkaWebsocketTrader(Trader):
     self.timeout = timeout
     self._consumer = None
     self._producer = None
-    self._ws = None
     
   def init_consumer(self):
     consumer = deepcopy(self.consumer)
@@ -637,10 +661,6 @@ class KafkaWebsocketTrader(Trader):
     producer['key_serializer'] = partitioner.serialize_key
     producer['value_serializer'] = partitioner.serialize_value
     self._producer = KafkaProducer(**producer)
-  
-  def init_ws(self):
-    self._ws = websocket.WebSocket()
-    self._ws.connect(self.api_url, timeout=self.timeout)
     
   def __call__(self):
     raise NotImplementedError()
@@ -723,8 +743,6 @@ class MomentumTrader(KafkaWebsocketTrader):
         self.init_consumer()
       if self._producer is None:
         self.init_producer()
-      if self._ws is None:
-        self.init_ws()
       # Strategy
       buffer = {}
       exchange, base, quote = self.key.split('-')
@@ -738,8 +756,7 @@ class MomentumTrader(KafkaWebsocketTrader):
       last_base_balance = 0.0
       last_quote_balance = 0.0
       if self.do_cancel_open_orders:
-        cancel_result = self.cancel_open_orders(
-          self._ws, symbol, timeout=self.timeout, exchange=exchange)
+        cancel_result = self.cancel_open_orders(symbol, timeout=self.timeout, exchange=exchange)
         pprint(cancel_result)
       for message in self._consumer:
         value = message.value
@@ -857,7 +874,7 @@ class MomentumTrader(KafkaWebsocketTrader):
           print(f'Position: {self.position}')
           print(f'Active order: {order_id}')
           if order_id is not None:
-            order = self.query_order(self._ws, symbol, order_id, 
+            order = self.query_order(symbol, order_id, 
                                      timeout=self.timeout, 
                                      exchange=exchange)
             pprint(order)
@@ -927,8 +944,7 @@ class MomentumTrader(KafkaWebsocketTrader):
                 'api_key': self.api_key
               }
               # Get status
-              account_status = self.get_account_status(
-                self._ws, timeout=self.timeout, exchange=exchange)
+              account_status = self.get_account_status(timeout=self.timeout, exchange=exchange)
               if self.verbose:
                 print(account_status)
               for b in account_status.get('balances'):
@@ -987,11 +1003,10 @@ class MomentumTrader(KafkaWebsocketTrader):
           do_a = any([do_b_t, do_s_t])
           print(f'Action: {do_a}')
           if do_a and order_id is None:
-            orderbook = self.get_orderbook(self._ws, 
-                                         symbol=symbol, 
-                                         limit=self.limit, 
-                                         timeout=self.timeout,
-                                         exchange=exchange)
+            orderbook = self.get_orderbook(symbol=symbol, 
+                                           limit=self.limit, 
+                                           timeout=self.timeout,
+                                           exchange=exchange)
             if orderbook is None:
               print('Skipping: bad orderbook')
               continue
@@ -1015,13 +1030,12 @@ class MomentumTrader(KafkaWebsocketTrader):
                 print(f'Order placement check is {check_order_placement} but not skipping')
             if do_b_t:
               print('buy_market')
-              result = self.buy_market(self._ws, 
-                                      symbol=symbol, 
-                                      quantity=self.quantity, 
-                                      is_base_quantity=self.is_base_quantity, 
-                                      is_test=self.is_test,
-                                      timeout=self.timeout, 
-                                      exchange=exchange)
+              result = self.buy_market(symbol=symbol, 
+                                       quantity=self.quantity, 
+                                       is_base_quantity=self.is_base_quantity, 
+                                       is_test=self.is_test,
+                                       timeout=self.timeout, 
+                                       exchange=exchange)
             # elif do_b_m:
             #   print('buy_limit')
             #   result = self.buy_limit(self._ws, 
@@ -1035,13 +1049,12 @@ class MomentumTrader(KafkaWebsocketTrader):
             #                           exchange=exchange)
             elif do_s_t:
               print('sell_market')
-              result = self.sell_market(self._ws,
-                                       symbol=symbol, 
-                                       quantity=self.quantity, 
-                                       is_base_quantity=self.is_base_quantity, 
-                                       is_test=self.is_test,
-                                       timeout=self.timeout,
-                                       exchange=exchange)
+              result = self.sell_market(symbol=symbol, 
+                                        quantity=self.quantity, 
+                                        is_base_quantity=self.is_base_quantity, 
+                                        is_test=self.is_test,
+                                        timeout=self.timeout,
+                                        exchange=exchange)
             # elif do_s_m:
             #   print('sell_limit')
             #   result = self.sell_limit(self._ws,
@@ -1068,9 +1081,7 @@ class MomentumTrader(KafkaWebsocketTrader):
     finally:
       print(f'Stop: trader {self.strategy}')
       if self.position != 'none':
-        self.init_ws()
-        result = self.close_position(ws=self._ws, 
-                                     position=self.position,
+        result = self.close_position(position=self.position,
                                      exchange=exchange, 
                                      symbol=symbol, 
                                      quantity=self.quantity, 
@@ -1084,8 +1095,8 @@ class MomentumTrader(KafkaWebsocketTrader):
       if self._producer is not None:
         self._producer.close()
       print(f'Close websocket: trader {self.strategy}')
-      if self._ws is not None:
-        self._ws.close()
+      if self.ws is not None:
+        self.ws.close()
       print(f'Done: trader {self.strategy}')
 
       
@@ -1169,7 +1180,6 @@ class RLTrader(Trader):
     self._consumer = None
     self._producer = None
     self._model_rl = None
-    self._ws = None
     
   def init_consumer(self):
     consumer = deepcopy(self.consumer)
@@ -1195,10 +1205,6 @@ class RLTrader(Trader):
     producer['value_serializer'] = partitioner.serialize_value
     self._producer = KafkaProducer(**producer)
   
-  def init_ws(self):
-    self._ws = websocket.WebSocket()
-    self._ws.connect(self.api_url, timeout=self.timeout)
-    
   def update_model_rl(self):
     if self._model_rl is None:
       print('Initalizing model')
@@ -1237,8 +1243,6 @@ class RLTrader(Trader):
         self.init_consumer()
       if self._producer is None:
         self.init_producer()
-      if self._ws is None:
-        self.init_ws()
       if self._model_rl is None:
         self.update_model_rl()
       # Strategy
@@ -1256,7 +1260,7 @@ class RLTrader(Trader):
       order_vwap = {}
       if self.do_cancel_open_orders:
         cancel_result = self.cancel_open_orders(
-          self._ws, symbol, timeout=self.timeout, exchange=exchange)
+          symbol, timeout=self.timeout, exchange=exchange)
         pprint(cancel_result)
       for message in self._consumer:
         value = message.value
@@ -1328,7 +1332,7 @@ class RLTrader(Trader):
           print(f'Position: {self.position}')
           print(f'Active order: {order_id}')
           if order_id is not None:
-            order = self.query_order(self._ws, symbol, order_id, 
+            order = self.query_order(symbol, order_id, 
                                      timeout=self.timeout, 
                                      exchange=exchange)
             pprint(order)
@@ -1396,7 +1400,7 @@ class RLTrader(Trader):
               # Get status
               if self.do_log_account_status:
                 account_status = self.get_account_status(
-                  self._ws, timeout=self.timeout, exchange=exchange)
+                  timeout=self.timeout, exchange=exchange)
                 if self.verbose:
                   print(account_status)
                 for b in account_status.get('balances'):
@@ -1439,8 +1443,7 @@ class RLTrader(Trader):
             print('Skipping: no actions')
             continue
           # if not do_buy_market and not do_buy_market
-          orderbook = self.get_orderbook(self._ws, 
-                                         symbol=symbol, 
+          orderbook = self.get_orderbook(symbol=symbol, 
                                          limit=self.limit, 
                                          timeout=self.timeout,
                                          exchange=exchange)
@@ -1506,16 +1509,14 @@ class RLTrader(Trader):
                   do_sl_long, do_tp_long,
                   do_sl_short, do_tp_short]):
             if do_buy_market or do_sl_short or do_tp_short:
-              result = self.buy_market(self._ws, 
-                                      symbol, 
-                                      quantity=self.quantity, 
-                                      is_base_quantity=self.is_base_quantity, 
-                                      is_test=self.is_test,
-                                      timeout=self.timeout, 
-                                      exchange=exchange)
+              result = self.buy_market(symbol, 
+                                       quantity=self.quantity, 
+                                       is_base_quantity=self.is_base_quantity, 
+                                       is_test=self.is_test,
+                                       timeout=self.timeout, 
+                                       exchange=exchange)
             elif do_sell_market or do_sl_long or do_tp_long:
-              result = self.sell_market(self._ws,
-                                        symbol, 
+              result = self.sell_market(symbol, 
                                         quantity=self.quantity, 
                                         is_base_quantity=self.is_base_quantity, 
                                         is_test=self.is_test,
@@ -1538,23 +1539,20 @@ class RLTrader(Trader):
       print(f'Stop: trader {self.strategy}')
       if self.position != 'none':
         print(f'Close open {self.position} position: trader {self.strategy}')
-        self.init_ws()
         if self.position == 'short':
-          result = self.buy_market(self._ws, 
-                                  symbol=symbol, 
-                                  quantity=self.quantity, 
-                                  is_base_quantity=self.is_base_quantity, 
-                                  is_test=self.is_test,
-                                  timeout=self.timeout, 
-                                  exchange=exchange)
-        elif self.position == 'long':
-          result = self.sell_market(self._ws,
-                                   symbol=symbol,
+          result = self.buy_market(symbol=symbol, 
                                    quantity=self.quantity, 
                                    is_base_quantity=self.is_base_quantity, 
                                    is_test=self.is_test,
-                                   timeout=self.timeout,
+                                   timeout=self.timeout, 
                                    exchange=exchange)
+        elif self.position == 'long':
+          result = self.sell_market(symbol=symbol,
+                                    quantity=self.quantity, 
+                                    is_base_quantity=self.is_base_quantity, 
+                                    is_test=self.is_test,
+                                    timeout=self.timeout,
+                                    exchange=exchange)
         else:
           result = {}
         pprint(result)
@@ -1567,8 +1565,8 @@ class RLTrader(Trader):
       if self._producer is not None:
         self._producer.close()
       print(f'Close websocket: trader {self.strategy}')
-      if self._ws is not None:
-        self._ws.close()
+      if self.ws is not None:
+        self.ws.close()
       print(f'Done: trader {self.strategy}')
 
       
@@ -1585,7 +1583,7 @@ class RLFastTrader(Trader):
     strategy, 
     key, 
     api_url=None, api_key=None, secret_key=None,
-    max_rate=0.95,
+    max_rate=0.95, ws_timeout=None,
     prediction_topic='prediction',
     metric_topic='metric',
     consumer_partitioner=None, consumer=None, 
@@ -1622,7 +1620,8 @@ class RLFastTrader(Trader):
     max_model_rl_delay=None,
     create_dataset_kwargs=None
   ):
-    super().__init__(strategy=strategy, api_url=api_url, api_key=api_key, secret_key=secret_key, max_rate=max_rate)
+    super().__init__(strategy=strategy, api_url=api_url, api_key=api_key, secret_key=secret_key, 
+                     max_rate=max_rate, ws_timeout=ws_timeout)
     self.key = key
     exchange, base, quote = self.key.split('-')
     self.exchange = exchange
@@ -1674,17 +1673,16 @@ class RLFastTrader(Trader):
     self.is_test = is_test
     self.verbose = verbose
     self.model_name_rl = model_name_rl if isinstance(model_name_rl, list) else [model_name_rl]
-    self.kind_rl = kind_rl if isinstance(kind_rl, list) else [kind_rl for _ in model_name_rl]
-    self.model_version_rl = model_version_rl if isinstance(model_version_rl, list) else [model_version_rl for _ in model_name_rl]
-    self.cur_model_version_rl = model_version_rl if isinstance(model_version_rl, list) else [model_version_rl for _ in model_name_rl]
-    self.model_stage_rl = model_stage_rl if isinstance(model_stage_rl, list) else [model_stage_rl for _ in model_name_rl]
-    self.cur_model_stage_rl = model_stage_rl if isinstance(model_stage_rl, list) else [model_stage_rl for _ in model_name_rl]
+    self.kind_rl = kind_rl if isinstance(kind_rl, list) else [kind_rl for _ in self.model_name_rl]
+    self.model_version_rl = model_version_rl if isinstance(model_version_rl, list) else [model_version_rl for _ in self.model_name_rl]
+    self.cur_model_version_rl = model_version_rl if isinstance(model_version_rl, list) else [model_version_rl for _ in self.model_name_rl]
+    self.model_stage_rl = model_stage_rl if isinstance(model_stage_rl, list) else [model_stage_rl for _ in self.model_name_rl]
+    self.cur_model_stage_rl = model_stage_rl if isinstance(model_stage_rl, list) else [model_stage_rl for _ in self.model_name_rl]
     self.sltp_t = sltp_t  # StopLoss-TakeProfit threshold
     self.sltp_r = sltp_r  # StopLoss/TakeProfit
     self._consumer = None
     self._producer = None
     self._model_rl = [None for _ in self.model_name_rl]
-    self._ws = None
     self.app = {} if app is None else app
     self.run = {} if run is None else run
     self.cur_timestamp = time.time_ns()
@@ -1765,12 +1763,6 @@ class RLFastTrader(Trader):
     producer['key_serializer'] = partitioner.serialize_key
     producer['value_serializer'] = partitioner.serialize_value
     self._producer = KafkaProducer(**producer)
-  
-  def init_ws(self):
-    print('Initalizing websocket')
-    self._ws = websocket.WebSocket()
-    self._ws.connect(self.api_url, timeout=self.timeout)
-    print('Websocket initalized')
    
   def init_dataset(self):
     print('Initalizing dataset')
@@ -1779,6 +1771,7 @@ class RLFastTrader(Trader):
     print('Dataset initalized')
 
   def update_model_rl(self):
+    print('Updating RL model')
     for i, model_rl in enumerate(self._model_rl):
       kind_rl = self.kind_rl[i]
       model_name = self.model_name_rl[i]
@@ -1805,6 +1798,7 @@ class RLFastTrader(Trader):
           self.last_model_rl_update = self.cur_timestamp
       else:
         pass
+    print('RL model updated')
     
   def update_buffer(self, messages):
     for message in messages:
@@ -1850,7 +1844,7 @@ class RLFastTrader(Trader):
       df = pd.DataFrame(self.buffer.values())
       if len(df) == 0:
         print(f'Skipping: empty data')
-        return
+        return 0
       df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ns')
       df = df.set_index('timestamp').sort_index()
       if self.verbose > 1:
@@ -1861,10 +1855,10 @@ class RLFastTrader(Trader):
       print(f'columns:       {len(df.columns)}')
       if len(df) < self.window_size:
         print(f'Skipping: data length {len(df)} < window size {self.window_size}')
-        return
+        return 0
       if self.prediction not in df:
         print(f'Skipping: no prediction {self.prediction} in df columns: {df.columns}')
-        return
+        return 0
       obs = preprocess_data(df=df,  
                             window_size=self.window_size,
                             forecast_column=self.prediction, 
@@ -1891,7 +1885,7 @@ class RLFastTrader(Trader):
           last_timestamp = df_t.index.max().value
     if obs is None:
       print('Skipping: no observation')
-      return
+      return 0
     if self.verbose:
       print(obs)
     if self.max_delay is not None:
@@ -1899,19 +1893,26 @@ class RLFastTrader(Trader):
       print(f'ml delay:      {delay/1e9}')
       if delay > self.max_delay:
         print(f'Skipping: delay {delay} > {self.max_delay}')
-        return
+        return 0
     # Update model
-    if self.position == 'none':
+    do_update_delay = False
+    if self.max_model_rl_delay is not None:
+      delay = self.cur_timestamp - self.last_model_rl_update
+      print(f'rl delay:      {delay/1e9}')
+      if delay > self.max_model_rl_delay:
+        do_update_delay = True
+    do_update_model = self.position == 'none' or do_update_delay
+    if do_update_model:
       self.update_model_rl()
+    if self.position == 'none':  # Skip delayed model if not in position
       if self.max_model_rl_delay is not None:
         delay = self.cur_timestamp - self.last_model_rl_update
-        print(f'rl delay:      {delay/1e9}')
         if delay > self.max_model_rl_delay:
           print(f'Skipping: model rl delay {delay} > {self.max_model_rl_delay}')
-          return
+          return 0
     # Predict action
     actions = []
-    for i, (model_name, model_version, model) in enumerate(zip(self.model_name_rl, self.model_version_rl, self._model_rl)):
+    for i, (model_name, model_version, model) in enumerate(zip(self.model_name_rl, self.cur_model_version_rl, self._model_rl)):
       action, _ = model.predict(obs)  # 0: HOLD, 1: BUY, 2: SELL
       print(f'Predicted action {i+1}/{len(self._model_rl)} of {model_name} {model_version}: {action}')
       actions.append(action)
@@ -2094,26 +2095,20 @@ class RLFastTrader(Trader):
     print(f'do_update: {do_update}, do_update_timeout: {do_update_timeout}, do_update_price_offset: {do_update_price_offset}')
     return do_update
   
-  def update_order(self, order, prices):
-    if order is None:
+  def update_order(self, order, prices=None):
+    if order is None or len(order) == 0:
       print('No order to update!')
       return order
-    order_id = order['orderId']
-    order_side = order['side']
-    order_price = self.order_prices['order_price']
-    if prices['order_price'] is None:
-      prices['order_price'] = self.calculate_price(prices=prices)
-    cur_order_price = prices['order_price']
-    if cur_order_price is None:
-      raise ValueError(f'cur_order_price: {cur_order_price}')
     self.n_order_updates += 1
-    order_ = self.query_order(self._ws, 
-                              symbol=self.symbol, 
+    prices = {} if prices is None else prices
+    order_id = order['orderId']
+    print(f'Query order {order_id}')
+    order_ = self.query_order(symbol=self.symbol, 
                               order_id=order_id, 
                               timeout=self.timeout, 
                               exchange=self.exchange)
-    print('Query order')
     pprint(order_)
+    order_side = order_['side']
     order_status = order_['status']
     order_time = order_['time']*1e6  # ms -> ns
     order_dt = self.cur_timestamp - order_time
@@ -2184,7 +2179,7 @@ class RLFastTrader(Trader):
       # Get status
       if self.do_log_account_status:
         account_status = self.get_account_status(
-          self._ws, timeout=self.timeout, exchange=self.exchange)
+          timeout=self.timeout, exchange=self.exchange)
         if self.verbose:
           print(account_status)
         for b in account_status.get('balances'):
@@ -2207,7 +2202,6 @@ class RLFastTrader(Trader):
       if self.position == 'none':  # On open position
         print(f'Cancel order {order_id}')
         result = self.cancel_order(
-          ws=self._ws,
           symbol=self.symbol, 
           order_id=order_id,
           cancel_restrictions='ONLY_NEW',
@@ -2219,8 +2213,13 @@ class RLFastTrader(Trader):
           self.action = 0
       else:  # On close position
         print(f'Cancel replace order {order_id}')
+        # order_price = self.order_prices['order_price']
+        if prices.get('order_price', None) is None:
+          prices['order_price'] = self.calculate_price(prices=prices)
+        cur_order_price = prices['order_price']
+        if cur_order_price is None:
+          raise ValueError(f'cur_order_price: {cur_order_price}')
         result = self.cancel_replace_limit(
-          ws=self._ws,
           symbol=self.symbol,
           order_id=order_id,
           side=order_side,
@@ -2350,16 +2349,14 @@ class RLFastTrader(Trader):
         if do_buy or do_sl_short or do_tp_short:
           print(f'open buy {price}')
           if self.open_type == 'market':
-            result = self.buy_market(self._ws, 
-                                    symbol=self.symbol, 
-                                    quantity=self.quantity, 
-                                    is_base_quantity=self.is_base_quantity, 
-                                    is_test=self.is_test,
-                                    timeout=self.timeout, 
-                                    exchange=self.exchange)
+            result = self.buy_market(symbol=self.symbol, 
+                                     quantity=self.quantity, 
+                                     is_base_quantity=self.is_base_quantity, 
+                                     is_test=self.is_test,
+                                     timeout=self.timeout, 
+                                     exchange=self.exchange)
           elif self.open_type == 'limit':
-            result = self.buy_limit(self._ws,
-                                    symbol=self.symbol,
+            result = self.buy_limit(symbol=self.symbol,
                                     price=price,
                                     post_only=self.post_only,
                                     time_in_force=self.time_in_force,
@@ -2373,16 +2370,14 @@ class RLFastTrader(Trader):
         elif do_sell or do_sl_long or do_tp_long:
           print(f'open sell {price}')
           if self.open_type == 'market':
-            result = self.sell_market(self._ws,
-                                     symbol=self.symbol, 
-                                     quantity=self.quantity, 
-                                     is_base_quantity=self.is_base_quantity, 
-                                     is_test=self.is_test,
-                                     timeout=self.timeout,
-                                     exchange=self.exchange)
+            result = self.sell_market(symbol=self.symbol, 
+                                      quantity=self.quantity, 
+                                      is_base_quantity=self.is_base_quantity, 
+                                      is_test=self.is_test,
+                                      timeout=self.timeout,
+                                      exchange=self.exchange)
           elif self.open_type == 'limit':
-            result = self.sell_limit(self._ws,
-                                     symbol=self.symbol,
+            result = self.sell_limit(symbol=self.symbol,
                                      price=price,
                                      post_only=self.post_only,
                                      time_in_force=self.time_in_force,
@@ -2399,16 +2394,14 @@ class RLFastTrader(Trader):
         if do_buy or do_sl_short or do_tp_short:
           print(f'close buy {price}')
           if self.close_type == 'market':
-            result = self.buy_market(self._ws, 
-                                    symbol=self.symbol, 
-                                    quantity=self.quantity, 
-                                    is_base_quantity=self.is_base_quantity, 
-                                    is_test=self.is_test,
-                                    timeout=self.timeout, 
-                                    exchange=self.exchange)
+            result = self.buy_market(symbol=self.symbol, 
+                                     quantity=self.quantity, 
+                                     is_base_quantity=self.is_base_quantity, 
+                                     is_test=self.is_test,
+                                     timeout=self.timeout, 
+                                     exchange=self.exchange)
           elif self.close_type == 'limit':
-            result = self.buy_limit(self._ws,
-                                    symbol=self.symbol,
+            result = self.buy_limit(symbol=self.symbol,
                                     price=price,
                                     post_only=self.post_only,
                                     time_in_force=self.time_in_force,
@@ -2422,16 +2415,14 @@ class RLFastTrader(Trader):
         elif do_sell or do_sl_long or do_tp_long:
           print(f'close sell {price}')
           if self.close_type == 'market':
-            result = self.sell_market(self._ws,
-                                     symbol=self.symbol, 
-                                     quantity=self.quantity, 
-                                     is_base_quantity=self.is_base_quantity, 
-                                     is_test=self.is_test,
-                                     timeout=self.timeout,
-                                     exchange=self.exchange)
+            result = self.sell_market(symbol=self.symbol, 
+                                      quantity=self.quantity, 
+                                      is_base_quantity=self.is_base_quantity, 
+                                      is_test=self.is_test,
+                                      timeout=self.timeout,
+                                      exchange=self.exchange)
           elif self.close_type == 'limit':
-            result = self.sell_limit(self._ws,
-                                     symbol=self.symbol,
+            result = self.sell_limit(symbol=self.symbol,
                                      price=price,
                                      post_only=self.post_only,
                                      time_in_force=self.time_in_force,
@@ -2464,12 +2455,13 @@ class RLFastTrader(Trader):
       raise error     
       
   def on_message(self, ws, message):
+    print(f'\nMessage')
     self.cur_timestamp = time.time_ns()
     self.dt = self.cur_timestamp - self.last_timestamp
     # Update prices buffer
     watermark_timestamp = self.cur_timestamp - self.watermark
     self.prices_buffer = {k: v for k, v in self.prices_buffer.items() if k > watermark_timestamp}
-    print(f'\ntrade {self.strategy}')
+    print(f'trade {self.strategy}')
     print(f'now:           {datetime.fromtimestamp(self.cur_timestamp/1e9, tz=timezone.utc)}')
     print(f'dt:            {self.dt/1e9}')
     print(f'buffer:        {len(self.buffer)}')
@@ -2500,7 +2492,7 @@ class RLFastTrader(Trader):
     else:
       self.action = self.update_action()
     # Predict
-    print(f'position: {self.position}, action: {self.action}')
+    print(f'Position: {self.position}, action: {self.action}')
     prices['order_price'] = None
     self.prices_buffer[self.cur_timestamp] = prices
     if self.order is not None:
@@ -2508,16 +2500,18 @@ class RLFastTrader(Trader):
       if do_update:
         self.order = self.update_order(self.order, prices)
       print(f'n_order_updates: {self.n_order_updates}')
-    print(f'position: {self.position}, action: {self.action}')
+    print(f'Position: {self.position}, action: {self.action}')
     if self.order is None:
       self.order = self.place_order(prices)
     self.prices_buffer[self.cur_timestamp] = prices
-    print('Current prices')
+    print('Current prices:')
     pprint(prices)
-    print('Current open order')
+    print('Current open order:')
     pprint(self.order)
+    print(f'Position: {self.position}, action: {self.action}')
     self.last_timestamp = self.cur_timestamp
-
+    print('Message end')
+    
   def __call__(self):
     try:
       # logger = logging.getLogger('kafka')
@@ -2528,9 +2522,8 @@ class RLFastTrader(Trader):
         self.init_consumer()
       if self._producer is None:
         self.init_producer()
-      if self._ws is None:
-        self.init_ws()
       self.update_model_rl()
+      # Run websocket app
       app = deepcopy(self.app)
       run = deepcopy(self.run)
       if self.exchange == 'binance':
@@ -2547,10 +2540,15 @@ class RLFastTrader(Trader):
         app['on_close'] = self.on_close
         app['on_error'] = self.on_error
         app['url'] = url
-      if self.timeout is not None:
-        websocket.setdefaulttimeout(self.timeout)
+      if self.ws_timeout is not None:
+        websocket.setdefaulttimeout(self.ws_timeout)
       app = websocket.WebSocketApp(**app)
       app.run_forever(**run)
+    except socket.error as e:  # Restart
+      print(f'Websocket error stream trader {self.strategy}')
+      print(e)
+      # if e.errno == errno.EPIPE:  # EPIPE error ([Errno 32] Broken pipe) 
+      self()
     except KeyboardInterrupt:
       print(f"Keyboard interrupt trader {self.strategy}")
     except Exception as e:
@@ -2559,38 +2557,43 @@ class RLFastTrader(Trader):
       # raise e
     finally:
       print(f'Stop: trader {self.strategy}')
-      self.init_ws()
+      print(f'Position: {self.position}')
       if self.order is not None:
+        print('Order:')
+        pprint(self.order)
         print(f'Cancel open order {self.order}: trader {self.strategy}')
-        result = self.cancel_order(self._ws, 
-                                   symbol=self.symbol, 
+        result = self.cancel_order(symbol=self.symbol, 
                                    order_id=self.order.get('orderId', None), 
                                    timeout=self.timeout, 
                                    exchange=self.exchange)
         pprint(result)
+        self.order = None
       if self.position != 'none':
         print(f'Close open {self.position} position: trader {self.strategy}')
         if self.position == 'short':
-          result = self.buy_market(self._ws, 
-                                  symbol=self.symbol, 
-                                  quantity=self.quantity, 
-                                  is_base_quantity=self.is_base_quantity, 
-                                  is_test=self.is_test,
-                                  timeout=self.timeout, 
-                                  exchange=self.exchange)
+          result = self.buy_market(
+            symbol=self.symbol, 
+            quantity=self.quantity, 
+            is_base_quantity=self.is_base_quantity, 
+            is_test=self.is_test,
+            timeout=self.timeout, 
+            exchange=self.exchange)
         elif self.position == 'long':
-          result = self.sell_market(self._ws,
-                                   symbol=self.symbol,
-                                   quantity=self.quantity, 
-                                   is_base_quantity=self.is_base_quantity, 
-                                   is_test=self.is_test,
-                                   timeout=self.timeout,
-                                   exchange=self.exchange)
+          result = self.sell_market(
+            symbol=self.symbol,
+            quantity=self.quantity, 
+            is_base_quantity=self.is_base_quantity, 
+            is_test=self.is_test,
+            timeout=self.timeout,
+            exchange=self.exchange)
         else:
           result = {}
         pprint(result)
-        self.position = 'none'
-        print(f'Position {self.position}: trader {self.strategy}')
+        self.order = result
+        self.order = self.update_order(self.order)
+      print(f'Position: {self.position}')
+      print('Order:')
+      pprint(self.order)
       print(f'Close consumer: trader {self.strategy}')
       if self._consumer is not None:
         self._consumer.close()
@@ -2598,6 +2601,6 @@ class RLFastTrader(Trader):
       if self._producer is not None:
         self._producer.close()
       print(f'Close websocket: trader {self.strategy}')
-      if self._ws is not None:
-        self._ws.close()
+      if self.ws is not None:
+        self.ws.close()
       print(f'Done: trader {self.strategy}')
