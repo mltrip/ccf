@@ -568,6 +568,8 @@ class InfluxDBDataset2(InfluxDB):
                                           start=start, stop=stop,
                                           exchange=exchange, base=base, quote=quote, 
                                           verbose=self.verbose, **self.filters)
+    if len(df) == 0:
+      return None
     for n, d in self.ratios.items():
       r = self.sep.join([self.ratio_prefix, n, d])
       df[r] = df[n].div(df[d].replace({0: np.nan}), fill_value=self.ratio_fill)
@@ -667,6 +669,8 @@ class KafkaDataset2(Agent):
       # print(self.buffer)
       # Create DataFrame
       df = pd.DataFrame(self.buffer)
+      if len(df) == 0:
+        return None
       df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ns')
       df = df.set_index('timestamp')
       df = df.sort_index()
