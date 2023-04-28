@@ -115,4 +115,24 @@ def load_model(name, version=None, stage=None, metadata_only=False):
   else:
       print(f'Model "{name}" is not found!')
   return model, version, stage
-  
+
+
+def update_model(kind, name, version, stage, model=None):
+  if model is None:
+    print(f'Initalizing model: {name} {version} {stage}')
+    last_model, last_version, last_stage = load_model(name, version, stage)
+    last_model = last_model.unwrap_python_model().model
+  elif kind == 'auto_update':
+    print(f'Auto-updating model: {name} {version} {stage}')
+    _, last_version, last_stage = load_model(name, None, stage, metadata_only=True)
+    if last_version != version:
+      print(f'Updating model from {version} to {last_version} version')
+      last_model, last_version, last_stage = load_model(name, None, stage)
+      last_model = last_model.unwrap_python_model().model
+    else:
+      print(f'Current model has latest version {version}')
+      last_model, last_version, last_stage = model, version, stage
+  else:
+    raise NotImplementedError(f'update model kind: {kind}')
+  print(f'last_version: {last_version}, last_stage: {last_stage}')
+  return last_model, last_version, last_stage

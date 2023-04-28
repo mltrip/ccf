@@ -569,6 +569,7 @@ class InfluxDBDataset2(InfluxDB):
                                           exchange=exchange, base=base, quote=quote, 
                                           verbose=self.verbose, **self.filters)
     if len(df) == 0:
+      print('Dataset: empty df')
       return None
     for n, d in self.ratios.items():
       r = self.sep.join([self.ratio_prefix, n, d])
@@ -599,7 +600,7 @@ class KafkaDataset2(Agent):
     consumer=None, partitioner=None, topic=None, key=None, filters=None,
     pivot=None, resample=None, aggregate=None, interpolate=None,
     verbose=False, 
-    ratios=None, ratio_prefix='rat', ratio_fill=1.0, sep='-'
+    ratios=None, ratio_prefix='rat', ratio_fill=1.0, sep='-', poll=None
   ):
     super().__init__()
     self.quant = quant
@@ -628,6 +629,10 @@ class KafkaDataset2(Agent):
     self.sep = sep
     self._consumer = None
     self.buffer = []
+    if poll is None:
+      self.poll = {'timeout_ms': 0, 'max_records': None, 'update_offsets': True}
+    else:
+      self.poll = poll
   
   def __next__(self):
     return None
@@ -649,7 +654,7 @@ class KafkaDataset2(Agent):
     # logger.setLevel(logging.CRITICAL)
     if self._consumer is None:
       self.init_consumer()
-    result = self._consumer.poll(timeout_ms=0, max_records=None, update_offsets=True)
+    result = self._consumer.poll(**self.poll)
     if len(result) > 0:
       # Update buffer
       for topic_partition, messages in result.items():
@@ -662,29 +667,34 @@ class KafkaDataset2(Agent):
               skip = True
           if not skip:
             self.buffer.append(value)
-      # print(self.buffer)
       if self.watermark is not None:
         watermark = time.time_ns() - self.watermark
         self.buffer = [x for x in self.buffer if x['timestamp'] > watermark]
-      # print(self.buffer)
       # Create DataFrame
       df = pd.DataFrame(self.buffer)
       if len(df) == 0:
+        print('Dataset: empty df')
         return None
       df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ns')
       df = df.set_index('timestamp')
       df = df.sort_index()
-      # print(df)
+      if self.verbose:
+        print(df)
       for n, d in self.ratios.items():
         r = self.sep.join([self.ratio_prefix, n, d])
         df[r] = df[n].div(df[d].replace({0: np.nan}), fill_value=self.ratio_fill)
         df[r] = df[r].replace([np.inf, -np.inf, np.nan], self.ratio_fill)
+        if self.verbose:
+          print(f'{r} = {n}/{d}')
+          print(df[r])
       if self.pivot is not None:
         df = df.reset_index()
         df = df.pivot_table(**self.pivot).reset_index()
         df.columns = [self.sep.join(str(y) for y in x if y).strip() for x in df.columns.values]
         df = df.set_index('timestamp')
         df = df.sort_index()
+        if self.verbose:
+          print(df)
       if self.resample is not None:
         resample = deepcopy(self.resample)
         resample['rule'] = pd.Timedelta(self.quant, unit='ns')
@@ -694,7 +704,9 @@ class KafkaDataset2(Agent):
                                for kk in expand_columns(df.columns, [k])}
         interpolate = deepcopy(self.interpolate)
         df = df.resample(**resample).aggregate(**aggregate).interpolate(**interpolate)
-      # print(df)
+        if self.verbose:
+          print(df)
       return df
     else:
+      print('Dataset: no new data')
       return None
