@@ -83,7 +83,7 @@ class Dataset:
     features = {}
     if len(self.agents) == 1:  # Run without executor
       for name, agent in self.agents.items():
-        print(name)
+        # print(name)
         r = agent()
         if r is None:
           if self.new_only:
@@ -96,7 +96,7 @@ class Dataset:
     else:
       future_to_name = {}
       for name, agent in self.agents.items():
-        print(name)
+        # print(name)
         future_to_name[self.executor.submit(agent)] = name
       for f in concurrent.futures.as_completed(future_to_name):
         n = future_to_name[f]

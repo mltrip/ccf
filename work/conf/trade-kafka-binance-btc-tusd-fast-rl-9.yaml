@@ -23,8 +23,8 @@ agents:
     open_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
     close_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
     close_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
-    open_price_offset: 1.5
-    close_price_offset: 1.5
+    open_price_offset: 1.7
+    close_price_offset: 1.7
     open_price_offset_kind: s_p-m_p
     close_price_offset_kind: s_p-m_p
     open_price_offset_agg: max

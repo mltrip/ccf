@@ -44,6 +44,7 @@ agents:
     class: Kafka
     producers:
       p_1:
+        api_version_auto_timeout_ms: 30000
         bootstrap_servers: "kafka:9092"
         topic_keys:
           prediction: [ binance-btc-tusd ]
@@ -51,6 +52,7 @@ agents:
     class: Kafka
     producers:
       p_1:
+        api_version_auto_timeout_ms: 30000
         bootstrap_servers: "kafka:9092"
         topic_keys:
           metric: [ binance-btc-tusd ]

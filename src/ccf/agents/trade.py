@@ -12,6 +12,9 @@ import hmac
 import hashlib
 import logging
 from math import ceil, floor
+import gc
+import os
+import functools
 
 from kafka import KafkaConsumer, KafkaProducer, TopicPartition
 import pandas as pd
@@ -132,6 +135,42 @@ class Trader(Agent):
     else:
       raise NotImplementedError(exchange)
       
+  def start_user_data_stream(self, exchange):
+    if exchange == 'binance':
+      params = {}
+    else:
+      raise NotImplementedError(exchange)
+    response = self.send_request(method='userDataStream.start', params=params,
+                                 exchange=exchange, 
+                                 add_api_key=True, add_signature=False,
+                                 timestamp=None, timeout=None,
+                                 recv_window=None)
+    return response
+  
+  def stop_user_data_stream(self, exchange, listen_key):
+    if exchange == 'binance':
+      params = {'listenKey': listen_key}
+    else:
+      raise NotImplementedError(exchange)
+    response = self.send_request(method='userDataStream.stop', params=params,
+                                 exchange=exchange, 
+                                 add_api_key=True, add_signature=False,
+                                 timestamp=None, timeout=None,
+                                 recv_window=None)
+    return response
+      
+  def ping_user_data_stream(self, exchange, listen_key):
+    if exchange == 'binance':
+      params = {'listenKey': listen_key}
+    else:
+      raise NotImplementedError(exchange)
+    response = self.send_request(method='userDataStream.ping', params=params,
+                                 exchange=exchange, 
+                                 add_api_key=True, add_signature=False,
+                                 timestamp=None, timeout=None,
+                                 recv_window=None)
+    return response
+    
   def get_server_time(self, timeout=None, exchange=None):
     response = self.send_request('time', timeout=timeout)
     if response is not None:
@@ -238,13 +277,13 @@ class Trader(Agent):
         data = message
       else:
         raise NotImplementedError(message)
-      if stream == 'ticker':
+      if 'ticker' in stream:
         orderbook = {}
         orderbook['a_p_0'] = float(data.get('a', 0))
         orderbook['a_q_0'] = float(data.get('A', 0))
         orderbook['b_p_0'] = float(data.get('b', 0))
         orderbook['b_q_0'] = float(data.get('B', 0))
-      elif stream == 'orderbook':
+      elif 'orderbook' in stream:
         asks = data.pop('asks', [])
         bids = data.pop('bids', [])
         if len(asks) != len(bids) or len(asks) == 0 or len(bids) == 0:
@@ -1125,7 +1164,7 @@ class RLTrader(Trader):
     do_log_account_status=False,
     quantity=None, is_base_quantity=True, min_quantity=None, position='none',
     is_test=False, verbose=False,
-    kind_rl=None, model_version_rl=None, model_stage_rl=None
+    kind_rl=None, model_version_rl=None, model_stage_rl=None, do_consume_rl=False
   ):
     super().__init__(strategy=strategy, api_url=api_url, api_key=api_key, secret_key=secret_key)
     self.key = key
@@ -1180,6 +1219,7 @@ class RLTrader(Trader):
     self._consumer = None
     self._producer = None
     self._model_rl = None
+    self.do_consume_rl = do_consume_rl
     
   def init_consumer(self):
     consumer = deepcopy(self.consumer)
@@ -1603,6 +1643,7 @@ class RLFastTrader(Trader):
     kind_rl=None, model_version_rl=None, model_stage_rl=None,
     app=None, run=None, stream='ticker', depth=20, speed=100,
     open_type='market', close_type='market', 
+    do_force_open=False, do_force_close=False,
     open_buy_price='a_vwap', open_sell_price='b_vwap', 
     close_buy_price='a_vwap', close_sell_price='b_vwap',
     precision=8, tick_size=0.01, open_price_offset=0.0, close_price_offset=0.0, min_d_price=0.0,
@@ -1618,7 +1659,10 @@ class RLFastTrader(Trader):
     open_price_offset_min=None, close_price_offset_min=None,
     open_price_offset_max=None, close_price_offset_max=None,
     max_model_rl_delay=None,
-    create_dataset_kwargs=None
+    create_dataset_kwargs=None,
+    poll=None,
+    ws_stream_ping_interval=None,
+    do_consume_rl=False
   ):
     super().__init__(strategy=strategy, api_url=api_url, api_key=api_key, secret_key=secret_key, 
                      max_rate=max_rate, ws_timeout=ws_timeout)
@@ -1700,6 +1744,8 @@ class RLFastTrader(Trader):
     self.speed = speed
     self.open_type = open_type 
     self.close_type = close_type
+    self.do_force_open = do_force_open
+    self.do_force_close = do_force_close
     self.open_buy_price = open_buy_price
     self.close_buy_price = close_buy_price
     self.open_sell_price = open_sell_price
@@ -1737,8 +1783,19 @@ class RLFastTrader(Trader):
     self.max_model_rl_delay = max_model_rl_delay
     self.last_model_rl_update = self.cur_timestamp
     self.prices_buffer = {}
+    self.actions_buffer = {}
     self.create_dataset_kwargs = create_dataset_kwargs
     self._dataset = None
+    self.listen_key = None
+    self._app = None
+    self.do_update_order = False
+    if poll is None:
+      self.poll = {'timeout_ms': 0, 'max_records': None, 'update_offsets': True}
+    else:
+      self.poll = poll
+    self.ws_stream_ping_interval = ws_stream_ping_interval
+    self.ws_stream_ping_last = self.cur_timestamp
+    self.do_consume_rl = do_consume_rl
     
   def init_consumer(self):
     consumer = deepcopy(self.consumer)
@@ -1760,6 +1817,7 @@ class RLFastTrader(Trader):
     partitioner_class = partitioner.pop('class')
     partitioner = getattr(ccf_partitioners, partitioner_class)(**partitioner)
     partitioner.update()
+    producer['partitioner'] = partitioner
     producer['key_serializer'] = partitioner.serialize_key
     producer['value_serializer'] = partitioner.serialize_value
     self._producer = KafkaProducer(**producer)
@@ -1835,10 +1893,39 @@ class RLFastTrader(Trader):
         print(value)
       timestamp = value['timestamp']  # timestamp of forecast
       self.buffer.setdefault(timestamp, {}).update(value)
-    watermark_timestamp = self.cur_timestamp - self.watermark
-    self.buffer = {k: v for k, v in self.buffer.items() if k > watermark_timestamp}
+  
+  def update_actions_buffer(self, messages):
+    for message in messages:
+      value = message.value
+      if value['exchange'] != self.exchange:
+        continue
+      if value['base'] != self.base:
+        continue
+      if value['quote'] != self.quote:
+        continue
+      if value['model'] != self.model_name_rl[0]:
+        continue
+      if self.model_version_rl[0] is not None:
+        if str(value['version']) != str(self.model_version_rl[0]):
+          continue
+      # self.cur_model_version_rl[0] = value['version']
+      timestamp = value['timestamp']  # timestamp of forecast
+      self.actions_buffer[timestamp] = value
     
   def update_action(self):
+    # Force open/close
+    if self.position == 'none':
+      if self.do_force_open:
+        if self.action in [1, 2]:
+          return self.action
+    elif self.position == 'long':
+      if self.do_force_close:
+        return 2
+    elif self.position == 'short':
+      if self.do_force_close:
+        return 1
+    else:
+      raise ValueError(f'Bad position: {self.position}!')
     # Get observation
     if self.create_dataset_kwargs is None:
       df = pd.DataFrame(self.buffer.values())
@@ -1883,6 +1970,15 @@ class RLFastTrader(Trader):
           last_timestamp = df_t.index[last_index].value
         else:
           last_timestamp = df_t.index.max().value
+        if obs is not None:
+          # LRU cache
+          print('Cleaning LRU cache')
+          gc.collect()
+          wrappers = [x for x in gc.get_objects() 
+                      if isinstance(x, functools._lru_cache_wrapper)]
+          for wrapper in wrappers:
+            wrapper.cache_clear()
+          print('LRU cache Cleaned')
     if obs is None:
       print('Skipping: no observation')
       return 0
@@ -2175,7 +2271,7 @@ class RLFastTrader(Trader):
         'base_delta': base_delta,
         'quote_delta': quote_delta,
         'model_rl': self.model_name_rl,
-        'version_rl': self.cur_model_version_rl}
+        'version_rl': str(self.cur_model_version_rl)}
       # Get status
       if self.do_log_account_status:
         account_status = self.get_account_status(
@@ -2453,14 +2549,141 @@ class RLFastTrader(Trader):
   def on_error(self, ws, error, *args, **kwargs):
       print(f'Error {ws}: {error}')
       raise error     
-      
+  
+  def on_message_user(self, ws, message):
+    self.cur_timestamp = time.time_ns()
+    self.dt = self.cur_timestamp - self.last_timestamp
+    print(f'\nMessage')
+    print(f'now:           {datetime.fromtimestamp(self.cur_timestamp/1e9, tz=timezone.utc)}')
+    print(f'dt:            {self.dt/1e9}')
+    print(message)
+    print('Message end')
+    self.last_timestamp = self.cur_timestamp
+  
+  def on_message_user_market(self, ws, message):
+    self.cur_timestamp = time.time_ns()
+    self.dt = self.cur_timestamp - self.last_timestamp
+    if self.ws_stream_ping_interval is not None:
+      if self.cur_timestamp - self.ws_stream_ping_last > self.ws_stream_ping_interval:
+        response = self.ping_user_data_stream(self.exchange, self.listen_key)
+        print(f'Message: ping websocket stream {response}')
+        self.ws_stream_ping_last = self.cur_timestamp
+    print(f'\nMessage')
+    print(f'strategy:       {self.strategy}')
+    print(f'now:            {datetime.fromtimestamp(self.cur_timestamp/1e9, tz=timezone.utc)}')
+    if self.watermark is not None:
+      watermark_timestamp = self.cur_timestamp - self.watermark
+      print(f'watermark:      {datetime.fromtimestamp(watermark_timestamp/1e9, tz=timezone.utc)}')
+      self.prices_buffer = {k: v for k, v in self.prices_buffer.items() if k > watermark_timestamp}
+    print(f'message dt:     {self.dt/1e9}')
+    print(f'prices buffer:  {len(self.prices_buffer)}')
+    print(f'actions buffer: {len(self.actions_buffer)}')
+    message = json.loads(message)
+    # print(message)
+    if message['stream'] == self.listen_key:  # outboundAccountPosition, balanceUpdate, executionReport
+      print('Message: user')
+      event_t = message['data']['E']*1e6  # ms -> ns
+      event_dt = self.cur_timestamp - event_t
+      print(f'event dt:       {event_dt/1e9}')
+      if message['data']['e'] == 'executionReport':
+        # Check order is FILLED
+        if self.order is not None:
+          order_id = self.order['orderId']
+          if order_id == message['data']['i']:
+            order_status = message['data']['X']
+            if order_status == 'FILLED':
+              self.do_update_order = True
+              print(message)
+    else:
+      print('Message: market')
+      # Orderbook
+      orderbook = Trader.message_to_orderbook(
+        self.exchange, message['data'], self.stream)
+      if orderbook is None:
+        print('Message: bad orderbook')
+        print('Message: end')
+        self.last_timestamp = self.cur_timestamp
+        return
+      # VWAP
+      vwap = Trader.calculate_vwap(
+        orderbook=orderbook, quantity=self.min_quantity, 
+        is_base_quantity=self.is_base_quantity)
+      if vwap is None:
+        print('Message: bad vwap')
+        print('Message: end')
+        self.last_timestamp = self.cur_timestamp
+        return
+      # Prices
+      prices = {**orderbook, **vwap}
+      prices['timestamp'] = self.cur_timestamp
+      self.prices_buffer[self.cur_timestamp] = prices
+      # Update action
+      if self.create_dataset_kwargs is None:
+        result = self._consumer.poll(**self.poll)
+        if len(result) > 0:
+          if not self.do_consume_rl:
+            for topic_partition, messages in result.items():
+              self.update_buffer(messages)
+            if self.watermark is not None:  
+              watermark_timestamp = self.cur_timestamp - self.watermark
+              self.buffer = {k: v for k, v in self.buffer.items() if k > watermark_timestamp}
+            print(f'message buffer: {len(self.buffer)}')
+            self.action = self.update_action()
+            self.actions_buffer[self.cur_timestamp] = self.action
+          else:
+            print('Update actions buffer')
+            for topic_partition, messages in result.items():
+              self.update_actions_buffer(messages)
+            if self.watermark is not None:  
+              watermark_timestamp = self.cur_timestamp - self.watermark
+              self.actions_buffer = {k: v for k, v in self.actions_buffer.items() if k > watermark_timestamp}
+            if len(self.actions_buffer) > 0:
+              last_action = self.actions_buffer[max(self.actions_buffer)]
+              self.action = int(last_action['action'])
+              action_dt = self.cur_timestamp - last_action['timestamp']
+              print(f'action dt:     {action_dt/1e9}')                                  
+            else:
+              self.action = 0 
+        else:
+          self.action = 0
+      else:
+        self.action = self.update_action()
+        self.actions_buffer[self.cur_timestamp] = self.action
+      print(f'position:       {self.position}')
+      print(f'action:         {self.action}')
+      print('Message: update order') 
+      # Update order
+      prices['order_price'] = None
+      self.prices_buffer[self.cur_timestamp] = prices
+      if self.order is not None:
+        do_update = self.check_update(order=self.order, prices=prices)
+        if do_update or self.do_update_order:
+          self.order = self.update_order(order=self.order, prices=prices)
+          self.do_update_order = False
+          self.prices_buffer[self.cur_timestamp] = prices
+      print(f'position:       {self.position}')
+      print(f'action:         {self.action}')
+      print('Message: place order') 
+      if self.order is None:
+        self.order = self.place_order(prices)
+        self.prices_buffer[self.cur_timestamp] = prices
+      print(f'position:       {self.position}')
+      print(f'action:         {self.action}')
+      print('prices:')
+      pprint(prices)
+    print('order:')
+    pprint(self.order)
+    print('Message: end')    
+    self.last_timestamp = self.cur_timestamp
+    
   def on_message(self, ws, message):
     print(f'\nMessage')
     self.cur_timestamp = time.time_ns()
     self.dt = self.cur_timestamp - self.last_timestamp
     # Update prices buffer
-    watermark_timestamp = self.cur_timestamp - self.watermark
-    self.prices_buffer = {k: v for k, v in self.prices_buffer.items() if k > watermark_timestamp}
+    if self.watermark is not None:  
+      watermark_timestamp = self.cur_timestamp - self.watermark
+      self.prices_buffer = {k: v for k, v in self.prices_buffer.items() if k > watermark_timestamp}
     print(f'trade {self.strategy}')
     print(f'now:           {datetime.fromtimestamp(self.cur_timestamp/1e9, tz=timezone.utc)}')
     print(f'dt:            {self.dt/1e9}')
@@ -2488,6 +2711,9 @@ class RLFastTrader(Trader):
       if len(result) > 0:
         for topic_partition, messages in result.items():
           self.update_buffer(messages)
+        if self.watermark is not None:  
+          watermark_timestamp = self.cur_timestamp - self.watermark
+          self.buffer = {k: v for k, v in self.buffer.items() if k > watermark_timestamp}
         self.action = self.update_action()
     else:
       self.action = self.update_action()
@@ -2512,6 +2738,66 @@ class RLFastTrader(Trader):
     self.last_timestamp = self.cur_timestamp
     print('Message end')
     
+  def init_app(self):
+    print('Initalizing websocket app')
+    app = deepcopy(self.app)
+    if self.exchange == 'binance':
+      ticker_stream = f'{self.symbol.lower()}@bookTicker'
+      orderbook_stream = f'{self.symbol.lower()}@depth{self.depth}@{self.speed}ms'
+      if self.stream == 'ticker':
+        on_message = self.on_message
+        # wss://stream.binance.com:9443 or wss://stream.binance.com:443
+        endpoint = 'wss://stream.binance.com:9443'
+        suffix = f'/ws/{ticker_stream}'
+      elif self.stream == 'orderbook':
+        on_message = self.on_message
+        endpoint = 'wss://stream.binance.com:9443'
+        suffix = f'/ws/{orderbook_stream}'
+      elif self.stream == 'user':
+        # see https://binance-docs.github.io/apidocs/spot/en/#user-data-streams
+        # https://github.com/binance/binance-spot-api-docs/blob/master/user-data-stream.md
+        on_message = self.on_message_user
+        result = self.start_user_data_stream(exchange='binance')
+        if result is None:
+          raise ValueError("Can't start user data stream!")
+        else:
+          self.listen_key = result['listenKey']
+        endpoint = 'wss://stream.binance.com:9443'
+        suffix = f'/ws/{self.listen_key}'
+      elif self.stream == 'ticker_user':
+        on_message = self.on_message_user_market
+        result = self.start_user_data_stream(exchange='binance')
+        if result is None:
+          raise ValueError("Can't start user data stream!")
+        else:
+          self.listen_key = result['listenKey']
+        endpoint = 'wss://stream.binance.com:9443'
+        suffix = f'/stream?streams={ticker_stream}/{self.listen_key}'
+      elif self.stream == 'orderbook_user':
+        on_message = self.on_message_user_market
+        result = self.start_user_data_stream(exchange='binance')
+        if result is None:
+          raise ValueError("Can't start user data stream!")
+        else:
+          self.listen_key = result['listenKey']
+        endpoint = 'wss://stream.binance.com:9443'
+        suffix = f'/stream?streams={orderbook_stream}/{self.listen_key}'
+      else:
+        raise NotImplementedError(self.exchange)
+      url = f'{endpoint}{suffix}'
+      print(url)
+      app['on_message'] = on_message
+      app['on_open'] = self.on_open
+      app['on_close'] = self.on_close
+      app['on_error'] = self.on_error
+      app['url'] = url
+    else:
+      raise NotImplementedError(self.stream)
+    if self.ws_timeout is not None:
+      websocket.setdefaulttimeout(self.ws_timeout)
+    self._app = websocket.WebSocketApp(**app)
+    print('Websocket app initalized')
+    
   def __call__(self):
     try:
       # logger = logging.getLogger('kafka')
@@ -2522,28 +2808,13 @@ class RLFastTrader(Trader):
         self.init_consumer()
       if self._producer is None:
         self.init_producer()
-      self.update_model_rl()
-      # Run websocket app
-      app = deepcopy(self.app)
-      run = deepcopy(self.run)
-      if self.exchange == 'binance':
-        if self.stream == 'ticker':
-          suffix = f'{self.symbol.lower()}@bookTicker'
-        elif self.stream == 'orderbook':
-          suffix = f'{self.symbol.lower()}@depth{self.depth}@{self.speed}ms'
-        else:
-          raise NotImplementedError(self.stream)
-        # wss://stream.binance.com:9443 or wss://stream.binance.com:443
-        url = f'wss://stream.binance.com:9443/ws/{suffix}'
-        app['on_message'] = self.on_message
-        app['on_open'] = self.on_open
-        app['on_close'] = self.on_close
-        app['on_error'] = self.on_error
-        app['url'] = url
-      if self.ws_timeout is not None:
-        websocket.setdefaulttimeout(self.ws_timeout)
-      app = websocket.WebSocketApp(**app)
-      app.run_forever(**run)
+      if self.ws is None:
+        self.init_ws()
+      if not self.do_consume_rl:
+        self.update_model_rl()
+      if self._app is None:
+        self.init_app()
+      self._app.run_forever(**self.run)
     except socket.error as e:  # Restart
       print(f'Websocket error stream trader {self.strategy}')
       print(e)
@@ -2600,6 +2871,9 @@ class RLFastTrader(Trader):
       print(f'Close producer: trader {self.strategy}')
       if self._producer is not None:
         self._producer.close()
+      print(f'Stop user data stream: trader {self.strategy}')
+      if self.listen_key is not None:
+        self.stop_user_data_stream(exchange=self.exchange, listen_key=self.listen_key)
       print(f'Close websocket: trader {self.strategy}')
       if self.ws is not None:
         self.ws.close()
