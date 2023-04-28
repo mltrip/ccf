@@ -1917,15 +1917,47 @@ class RLFastTrader(Trader):
     if self.position == 'none':
       if self.do_force_open:
         if self.action in [1, 2]:
+          print(f'Force open {self.action}')
           return self.action
     elif self.position == 'long':
       if self.do_force_close:
+        print('Force close long')
         return 2
     elif self.position == 'short':
       if self.do_force_close:
+        print('Force close short')
         return 1
     else:
       raise ValueError(f'Bad position: {self.position}!')
+    # Update buffer
+    result = self._consumer.poll(**self.poll)
+    if len(result) > 0:
+      if self.do_consume_rl:      
+        print('Update actions buffer')
+        for topic_partition, messages in result.items():
+          self.update_actions_buffer(messages)
+        if self.watermark is not None:  
+          watermark_timestamp = self.cur_timestamp - self.watermark
+          self.actions_buffer = {k: v for k, v in self.actions_buffer.items() if k > watermark_timestamp}
+        if len(self.actions_buffer) > 0:
+          last_action = self.actions_buffer[max(self.actions_buffer)]
+          action = int(last_action['action'])
+          action_dt = self.cur_timestamp - last_action['timestamp']
+          print(f'action dt:     {action_dt/1e9}')
+          return action
+        else:
+          print(f'Skipping: empty actions buffer')
+          return 0
+      else:
+        print('Update messages buffer')
+        for topic_partition, messages in result.items():
+          self.update_buffer(messages)
+        if self.watermark is not None:  
+          watermark_timestamp = self.cur_timestamp - self.watermark
+          self.buffer = {k: v for k, v in self.buffer.items() if k > watermark_timestamp}
+    else:
+      print(f'Skipping: empty poll')
+      return 0
     # Get observation
     if self.create_dataset_kwargs is None:
       df = pd.DataFrame(self.buffer.values())
@@ -2618,37 +2650,7 @@ class RLFastTrader(Trader):
       prices['timestamp'] = self.cur_timestamp
       self.prices_buffer[self.cur_timestamp] = prices
       # Update action
-      if self.create_dataset_kwargs is None:
-        result = self._consumer.poll(**self.poll)
-        if len(result) > 0:
-          if not self.do_consume_rl:
-            for topic_partition, messages in result.items():
-              self.update_buffer(messages)
-            if self.watermark is not None:  
-              watermark_timestamp = self.cur_timestamp - self.watermark
-              self.buffer = {k: v for k, v in self.buffer.items() if k > watermark_timestamp}
-            print(f'message buffer: {len(self.buffer)}')
-            self.action = self.update_action()
-            self.actions_buffer[self.cur_timestamp] = self.action
-          else:
-            print('Update actions buffer')
-            for topic_partition, messages in result.items():
-              self.update_actions_buffer(messages)
-            if self.watermark is not None:  
-              watermark_timestamp = self.cur_timestamp - self.watermark
-              self.actions_buffer = {k: v for k, v in self.actions_buffer.items() if k > watermark_timestamp}
-            if len(self.actions_buffer) > 0:
-              last_action = self.actions_buffer[max(self.actions_buffer)]
-              self.action = int(last_action['action'])
-              action_dt = self.cur_timestamp - last_action['timestamp']
-              print(f'action dt:     {action_dt/1e9}')                                  
-            else:
-              self.action = 0 
-        else:
-          self.action = 0
-      else:
-        self.action = self.update_action()
-        self.actions_buffer[self.cur_timestamp] = self.action
+      self.action = self.update_action()
       print(f'position:       {self.position}')
       print(f'action:         {self.action}')
       print('Message: update order') 

@@ -11,14 +11,16 @@ consumer:
 producer:
   bootstrap_servers: "kafka:9092"
 agents:
-  rl-fast-ticker-ppo-binance-btc-tusd-20-h_20-v-a-last_30m-qb_4em4-olcl-gtc:
+  rl-fast-ob_user-ppo-binance-btc-tusd-20-h_20-v-a-last_30m-qb_4em4-olcl_1.5:
     class: RLFastTrader
-    strategy: rl-fast-ticker-ppo-binance-btc-tusd-20-h_20-v-a-last_30m-qb_4em4-olcl-gtc
+    strategy: rl-fast-ob_user-ppo-binance-btc-tusd-20-h_20-v-a-last_30m-qb_4em4-olcl_1.5
     do_consume_rl: true
     key: binance-btc-tusd
     model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
     version: 4
     time_in_force: GTC  # GTC, FOK, IOC
+    do_force_open: false
+    do_force_close: false
     open_type: limit  # market
     close_type: limit  # market
     open_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
