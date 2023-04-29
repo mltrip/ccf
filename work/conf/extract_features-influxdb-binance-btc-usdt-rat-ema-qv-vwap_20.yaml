@@ -14,7 +14,7 @@ agents:
     feature: rat-ema-qv-vwap_20
     kind: rat
     verbose: true
-    start: "2022-12-30T00:00:00+00:00"
+    start: "2023-01-04T00:00:00+00:00"
     stop: "2023-03-01T00:00:00+00:00"
     size: ~
     quant: 3.0e+9

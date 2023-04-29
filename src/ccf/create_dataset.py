@@ -29,7 +29,7 @@ class Dataset:
                split=None, target_prefix='tgt', replace_dot=' ',
                default_group_column='group_id',
                df_only=False, watermark=None, verbose=False, 
-               merge_features=False, sep='-', new_only=False):
+               merge_features=False, sep='-', new_only=False, return_all_df=True):
     # Preinit
     if executor is None:
       executor = {'class': 'ThreadPoolExecutor'}
@@ -78,6 +78,7 @@ class Dataset:
     self.merge_features = merge_features
     self.sep = sep
     self.new_only = new_only
+    self.return_all_df = return_all_df
     
   def get_features(self):
     features = {}
@@ -355,7 +356,10 @@ class Dataset:
       df = df.set_index('timestamp')
       df2 = df2.set_index('timestamp')
     else:
-      df, df2 = all_df, None
+      if self.return_all_df:
+        df, df2 = all_df, None
+      else:
+        df, df2 = df, None
     if self.verbose:
       print(df)
       pprint(df.columns)
