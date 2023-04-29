@@ -174,7 +174,7 @@ class BacktestingThread(Thread):
         
       
 class Episode:
-    def __init__(self, dataset, data, bt_kwargs, price_column, price_shift=0):
+    def __init__(self, dataset, data, bt_kwargs, price_column, price_shift=0, max_len=None, scaler=None):
         # if param.add_feature:
         #     self.features = pd.DataFrame({"Reward": np.zeros(len(episode_data)), "Position": np.zeros(len(episode_data))}, index=episode_data.index)
         self.dataset = dataset
@@ -190,6 +190,8 @@ class Episode:
         self.bt.start()
         # self.strategy = self.bt.get_strategy()  # One step
         self.strategy = None
+        self.max_len = max_len
+        self.scaler = scaler
 
     def forward(self):
       # print('forward start')
@@ -197,6 +199,9 @@ class Episode:
         self.episode_step += 1
         self.strategy = self.bt.get_strategy()
         self.terminated = True if self.episode_step >= len(self.dataset) else False
+        if self.max_len is not None:
+          if self.episode_step >= self.max_len:
+            self.truncated = True
       # print('forward stop')
 
     def status(self):
@@ -216,15 +221,34 @@ class Episode:
       self.bt.kill()
       self.bt.join()
 
+    def scale(self, observation):
+      if self.scaler is None:
+        return observation
+      scaler = deepcopy(self.scaler)
+      scaler_class = scaler.pop('class')
+      kind = scaler.pop('kind', 'feature')
+      s = getattr(preprocessing, scaler_class)(**scaler)
+      if kind == 'feature':
+        observation = s.fit_transform(observation)
+      elif kind == 'sample':
+        observation = np.transpose(s.fit_transform(np.transpose(observation)))
+      elif kind == 'all':
+        shape = observation.shape
+        observation = s.fit_transform(observation.reshape(-1, 1)).reshape(shape)
+      else:
+        raise NotImplementedError(f'episode scaler kind: {kind}')
+      return observation
+      
     def observation(self):
       x, y = next(self.dataloader)
       # pprint(x)
       # pprint(y)
       # print(self.strategy.data)
       # print(self.strategy.data.df)
-      # if self.episode_step == 2:
-      #   assert False
       obs = x['encoder_cont'][0]
+      # print(obs)
+      obs = self.scale(obs)
+      # print(obs)
       return obs
 
     def reward(self):
@@ -247,33 +271,10 @@ class Episode:
         "position": self.strategy.position, 
         "closed_trades": self.strategy.closed_trades}
 
-      
-class EpisodeFactory:
-  def __init__(self, dataset, data, kind, bt_kwargs, price_column, price_shift=0):
-    self.dataset = dataset
-    self.data = data
-    self.kind = kind
-    self.bt_kwargs = bt_kwargs
-    self.episode = None
-    self.price_column = price_column
-    self.price_shift = price_shift
-
-  def create(self):
-    if self.kind == "random":
-      next_timestamp = random.choice(range(len(self.data) - self.dataset.min_encoder_length - self.dataset.min_prediction_length))
-    else:  # "sequential" or "backtest"
-      if self.episode == None or self.episode.episode_step + self.dataset.min_encoder_length > len(self.episode.dataset):
-        next_timestamp = 0
-      else:
-        next_timestamp = self.episode.timestamp + 1
-    data = self.data[next_timestamp:]
-    dataset = self.dataset.from_dataset(self.dataset, data)
-    self.episode = Episode(dataset, data, self.bt_kwargs, self.price_column, self.price_shift)
-    return self.episode 
-
 
 class TradingEnv(gym.Env):
-  def __init__(self, dataset, data, bt_kwargs, price_column, kind='sequential', price_shift=0):
+  def __init__(self, dataset, data, bt_kwargs, price_column, kind='sequential', price_shift=0, 
+               max_len=None, scaler=None):
     self.dataset = dataset
     self.action_space = spaces.Discrete(3)  # action is [0, 1, 2] 0: HOLD, 1: BUY, 2: SELL
     n_features = len(dataset.static_reals) + len(dataset.time_varying_known_reals) + len(dataset.time_varying_unknown_reals)
@@ -282,13 +283,35 @@ class TradingEnv(gym.Env):
     print(f'action space: {self.action_space.shape}, observation space: {self.observation_space.shape}')
     self.price_column = price_column
     self.price_shift = price_shift
+    self.max_len = max_len
     # Episode factory
     self.data = data
     self.kind = kind
     self.bt_kwargs = bt_kwargs
-    self.factory = EpisodeFactory(self.dataset, self.data, self.kind, 
-                                  self.bt_kwargs, self.price_column, self.price_shift)
     self.episode = None
+    self.scaler = scaler
+    
+  def create_episode(self):
+    if self.kind == "random":
+      next_timestamp = random.choice(range(len(self.data) - self.dataset.min_encoder_length - self.dataset.min_prediction_length))
+    else:  # "sequential" or "backtest"
+      if self.episode == None:
+        next_timestamp = 0
+      elif self.episode.episode_step + self.dataset.min_encoder_length > len(self.episode.dataset):
+        next_timestamp = 0
+      else:
+        next_timestamp = self.episode.episode_step + 1
+    # print(next_timestamp, len(self.data), self.data.index.min(), self.data.index.max())
+    data = self.data[next_timestamp:]
+    # print(len(data), data.index.min(), data.index.max())
+    dataset = self.dataset.from_dataset(self.dataset, data)
+    if self.kind == "backtest":
+      episode = Episode(dataset, data, self.bt_kwargs, self.price_column, self.price_shift, 
+                        max_len=None, scaler=self.scaler)
+    else:
+      episode = Episode(dataset, data, self.bt_kwargs, self.price_column, self.price_shift, 
+                        max_len=self.max_len, scaler=self.scaler)
+    return episode
     
   def step(self, 
            action, 
@@ -322,11 +345,10 @@ class TradingEnv(gym.Env):
     # print('reset')
     if self.episode != None:
       self.episode.clear()
-    # self.factory = EpisodeFactory(self.dataset, self.data, self.kind, 
-    #                               self.bt_kwargs, self.price_column, self.price_shift)
-    self.episode = self.factory.create()
+    self.episode = self.create_episode()
     self.episode.forward()
     observation, _, _, _, _ = self.episode.status()
+    # print(observation)
     return observation
 
   def stats(self):
@@ -369,11 +391,12 @@ class TradingEnv(gym.Env):
   
 class PositionEnv(gym.Wrapper):
     def __init__(self, dataset, data, bt_kwargs, 
-                 price_column, kind='sequential', price_shift=0,
+                 price_column, kind='sequential', price_shift=0, max_len=None,
                  terminate_on_none=False, 
-                 size=1.0, limit=None, stop=None, sl=None, tp=None):
+                 size=1.0, limit=None, stop=None, sl=None, tp=None, scaler=None):
         env = TradingEnv(dataset=dataset, data=data, bt_kwargs=bt_kwargs, 
-                         price_column=price_column, kind=kind, price_shift=price_shift)
+                         price_column=price_column, kind=kind, price_shift=price_shift,
+                         max_len=max_len, scaler=scaler)
         super().__init__(env)
         self.env = env
         self.side = 'NONE'
@@ -585,7 +608,7 @@ def train(
     bt_env_kwargs['dataset'] = ds_t
     bt_env_kwargs['data'] = df_t
     bt_env_kwargs['bt_kwargs'] = deepcopy(bt_kwargs)
-    bt_env_kwargs['kind'] = 'sequential'
+    bt_env_kwargs['kind'] = 'backtest'
     bt_env_kwargs['terminate_on_none'] = False
     bt_train_env = env_class(**bt_env_kwargs)
     run_backtest(env=bt_train_env, model=model, filename=f'{model_name}-bt-train.html')
@@ -595,7 +618,7 @@ def train(
       bt_env_kwargs['dataset'] = ds_v
       bt_env_kwargs['data'] = df_v
       bt_env_kwargs['bt_kwargs'] = deepcopy(bt_kwargs)
-      bt_env_kwargs['kind'] = 'sequential'
+      bt_env_kwargs['kind'] = 'backtest'
       bt_env_kwargs['terminate_on_none'] = False
       bt_test_env = env_class(**bt_env_kwargs)
       run_backtest(env=bt_test_env, model=model, filename=f'{model_name}-bt-test.html')

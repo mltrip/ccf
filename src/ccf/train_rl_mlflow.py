@@ -33,7 +33,6 @@ from mlflow import MlflowClient
 from ccf.agents import InfluxDB
 from ccf.utils import initialize_time
 from ccf.model_mlflow import CCFRLModel, load_model
-  
 
 
 class MLflowOutputFormat(KVWriter):
@@ -325,6 +324,27 @@ class TradingEnv(gym.Env):
             open_browser=open_browser,
         )
 
+
+class Preprocessor:
+  def __init__(self, scalers, window_size):
+    self.scalers = {}
+    for column, scaler in scalers.items():
+      scaler_class = scaler.pop('class')
+      self.scalers[column] = getattr(preprocessing, scaler_class)(**scaler)
+    self.window_size = window_size
+    
+  def __call__(self, df):
+    columns = list(self.scalers.keys())
+    df = df[columns][-self.window_size:]
+    df = df.sort_index(axis=1)
+    vs = []
+    for column, scaler in self.scalers.items():
+      v = df[column].values
+      v_ = scaler.fit_transform(v)
+      vs.append(v_)
+    vs = np.column_stack(vs)
+    return vs
+  
         
 def preprocess_data(df, window_size, forecast_column='Forecast', price_column='Close'):
   cols = [forecast_column, price_column]
@@ -432,7 +452,7 @@ class EpisodeFactory:
         if self.param.mode == "random": 
             return random.choice(range(len(self.param.df) - 2*self.param.window_size))  # with margin
         else:  # "sequential" or "backtest"
-            if self.episode == None or self.episode.timestamp + self.param.window_size > len(self.episode.episode_data):
+            if self.episode == None or self.episode.timestamp + 2*self.param.window_size > len(self.episode.episode_data):
                 return 0
             else:
                 return self.episode.timestamp + 1
@@ -497,7 +517,7 @@ def run_backtest(env, model, filename):
 
 def get_data(start, exchange, base, quote,
              model_name, model_version, unit_scale, 
-             reload=False, test_size=None,
+             reload=False, test_size=None, do_dump=True,
              stop=None, horizon=None, feature=None, target=None, bucket='ccf', 
              batch_size=3600e9, verbose=True, quant=None, size=None):
   start, stop, size, quant = initialize_time(start, stop, size, quant)
@@ -527,7 +547,8 @@ def get_data(start, exchange, base, quote,
       verbose=verbose)
     client_.close()
     df = df[[x for x in ['last', 'quantile_0.5', 'value'] if x in df]]
-    df.to_csv(data_path)
+    if do_dump:
+      df.to_csv(data_path)
   else:
     print('Loading data from file')
     df = pd.read_csv(data_path)
@@ -580,9 +601,11 @@ def train(hydra_config,
   model_class = getattr(stable_baselines3, model_class_name)
   
   # Get data
+  print('Get data')
   df = get_data(**data_kwargs)
   
   # Split dataset
+  print('Split data')
   if split is not None:
     split_idx = int(len(df)*split)
     df_train = df.iloc[:split_idx]
@@ -595,33 +618,40 @@ def train(hydra_config,
     df_test = None
   
   # Train
+  print('Train')
   if do_train:
-    # Create environment
+    print('Create environment')
     train_env_kwargs = deepcopy(env_kwargs)
     train_env_kwargs['df'] = df_train
     train_env_kwargs['mode'] = 'random'
     train_param = EnvParameter(**train_env_kwargs)
     if n_envs == 1:
+      print('Create one environment')
       train_env = OneEnv(train_param)
       check_env(train_env)
     else:
+      print('Create many environments')
       train_env_kwargs = {'param': train_param}
       train_env = make_vec_env(OneEnv, env_kwargs=train_env_kwargs,
-                               n_envs=n_envs, seed=seed, vec_env_cls=SubprocVecEnv)  
+                               n_envs=n_envs, seed=seed, vec_env_cls=SubprocVecEnv)
+    print('Create loggers')
     loggers = Logger(folder=None,
                      output_formats=[HumanOutputFormat(sys.stdout), 
                                      MLflowOutputFormat()])
     experiment_name = model_name
+    print('Create experiment')
     experiment = mlflow.set_experiment(experiment_name)
+    print('Start experiment')
     with mlflow.start_run(experiment_id=experiment.experiment_id) as run:
+      print('Log parameters')
       mlflow.log_params(mlflow_params)
       if not is_tune:
-        print('Creating model')
+        print('Create model')
         model_kwargs['env'] = train_env
         model_kwargs['verbose'] = verbose 
         model = model_class(**model_kwargs)
       else:
-        print('Loading model')
+        print('Load model')
         last_model, last_version, last_stage = load_model(parent_name, parent_version, parent_stage)
         if last_model is not None:
           # model = model_class.load(path=model_name, env=train_env)
@@ -633,15 +663,16 @@ def train(hydra_config,
           model_kwargs['verbose'] = verbose 
           model = model_class(**model_kwargs)
       model.set_logger(loggers)
-      print('Training')  
+      print('Start train')  
       model.learn(**learn_kwargs)
-      print('Saving model')
+      print('Save model')
       model.save(model_name)
       cwd = Path(hydra_config.runtime.cwd)
       conf_path = cwd / 'conf'
       config_name = hydra_config.job.config_name
       model_path = Path(f'{model_name}.zip')
       mlflow_model = CCFRLModel(config_name=config_name)
+      print('Log model')
       model_info = mlflow.pyfunc.log_model(artifact_path=model_name, 
                                            registered_model_name=model_name,
                                            python_model=mlflow_model,
