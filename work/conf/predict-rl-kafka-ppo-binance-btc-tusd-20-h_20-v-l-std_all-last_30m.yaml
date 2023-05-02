@@ -1,0 +1,51 @@
+defaults:
+  - partitioner@partitioner: prediction
+  - dataset@create_dataset_kwargs.dataset_kwargs: rl-mel_20-mpl_20-v-l-no_norm
+  - partitioner@create_dataset_kwargs.agents.tusd.partitioner: prediction
+  - _self_
+
+
+model_name: ppo-binance-btc-tusd-20-h_20-v-l-std_all-last_30m
+model_version: ~
+model_kind: 'auto_update'
+key: binance-btc-tusd
+max_model_delay: 1800e9
+producer:
+  bootstrap_servers: "kafka:9092"
+  api_version_auto_timeout_ms: 30000
+create_dataset_kwargs:
+  quant: 3e+9
+  # start: "2023-04-13T00:00:00+00:00"
+  # stop: "2023-04-13T00:30:00+00:00"
+  start: ~  # number of quants
+  stop: ~  # now
+  watermark: 90e9
+  replace_nan: ~
+  split: ~
+  new_only: true
+  return_all_df: true
+  merge_features: false
+  verbose: false
+  dataset_kwargs:
+    predict_mode: true
+  agents:
+    tusd:
+      class: KafkaDataset2
+      consumer:
+        bootstrap_servers: "kafka:9092"
+      poll:
+        timeout_ms: 1000
+        max_records: ~
+        update_offsets: true
+      topic: prediction
+      key: binance-btc-tusd
+      filters:
+        model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+        version: 4
+        horizon: 20
+      # ratios:
+      #   value: last
+      # pivot:
+      #   index: ['timestamp', 'exchange', 'base', 'quote', 'quant', 'feature', 'target', 'model', 'version']
+      #   columns: ['horizon']
+      resample: {}

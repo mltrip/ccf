@@ -378,13 +378,14 @@ class Trader(Agent):
       's_m_vwap': s_m_vwap}
     return vwap
   
-  def buy_market(self, symbol, quantity, exchange, is_base_quantity=True, 
-                is_test=False, recv_window=5000, timeout=None):
+  def buy_market(self, symbol, quantity, exchange, is_base_quantity=True,
+                 stp="EXPIRE_TAKER", is_test=False, recv_window=5000, timeout=None):
     if exchange == 'binance':
       params = {
           "symbol": symbol,
           "side": "BUY",
-          "type": "MARKET"
+          "type": "MARKET",
+          "selfTradePreventionMode": stp
       }
       if is_base_quantity:
         params['quantity'] = quantity
@@ -401,12 +402,13 @@ class Trader(Agent):
     return response
   
   def sell_market(self, symbol, quantity, exchange, is_base_quantity=True, 
-                 is_test=False, recv_window=5000, timeout=None):
+                  stp="EXPIRE_TAKER", is_test=False, recv_window=5000, timeout=None):
     if exchange == 'binance':
       params = {
           "symbol": symbol,
           "side": "SELL",
-          "type": "MARKET"
+          "type": "MARKET",
+          "selfTradePreventionMode": stp
       }
       if is_base_quantity:
         params['quantity'] = quantity
@@ -424,13 +426,14 @@ class Trader(Agent):
   
   def buy_limit(self, symbol, price, quantity, time_in_force='GTC', 
                 is_base_quantity=True, is_test=False, post_only=False,
-                recv_window=5000, timeout=None, exchange=None):
+                stp="EXPIRE_TAKER", recv_window=5000, timeout=None, exchange=None):
     params = {
         "symbol": symbol,
         "side": "BUY",
         "type": "LIMIT" if not post_only else "LIMIT_MAKER",
         "price": price,
-        "timeInForce": time_in_force
+        "timeInForce": time_in_force,
+        "selfTradePreventionMode": stp
     }
     if is_base_quantity:
       params['quantity'] = quantity
@@ -445,13 +448,14 @@ class Trader(Agent):
   
   def sell_limit(self, symbol, price, quantity, time_in_force='GTC', 
                  is_base_quantity=True, is_test=False, post_only=False,
-                 recv_window=5000, timeout=None, exchange=None):
+                 stp="EXPIRE_TAKER", recv_window=5000, timeout=None, exchange=None):
     params = {
         "symbol": symbol,
         "side": "SELL",
         "type": "LIMIT" if not post_only else "LIMIT_MAKER",
         "price": price,
-        "timeInForce": time_in_force
+        "timeInForce": time_in_force,
+        "selfTradePreventionMode": stp
     }
     if is_base_quantity:
       params['quantity'] = quantity
@@ -487,7 +491,7 @@ class Trader(Agent):
                            cancel_restrictions=None,
                            cancel_replace_mode='STOP_ON_FAILURE',
                            is_base_quantity=True, is_test=False,
-                           post_only=False,
+                           stp="EXPIRE_TAKER", post_only=False,
                            recv_window=5000, timeout=None, exchange=None):
     
 #     Rate of REQUEST_WEIGHT per 1 MINUTE = 115/1200 = 9.58% (95.00% max)
@@ -538,6 +542,7 @@ class Trader(Agent):
         "type": "LIMIT" if not post_only else "LIMIT_MAKER",
         "price": price,
         "timeInForce": time_in_force,
+        "selfTradePreventionMode": stp
         }
     if cancel_restrictions is not None:
       params['cancelRestrictions'] = cancel_restrictions
@@ -2325,6 +2330,20 @@ class RLFastTrader(Trader):
       self.action = 0
     elif order_status == 'PARTIALLY_FILLED':  # In process
       print(f'Order {order_side} {order_id} in process with status: {order_status}')
+      # Cancel timeout for partially filled orders
+      # Cancel order
+      # Get executedQty
+      # BUY/SELL executedQty reversely
+      # 'cummulativeQuoteQty': '2.35379680',
+      # 'executedQty': '0.00008000',
+      # 'orderId': 696352798,
+      # 'origQty': '0.00040000',
+      # 'origQuoteOrderQty': '0.00000000',
+      # 'price': '29422.46000000',
+      # 'side': 'SELL',
+      # is_base_quantity
+      # If cummulativeQuoteQty >= Minimum Order Size and executedQty >= Minimum Trade Amount
+      # Update balances
     elif order_status == 'NEW':  # In process
       print(f'Order {order_side} {order_id} in process with status: {order_status}')
       if self.position == 'none':  # On open position
