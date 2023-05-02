@@ -3,7 +3,7 @@ defaults:
   - partitioner@producer_partitioner: metric
   - _self_
 
-n_clones: 3
+n_clones: ~
 executor:
   class: ProcessPoolExecutor
 consumer:
@@ -39,8 +39,8 @@ agents:
     close_price_offset_min: 5e-5
     open_price_offset_max: ~
     close_price_offset_max: ~
-    open_price_offset_len: 60e9
-    close_price_offset_len: 60e9
+    open_price_offset_len: 1800e9
+    close_price_offset_len: 1800e9
     open_update_timeout: 3e9
     close_update_timeout: 30e9
     precision: 8
@@ -51,7 +51,7 @@ agents:
     is_test: false
     verbose: true
     do_log_account_status: false
-    watermark: 120e9
+    watermark: 1800e9
     max_delay: 30e9
     max_model_rl_delay: 1800e9
     ws_stream_ping_interval: 1800e9

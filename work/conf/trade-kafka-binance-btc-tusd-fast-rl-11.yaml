@@ -2,21 +2,27 @@ defaults:
   - partitioner@consumer_partitioner: prediction
   - partitioner@producer_partitioner: metric
   - _self_
- 
+
+n_clones: ~
 executor:
   class: ProcessPoolExecutor
 consumer:
+  api_version_auto_timeout_ms: 30000
   bootstrap_servers: "kafka:9092"
 producer:
+  api_version_auto_timeout_ms: 30000
   bootstrap_servers: "kafka:9092"
 agents:
-  rl-fast-ticker-ppo-last_1h-qb_4em4-po_1em4-olcl-gtc-15em1:
+  rl-fast-ob_user-ppo-binance-btc-tusd-20-h_20-v-l-std_all-last_30m-qb_4em4-olcl_1.5:
     class: RLFastTrader
-    strategy: rl-fast-ticker-ppo-last_1h-qb_4em4-po_1em4-olcl-gtc-15em1
+    strategy: rl-fast-ob_user-ppo-binance-btc-tusd-20-h_20-v-l-std_all-last_30m-qb_4em4-olcl_1.5
+    do_consume_rl: true
     key: binance-btc-tusd
     model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
     version: 4
     time_in_force: GTC  # GTC, FOK, IOC
+    do_force_open: false
+    do_force_close: false
     open_type: limit  # market
     close_type: limit  # market
     open_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
@@ -33,24 +39,22 @@ agents:
     close_price_offset_min: 5e-5
     open_price_offset_max: ~
     close_price_offset_max: ~
-    open_price_offset_len: 60e9
-    close_price_offset_len: 60e9
+    open_price_offset_len: 1800e9
+    close_price_offset_len: 1800e9
     open_update_timeout: 3e9
     close_update_timeout: 30e9
     precision: 8
     tick_size: 0.01
-    stream: ticker
+    stream: orderbook_user
     depth: 20
-    speed: 100
+    speed: 1000
     is_test: false
-    verbose: false
+    verbose: true
     do_log_account_status: false
-    horizon: 20
-    window_size: 20
-    prediction: value  # value, quantile_0.5
-    watermark: 60e9
+    watermark: 1800e9
     max_delay: 30e9
-    max_model_rl_delay: 7200e9
+    max_model_rl_delay: 1800e9
+    ws_stream_ping_interval: 1800e9
     do_check_order_placement_open: false
     do_check_order_placement_close: false
     max_spread: 1e-4
@@ -64,60 +68,5 @@ agents:
     quantity: 4e-4
     is_base_quantity: true
     kind_rl: 'auto_update'  # 'auto_update'
-    model_name_rl: ppo-binance-btc-tusd-last_1h
+    model_name_rl: ppo-binance-btc-tusd-20-h_20-v-l-std_all-last_30m
     model_version_rl: ~
-   # rl-fast-ticker-ppo-2M_last_2w-qb_4em4-po_1em4-olcl-gtc:
-   #  class: RLFastTrader
-   #  strategy: rl-fast-ticker-ppo-2M_last_2w_qb_4em4-po_1em4-olcl-gtc
-   #  key: binance-btc-tusd
-   #  model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
-   #  version: 4
-   #  time_in_force: GTC  # GTC, FOK, IOC
-   #  open_type: limit  # market
-   #  close_type: limit  # market
-   #  open_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
-   #  open_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
-   #  close_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
-   #  close_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
-   #  open_price_offset: 1.0
-   #  close_price_offset: 1.0
-   #  open_price_offset_kind: s_p-m_p
-   #  close_price_offset_kind: s_p-m_p
-   #  open_price_offset_agg: max
-   #  close_price_offset_agg: max
-   #  open_price_offset_min: 5e-5
-   #  close_price_offset_min: 5e-5
-   #  open_price_offset_max: ~
-   #  close_price_offset_max: ~
-   #  open_price_offset_len: 60e9
-   #  close_price_offset_len: 60e9
-   #  precision: 8
-   #  tick_size: 0.01
-   #  stream: ticker
-   #  depth: 20
-   #  speed: 100
-   #  is_test: false
-   #  verbose: false
-   #  do_log_account_status: false
-   #  horizon: 20
-   #  window_size: 20
-   #  prediction: value  # value, quantile_0.5
-   #  watermark: 120e9
-   #  max_delay: 30e9
-   #  do_check_order_placement_open: false
-   #  do_check_order_placement_close: false
-   #  max_spread: 1e-4
-   #  min_quantity: 1e-8
-   #  open_update_timeout: 3e9
-   #  close_update_timeout: 30e9
-   #  ema_length: 1800
-   #  ema_quant: 1e9
-   #  do_check_ema: false
-   #  # min_d_price: 3e-4
-   #  # sltp_t: 3e-4
-   #  # sltp_r: 1.0
-   #  quantity: 4e-4
-   #  is_base_quantity: true
-   #  kind_rl: 'auto_update'  # 'auto_update'
-   #  model_name_rl: ppo-binance-btc-tusd-tt_2M-last_2w
-   #  model_version_rl: ~

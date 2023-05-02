@@ -18,10 +18,10 @@ def trade(
   agents, executor=None, 
   consumer=None, producer=None, 
   consumer_partitioner=None, producer_partitioner=None,
-  n_clones=1, delay=0.0
+  n_clones=None, delay=0.0
 ):
   # Preprocess
-  if n_clones > 1:
+  if n_clones is not None:
     new_agents = {}
     for name, agent_kwargs in agents.items():
       for i in range(n_clones):
