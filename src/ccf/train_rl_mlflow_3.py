@@ -442,8 +442,8 @@ class TradingEnv(gym.Env):
     
   
 class PositionEnv(gym.Wrapper):
-    def __init__(self, dataset, data, bt_kwargs, 
-                 price_column, kind='sequential', price_shift=0, max_len=None,
+    def __init__(self, dataset=None, data=None, bt_kwargs=None, 
+                 price_column=None, kind='sequential', price_shift=0, max_len=None,
                  terminate_on_none=False, 
                  size=1.0, limit=None, stop=None, sl=None, tp=None, scaler=None,
                  add_reward=False, add_position=False, reward_scaler=None, position_scaler=None):
