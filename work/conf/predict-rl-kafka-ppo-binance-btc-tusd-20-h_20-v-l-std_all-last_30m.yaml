@@ -2,6 +2,7 @@ defaults:
   - partitioner@partitioner: prediction
   - dataset@create_dataset_kwargs.dataset_kwargs: rl-mel_20-mpl_20-v-l-no_norm
   - partitioner@create_dataset_kwargs.agents.tusd.partitioner: prediction
+  - env@env_kwargs: pos-20-h_20-v-l-std_all
   - _self_
 
 

@@ -18,11 +18,13 @@ from kafka import KafkaConsumer, KafkaProducer, TopicPartition
 from ccf.create_dataset import Dataset
 from ccf.model_mlflow import update_model
 from ccf import partitioners as ccf_partitioners
+import ccf.train_rl_mlflow_3 as ccf_rl
 
 
 def predict(
   model_name, key,
   create_dataset_kwargs, 
+  env_kwargs,
   producer, partitioner, 
   topic='prediction',
   model_kind=None, model_version=None, model_stage=None,
@@ -43,6 +45,7 @@ def predict(
   model, last_version, last_stage = update_model(
     model=None, kind=model_kind, name=model_name, 
     version=model_version, stage=model_stage)
+  env = None
   last_model_t =  time.time_ns()
   # Run
   prev_t = time.time_ns()
@@ -55,6 +58,14 @@ def predict(
     if ds_t is None:
       prev_t = cur_t
       continue
+    if env is None:
+      print('Environment')
+      env_class_name = env_kwargs.pop('class')
+      env_class = getattr(ccf_rl, env_class_name)
+      env_kwargs['dataset'] = ds_t
+      env_kwargs['data'] = df_t
+      env = env_class(**env_kwargs)
+      print(env)
     print('Obtaining observation')
     dl_t = ds_t.to_dataloader(train=False, batch_size=1, batch_sampler='synchronized')
     x, y = next(iter(dl_t))
@@ -102,6 +113,9 @@ def predict(
       if delta_model > max_model_delay:
         print('Skipping: max model delay')
         continue
+    print('Scale observation')
+    obs = env.scale_observation(obs)
+    print(obs)
     print('Prediction action')
     action, _ = model.predict(obs)  # 0: HOLD, 1: BUY, 2: SELL
     print(f'action: {action}')
