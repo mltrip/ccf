@@ -1,26 +1,27 @@
 defaults:
- - dataset@create_dataset_kwargs.dataset_kwargs: rl-mel_20-mpl_20-v-l-no_norm
+ - dataset@create_dataset_kwargs.dataset_kwargs: rl-mel_20-mpl_20-h-v-no_norm
  - _self_
 
-n_envs: 1
+n_envs: 16
 seed: ~
 verbose: 0
 do_train: true
 do_backtest: true
 do_mlflow: true
-model_name: ppo-binance-btc-tusd-20-h_20-v-l-min_max_all-last_30m
-is_tune: false
-parent_name: ppo-binance-btc-tusd-20-h_20-v-l-min_max_all-last_30m
+model_name: ppo-binance-btc-tusd-20-h-v-min_max_all-last_1w-tune
+is_tune: true
+parent_name: ppo-binance-btc-tusd-20-h-v-min_max_all-last_1w-tune
 parent_version: ~  # last
 create_dataset_kwargs:
   quant: 3e+9
   # start: "2023-04-13T00:00:00+00:00"
   # stop: "2023-04-13T00:30:00+00:00"
-  start: -600  # number of quants
+  start: -201600  # number of quants
   stop: ~  # now
   replace_nan: ~
   split: ~
   merge_features: false
+  return_all_df: false
   verbose: true
   agents:
     tusd:
@@ -33,12 +34,12 @@ create_dataset_kwargs:
       filters:
         model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
         version: 4
-        horizon: 20
+      # horizon: 20
       # ratios:
       #   value: last
-      # pivot:
-      #   index: ['timestamp', 'exchange', 'base', 'quote', 'quant', 'feature', 'target', 'model', 'version']
-      #   columns: ['horizon']
+      pivot:
+        index: ['timestamp', 'exchange', 'base', 'quote', 'quant', 'feature', 'target', 'model', 'version']
+        columns: ['horizon']
       resample: {}
 bt_kwargs:
   cash: 100000.0
@@ -49,16 +50,17 @@ bt_kwargs:
   exclusive_orders: false
 learn_kwargs:
   # tb_log_name: ppo-binance-btc-tusd-20-h_20-v-a-last_30m-tune
-  total_timesteps: 100000  # number of rollouts (epochs) = total_timesteps / (n_steps * n_envs)
+  total_timesteps: 200000  # number of rollouts (epochs) = total_timesteps / (n_steps * n_envs)
   reset_num_timesteps: false
   callback: ~ 
   log_interval: 1  #  The number of rollouts before logging
   progress_bar: true
 env_kwargs:
   class: PositionEnv
-  price_column: tgt-last
+  price_column: tgt-last-20
   price_shift: -20
   size: 1.0
+  max_len: 20
   scaler:
     class: MinMaxScaler
     kind: all

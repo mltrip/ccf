@@ -7,7 +7,7 @@ seed: ~
 verbose: 0
 do_train: true
 do_backtest: true
-do_mlflow: false
+do_mlflow: true
 model_name: ppo-binance-btc-tusd-20-h_20-v-l-std_all-last_30m
 is_tune: false
 parent_name: ppo-binance-btc-tusd-20-h_20-v-l-std_all-last_30m
@@ -16,10 +16,10 @@ create_dataset_kwargs:
   quant: 3e+9
   # start: "2023-04-13T00:00:00+00:00"
   # stop: "2023-04-13T00:30:00+00:00"
-  start: -1800  # number of quants
+  start: -600  # number of quants
   stop: ~  # now
   replace_nan: ~
-  split: 0.333
+  split: ~
   merge_features: false
   verbose: true
   agents:

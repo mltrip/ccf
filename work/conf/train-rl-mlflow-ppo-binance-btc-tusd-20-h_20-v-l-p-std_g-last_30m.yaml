@@ -7,19 +7,19 @@ seed: ~
 verbose: 0
 do_train: true
 do_backtest: true
-do_mlflow: true
-model_name: ppo-binance-btc-tusd-20-h_20-v-l-min_max_all-last_30m
+do_mlflow: false
+model_name: ppo-binance-btc-tusd-20-h_20-v-l-p-std_g-last_30m
 is_tune: false
-parent_name: ppo-binance-btc-tusd-20-h_20-v-l-min_max_all-last_30m
+parent_name: ppo-binance-btc-tusd-20-h_20-v-l-p-std_g-last_30m
 parent_version: ~  # last
 create_dataset_kwargs:
   quant: 3e+9
   # start: "2023-04-13T00:00:00+00:00"
   # stop: "2023-04-13T00:30:00+00:00"
-  start: -600  # number of quants
+  start: -1800  # number of quants
   stop: ~  # now
   replace_nan: ~
-  split: ~
+  split: 0.333
   merge_features: false
   verbose: true
   agents:
@@ -59,10 +59,18 @@ env_kwargs:
   price_column: tgt-last
   price_shift: -20
   size: 1.0
+  add_reward: false
+  add_position: true
   scaler:
-    class: MinMaxScaler
-    kind: all
-    feature_range: [-1, 1]
+    class: StandardScaler
+    kind: global
+  # reward_scaler:
+  #   class: StandardScaler
+  #   kind: feature
+  # position_scaler:
+  #   class: MinMaxScaler
+  #   kind: feature
+  #   feature_range: [-1, 1]
 model_kwargs:
   class: PPO
   policy: MlpPolicy
