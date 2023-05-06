@@ -1,3 +1,4 @@
+from collections import deque
 from copy import deepcopy
 import concurrent.futures
 from pprint import pprint
@@ -175,7 +176,8 @@ class BacktestingThread(Thread):
       
 class Episode:
     def __init__(self, dataset, data, bt_kwargs, price_column, price_shift=0, 
-                 max_len=None, add_reward=False, add_position=False):
+                 max_len=None, add_reward=False, add_position=False, 
+                 reward_scaler=None, scale_reward=False, scale_zero_reward=False):
         self.dataset = dataset
         self.dataloader = iter(self.dataset.to_dataloader(
           train=False, batch_size=1, batch_sampler='synchronized'))
@@ -194,6 +196,9 @@ class Episode:
         self.position_buffer = []
         self.add_reward = add_reward
         self.add_position = add_position
+        self.reward_scaler = reward_scaler
+        self.scale_reward = scale_reward
+        self.scale_zero_reward = scale_zero_reward
 
     def forward(self):
       # print('forward start')
@@ -213,6 +218,16 @@ class Episode:
         truncated = self.truncated
         info = self.info()
         self.reward_buffer.append(reward)
+        if self.scale_reward:
+          if self.scale_zero_reward:
+            scaled_rewards = TradingEnv.scale_array([[x] for x in self.reward_buffer], self.reward_scaler)
+            reward = scaled_rewards[-1][0]
+          else:
+            if reward != 0:
+              nonzero_rewards = [x for x in self.reward_buffer if x != 0]
+              if len(nonzero_rewards) > 0:
+                scaled_rewards = TradingEnv.scale_array([[x] for x in nonzero_rewards], self.reward_scaler)
+                reward = scaled_rewards[-1][0]
         self.position_buffer.append(self.strategy.position.size)
         if self.add_reward:
           n_samples = observation.shape[0]
@@ -274,7 +289,9 @@ class TradingEnv(gym.Env):
   def __init__(self, dataset=None, data=None, bt_kwargs=None,
                price_column=None, kind='sequential', price_shift=0, 
                max_len=None, scaler=None, add_reward=False, add_position=False,
-               reward_scaler=None, position_scaler=None):
+               reward_scaler=None, position_scaler=None, 
+               scale_reward=False, scale_zero_reward=False,
+               scale_reward_env=False, scale_zero_reward_env=False, reward_buffer_env_max_len=10000):
     self.dataset = dataset
     self.action_space = spaces.Discrete(3)  # action is [0, 1, 2] 0: HOLD, 1: BUY, 2: SELL
     n_features = len(dataset.static_reals) + len(dataset.time_varying_known_reals) + len(dataset.time_varying_unknown_reals)
@@ -298,6 +315,12 @@ class TradingEnv(gym.Env):
     self.add_position = add_position
     self.reward_scaler = reward_scaler
     self.position_scaler = position_scaler
+    self.scale_reward = scale_reward
+    self.scale_zero_reward = scale_zero_reward
+    self.scale_reward_env = scale_reward_env
+    self.scale_zero_reward_env = scale_zero_reward_env
+    self.reward_buffer_env_max_len = reward_buffer_env_max_len
+    self.reward_buffer = deque()
     
   def create_episode(self):
     if self.kind == "random":
@@ -315,11 +338,15 @@ class TradingEnv(gym.Env):
     dataset = self.dataset.from_dataset(self.dataset, data)
     if self.kind == "backtest":
       episode = Episode(dataset, data, self.bt_kwargs, self.price_column, self.price_shift, 
-                        max_len=None, add_reward=self.add_reward, add_position=self.add_position)
+                        max_len=None, add_reward=self.add_reward, add_position=self.add_position,
+                        reward_scaler=self.reward_scaler, scale_reward=self.scale_reward,
+                        scale_zero_reward=self.scale_zero_reward)
     else:
       episode = Episode(dataset, data, self.bt_kwargs, self.price_column, self.price_shift, 
                         max_len=self.max_len,
-                        add_reward=self.add_reward, add_position=self.add_position)
+                        add_reward=self.add_reward, add_position=self.add_position,
+                        reward_scaler=self.reward_scaler, scale_reward=self.scale_reward,
+                        scale_zero_reward=self.scale_zero_reward)
     return episode
     
   @staticmethod
@@ -345,13 +372,15 @@ class TradingEnv(gym.Env):
     if self.add_reward and self.add_position:
       obs, rew, pos = observation[:,:-2], observation[:,-2:-1], observation[:,-1:]
       obs = self.scale_array(obs, self.scaler)
-      rew = self.scale_array(rew, self.reward_scaler)
+      if not self.scale_reward:  # Already scaled at episode
+        rew = self.scale_array(rew, self.reward_scaler)
       pos = self.scale_array(pos, self.position_scaler)
       observation = np.concatenate((obs, rew, pos), axis=1)
     elif self.add_reward:
       obs, rew = observation[:,:-1], observation[:,-1:]
       obs = self.scale_array(obs, self.scaler)
-      rew = self.scale_array(rew, self.reward_scaler)
+      if not self.scale_reward:  # Already scaled at episode
+        rew = self.scale_array(rew, self.reward_scaler)
       observation = np.concatenate((obs, rew), axis=1)
     elif self.add_position:
       obs, pos = observation[:,:-1], observation[:,-1:]
@@ -388,6 +417,19 @@ class TradingEnv(gym.Env):
             tp=tp)
     self.episode.forward()
     observation, reward, terminated, truncated, info = self.episode.status()
+    self.reward_buffer.append(reward)
+    if len(self.reward_buffer) > self.reward_buffer_env_max_len:
+      self.reward_buffer.popleft()
+    if self.scale_reward_env:
+      if self.scale_zero_reward_env:
+        scaled_rewards = self.scale_array([[x] for x in self.reward_buffer], self.reward_scaler)
+        reward = scaled_rewards[-1][0]
+      else:
+        if reward != 0:
+          nonzero_rewards = [x for x in self.reward_buffer if x != 0]
+          if len(nonzero_rewards) > 0:
+            scaled_rewards = self.scale_array([[x] for x in nonzero_rewards], self.reward_scaler)
+            reward = scaled_rewards[-1][0]
     observation = self.scale_observation(observation)
     return observation, reward, terminated or truncated, info
 
@@ -446,12 +488,17 @@ class PositionEnv(gym.Wrapper):
                  price_column=None, kind='sequential', price_shift=0, max_len=None,
                  terminate_on_none=False, 
                  size=1.0, limit=None, stop=None, sl=None, tp=None, scaler=None,
-                 add_reward=False, add_position=False, reward_scaler=None, position_scaler=None):
+                 add_reward=False, add_position=False, reward_scaler=None, position_scaler=None,
+                 scale_reward=False, scale_zero_reward=False,
+                 scale_reward_env=False, scale_zero_reward_env=False, reward_buffer_env_max_len=10000):
         env = TradingEnv(dataset=dataset, data=data, bt_kwargs=bt_kwargs, 
                          price_column=price_column, kind=kind, price_shift=price_shift,
                          max_len=max_len, scaler=scaler, 
                          add_reward=add_reward, add_position=add_position,
-                         reward_scaler=reward_scaler, position_scaler=position_scaler)
+                         reward_scaler=reward_scaler, position_scaler=position_scaler, 
+                         scale_reward=scale_reward, scale_zero_reward=scale_zero_reward,
+                         scale_reward_env=scale_reward_env, scale_zero_reward_env=scale_zero_reward_env,
+                         reward_buffer_env_max_len=reward_buffer_env_max_len)
         super().__init__(env)
         self.env = env
         self.side = 'NONE'
