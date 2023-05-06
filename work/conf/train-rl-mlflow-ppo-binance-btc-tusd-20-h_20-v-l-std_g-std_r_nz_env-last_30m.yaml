@@ -8,9 +8,9 @@ verbose: 0
 do_train: true
 do_backtest: true
 do_mlflow: false
-model_name: ppo-binance-btc-tusd-20-h_20-v-l-std_g-last_30m
+model_name: ppo-binance-btc-tusd-20-h_20-v-l-std_g-std_r_nz_env-last_30m
 is_tune: false
-parent_name: ppo-binance-btc-tusd-20-h_20-v-l-std_g-last_30m
+parent_name: ppo-binance-btc-tusd-20-h_20-v-l-std_g-std_r_nz_env-last_30m
 parent_version: ~  # last
 create_dataset_kwargs:
   quant: 3e+9
@@ -63,6 +63,8 @@ env_kwargs:
   add_position: false
   scale_reward: false
   scale_zero_reward: false
+  scale_reward_env: true
+  scale_zero_reward_env: false
   scaler:
     class: StandardScaler
     kind: global
