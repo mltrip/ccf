@@ -1,5 +1,6 @@
 defaults:
- - dataset@create_dataset_kwargs.dataset_kwargs: rl-mel_20-mpl_20-v-l-no_norm
+ - dataset@create_dataset_kwargs.dataset_kwargs: rl-mel_20-mpl_20-v-no_norm
+ - environment@env_kwargs: pos-20-h_20-last-std_g
  - _self_
 
 n_envs: 1
@@ -8,9 +9,9 @@ verbose: 0
 do_train: true
 do_backtest: true
 do_mlflow: false
-model_name: ppo-binance-btc-tusd-20-h_20-v-l-r-std_g-last_30m
+model_name: ppo-binance-btc-tusd-20-h_20-v-std_g-last_30m
 is_tune: false
-parent_name: ppo-binance-btc-tusd-20-h_20-v-l-r-std_g-last_30m
+parent_name: ppo-binance-btc-tusd-20-h_20-v-std_g-last_30m
 parent_version: ~  # last
 create_dataset_kwargs:
   quant: 3e+9
@@ -54,23 +55,6 @@ learn_kwargs:
   callback: ~ 
   log_interval: 1  #  The number of rollouts before logging
   progress_bar: true
-env_kwargs:
-  class: PositionEnv
-  price_column: tgt-last
-  price_shift: -20
-  size: 1.0
-  add_reward: true
-  add_position: false
-  scaler:
-    class: StandardScaler
-    kind: global
-  # reward_scaler:
-  #   class: StandardScaler
-  #   kind: feature
-  # position_scaler:
-  #   class: MinMaxScaler
-  #   kind: feature
-  #   feature_range: [-1, 1]
 model_kwargs:
   class: PPO
   policy: MlpPolicy

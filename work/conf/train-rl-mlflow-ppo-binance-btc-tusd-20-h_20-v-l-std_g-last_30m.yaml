@@ -1,5 +1,6 @@
 defaults:
  - dataset@create_dataset_kwargs.dataset_kwargs: rl-mel_20-mpl_20-v-l-no_norm
+ - environment@env_kwargs: pos-20-h_20-last-std_g
  - _self_
 
 n_envs: 1
@@ -54,25 +55,6 @@ learn_kwargs:
   callback: ~ 
   log_interval: 1  #  The number of rollouts before logging
   progress_bar: true
-env_kwargs:
-  class: PositionEnv
-  price_column: tgt-last
-  price_shift: -20
-  size: 1.0
-  add_reward: false
-  add_position: false
-  scale_reward: false
-  scale_zero_reward: false
-  scaler:
-    class: StandardScaler
-    kind: global
-  reward_scaler:
-    class: StandardScaler
-    kind: feature
-  # position_scaler:
-  #   class: MinMaxScaler
-  #   kind: feature
-  #   feature_range: [-1, 1]
 model_kwargs:
   class: PPO
   policy: MlpPolicy

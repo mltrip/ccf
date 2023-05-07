@@ -542,7 +542,7 @@ class PositionEnv(gym.Wrapper):
       return observation, reward, done, info
     
     
-def run_backtest(env, model, filename):
+def run_backtest(env, model, filename, save_stats=False):
   print('Start')
   observation = env.reset()
   pbar = tqdm(total=len(env.episode.dataset))
@@ -559,7 +559,11 @@ def run_backtest(env, model, filename):
   print('Done\n')
   stats = env.stats()
   print(stats)
-  env.plot(filename=filename, open_browser=False)    
+  if save_stats:
+    stats_json = stats.to_json()
+    with open(Path(filename).with_suffix('.json'), 'w') as f:
+      f.write(stats_json)
+  env.plot(filename=str(Path(filename).with_suffix('.html')), open_browser=False)
     
     
 def train(
@@ -568,7 +572,8 @@ def train(
   model_kwargs=None, learn_kwargs=None, env_kwargs=None, 
   n_envs=1, seed=None, verbose=0,
   is_tune=False, parent_name=None, parent_version=None, parent_stage=None,
-  do_train=True, do_backtest=True, do_mlflow=True
+  do_train=True, do_backtest=True, do_mlflow=True, 
+  save_stats=False, split_test=None, bt_suffix='-bt'
 ):
   # Params
   create_dataset_kwargs = {} if create_dataset_kwargs is None else create_dataset_kwargs
@@ -717,17 +722,20 @@ def train(
     bt_env_kwargs['kind'] = 'backtest'
     bt_env_kwargs['terminate_on_none'] = False
     bt_train_env = env_class(**bt_env_kwargs)
-    run_backtest(env=bt_train_env, model=model, filename=f'{model_name}-bt-train.html')
+    run_backtest(env=bt_train_env, model=model, filename=f'{model_name}{bt_suffix}-train', save_stats=save_stats)
     if ds_v is not None and df_v is not None:
       print('Backtesting Test')
       bt_env_kwargs = deepcopy(env_kwargs)
       bt_env_kwargs['dataset'] = ds_v
+      if split_test is not None:
+        split_index = int(len(df_v)*split_test)
+        df_v = df_v[split_index:]
       bt_env_kwargs['data'] = df_v
       bt_env_kwargs['bt_kwargs'] = deepcopy(bt_kwargs)
       bt_env_kwargs['kind'] = 'backtest'
       bt_env_kwargs['terminate_on_none'] = False
       bt_test_env = env_class(**bt_env_kwargs)
-      run_backtest(env=bt_test_env, model=model, filename=f'{model_name}-bt-test.html')
+      run_backtest(env=bt_test_env, model=model, filename=f'{model_name}{bt_suffix}-test', save_stats=save_stats)
     
   
 @hydra.main(version_base=None)
