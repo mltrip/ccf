@@ -1,0 +1,5 @@
+class: PositionEnv
+price_column: tgt-last
+price_shift: -20
+size: 1.0
+add_reward: true

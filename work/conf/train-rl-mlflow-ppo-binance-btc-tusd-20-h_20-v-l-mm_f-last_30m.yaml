@@ -1,0 +1,81 @@
+defaults:
+ - dataset@create_dataset_kwargs.dataset_kwargs: rl-mel_20-mpl_20-v-l-no_norm
+ - environment@env_kwargs: pos-20-h_20-last-mm_f
+ - _self_
+
+n_envs: 1
+seed: ~
+verbose: 0
+do_train: true
+do_backtest: true
+do_mlflow: false
+model_name: ppo-binance-btc-tusd-20-h_20-v-l-mm_f-last_30m
+is_tune: false
+parent_name: ppo-binance-btc-tusd-20-h_20-v-l-mm_f-last_30m
+parent_version: ~  # last
+create_dataset_kwargs:
+  quant: 3e+9
+  # start: "2023-04-13T00:00:00+00:00"
+  # stop: "2023-04-13T00:30:00+00:00"
+  start: -1800  # number of quants
+  stop: ~  # now
+  replace_nan: ~
+  split: 0.333
+  merge_features: false
+  verbose: true
+  agents:
+    tusd:
+      class: InfluxDBDataset2
+      batch_size: 86400e+9
+      client:
+        timeout: 100000
+      topic: prediction
+      key: binance-btc-tusd
+      filters:
+        model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+        version: 4
+        horizon: 20
+      # ratios:
+      #   value: last
+      # pivot:
+      #   index: ['timestamp', 'exchange', 'base', 'quote', 'quant', 'feature', 'target', 'model', 'version']
+      #   columns: ['horizon']
+      resample: {}
+bt_kwargs:
+  cash: 100000.0
+  commission: 0.0
+  margin: 1.0
+  trade_on_close: false
+  hedging: false
+  exclusive_orders: false
+learn_kwargs:
+  # tb_log_name: ppo-binance-btc-tusd-20-h_20-v-a-last_30m-tune
+  total_timesteps: 100000  # number of rollouts (epochs) = total_timesteps / (n_steps * n_envs)
+  reset_num_timesteps: false
+  callback: ~ 
+  log_interval: 1  #  The number of rollouts before logging
+  progress_bar: true
+model_kwargs:
+  class: PPO
+  policy: MlpPolicy
+  learning_rate: 0.0003
+  n_steps: 2048  # The number of steps to run for each environment per update (i.e. rollout buffer size is n_steps * n_envs where n_envs is number of environment copies running in parallel) NOTE: n_steps * n_envs must be greater than 1 (because of the advantage normalization)
+  batch_size: 64
+  n_epochs: 10  # Number of epoch when optimizing the surrogate loss
+  gamma: 0.99 
+  gae_lambda: 0.95
+  clip_range: 0.2
+  seed: ~
+  device: cuda
+  clip_range_vf: ~ 
+  normalize_advantage: true
+  ent_coef: 0.0 
+  vf_coef: 0.5
+  max_grad_norm: 0.5
+  use_sde: false
+  sde_sample_freq: -1 
+  target_kl: ~
+  # tensorboard_log: "./tensorboard/ppo"
+  policy_kwargs: ~
+    # net_arch: {pi: [64, 64], vf: [64, 64]}  # default
+    # net_arch: [128, 128]
