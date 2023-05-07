@@ -1,0 +1,30 @@
+benchmark_name: rl_train_benchmark_1
+plot_kwargs: {}
+run_kwargs:
+  n_runs: 3
+  conf_dir: conf
+  benchmarks_dir: benchmarks
+  train_script: "../src/ccf/train_rl_mlflow_3.py"
+  pythonpath: "../src"
+  train_config:
+    save_stats: true
+    do_backtest: true
+    do_train: true
+    do_mlflow: false
+    is_tune: false
+    split_test: 0.5
+    bt_suffix: '-benchmark'
+    learn_kwargs:
+      total_timesteps: 100000
+  train_configs: 
+    last_std: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-l-std_g-last_30m
+    value_std: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-std_g-last_30m
+    ratio_std: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-r-std_g-last_30m
+    last_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-l-mm_g-last_30m
+    value_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-mm_g-last_30m
+    ratio_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-r-mm_g-last_30m
+  frames:
+    flat_1: { start: "2023-05-05T09:30:00+00:00", stop: "2023-05-05T11:00:00+00:00", split: 0.333 }
+    # flat_2: { start: "2023-05-05T13:45:00+00:00", stop: "2023-05-05T15:15:00+00:00", split: 0.333 }
+    # flat_3: { start: "2023-05-05T20:15:00+00:00", stop: "2023-05-05T21:45:00+00:00", split: 0.333 }
+    # flat_4: { start: "2023-05-06T04:10:00+00:00", stop: "2023-05-06T05:40:00+00:00", split: 0.333 }
