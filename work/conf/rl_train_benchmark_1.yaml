@@ -1,11 +1,27 @@
-benchmark_name: rl_train_benchmark_1
-plot_kwargs: {}
-run_kwargs:
-  n_runs: 3
-  conf_dir: conf
+do_run: false
+do_plot: true
+benchmark_kwargs:
+  benchmark_name: rl_train_benchmark_1
   benchmarks_dir: benchmarks
-  train_script: "../src/ccf/train_rl_mlflow_3.py"
-  pythonpath: "../src"
+  reset_benchmark: false
+  reset_conf: true
+plot_kwargs:
+  update_results: true
+  layout_kwargs:
+    plot_bgcolor: rgb(30, 30, 30)  # grey
+    template: plotly_dark
+  metrics:
+    return: "Return [%]"
+    win_rate: "Win Rate [%]"
+    avg_trade: "Avg. Trade [%]"
+    sqn: "SQN"
+run_kwargs:
+  n_runs: 10
+  delay: 30
+  run_kind: 'pbs'
+  env_path: ".env.benchmark"
+  conf_dir: conf
+  executable_path: "../src/ccf/train_rl_mlflow_3.py"
   train_config:
     save_stats: true
     do_backtest: true
@@ -23,8 +39,32 @@ run_kwargs:
     last_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-l-mm_g-last_30m
     value_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-mm_g-last_30m
     ratio_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-r-mm_g-last_30m
+    value_last_std_g: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_g-last_30m
+    value_last_std_f: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_f-last_30m
+    value_last_std_s: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_s-last_30m
+    value_last_mm_g: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-mm_g-last_30m
+    value_last_mm_f: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-mm_f-last_30m
+    value_last_mm_s: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-mm_s-last_30m
+    value_ratio_std_f: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-r-std_f-last_30m
+    last_ratio_std_f: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-l-r-std_f-last_30m
+    value_last_ratio_std_f: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-last_30m
+    vlr_std_f_scale_rew_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-scale_rew-std-last_30m
+    vlr_std_f_scale_rew_nz_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-scale_rew_nz-std-last_30m
+    vlr_std_f_scale_rew_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-scale_rew-mm-last_30m
+    vlr_std_f_scale_rew_nz_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-scale_rew_nz-mm-last_30m
+    vlr_std_f_pos: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-pos-last_30m
+    vlr_std_f_rew: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-rew-last_30m
+    vlr_std_f_pos_rew: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-pos-rew-last_30m
   frames:
     flat_1: { start: "2023-05-05T09:30:00+00:00", stop: "2023-05-05T11:00:00+00:00", split: 0.333 }
     # flat_2: { start: "2023-05-05T13:45:00+00:00", stop: "2023-05-05T15:15:00+00:00", split: 0.333 }
     # flat_3: { start: "2023-05-05T20:15:00+00:00", stop: "2023-05-05T21:45:00+00:00", split: 0.333 }
     # flat_4: { start: "2023-05-06T04:10:00+00:00", stop: "2023-05-06T05:40:00+00:00", split: 0.333 }
+    up_1: { start: "2023-05-06T16:00:00+00:00", stop: "2023-05-06T17:30:00+00:00", split: 0.333 }
+    # up_2: { start: "2023-05-06T17:45:00+00:00", stop: "2023-05-06T19:15:00+00:00", split: 0.333 }
+    # up_3: { start: "2023-05-06T22:00:00+00:00", stop: "2023-05-06T23:30:00+00:00", split: 0.333 }
+    down_1: { start: "2023-05-06T02:45:00+00:00", stop: "2023-05-06T04:15:00+00:00", split: 0.333 }
+    # down_2: { start: "2023-05-06T13:00:00+00:00", stop: "2023-05-06T14:30:00+00:00", split: 0.333 }
+    # down_2: { start: "2023-05-06T19:15:00+00:00", stop: "2023-05-06T20:45:00+00:00", split: 0.333 }
+    # vol_1: { start: "2023-05-07T00:40:00+00:00", stop: "2023-05-07T02:10:00+00:00", split: 0.333 }
+    

@@ -1,0 +1,9 @@
+class: PositionEnv
+price_column: tgt-last
+price_shift: -20
+size: 1.0
+add_position: true
+add_reward: true
+scaler:
+  class: StandardScaler
+  kind: sample

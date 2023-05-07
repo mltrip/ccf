@@ -1,6 +1,7 @@
 work/monitor/
 work/outputs/
 work/tensorboard/
+work/benchmarks
 *.db-journal
 *.db
 *.ckpt
@@ -136,6 +137,7 @@ celerybeat.pid
 .env.secret.mlflow
 .env.secret.model
 .env.secret.optuna
+.env.benchmark
 .env.secret.trade*
 !.env.secret.trade.example
 .venv

@@ -542,7 +542,7 @@ class PositionEnv(gym.Wrapper):
       return observation, reward, done, info
     
     
-def run_backtest(env, model, filename, save_stats=False):
+def run_backtest(env, model, filename, save_stats=False, save_plot=True):
   print('Start')
   observation = env.reset()
   pbar = tqdm(total=len(env.episode.dataset))
@@ -563,7 +563,8 @@ def run_backtest(env, model, filename, save_stats=False):
     stats_json = stats.to_json()
     with open(Path(filename).with_suffix('.json'), 'w') as f:
       f.write(stats_json)
-  env.plot(filename=str(Path(filename).with_suffix('.html')), open_browser=False)
+  if save_plot:
+    env.plot(filename=str(Path(filename).with_suffix('.html')), open_browser=False)
     
     
 def train(
@@ -573,7 +574,7 @@ def train(
   n_envs=1, seed=None, verbose=0,
   is_tune=False, parent_name=None, parent_version=None, parent_stage=None,
   do_train=True, do_backtest=True, do_mlflow=True, 
-  save_stats=False, split_test=None, bt_suffix='-bt'
+  save_stats=False, split_test=None, bt_suffix='-bt', save_plot=True
 ):
   # Params
   create_dataset_kwargs = {} if create_dataset_kwargs is None else create_dataset_kwargs
@@ -722,7 +723,8 @@ def train(
     bt_env_kwargs['kind'] = 'backtest'
     bt_env_kwargs['terminate_on_none'] = False
     bt_train_env = env_class(**bt_env_kwargs)
-    run_backtest(env=bt_train_env, model=model, filename=f'{model_name}{bt_suffix}-train', save_stats=save_stats)
+    run_backtest(env=bt_train_env, model=model, filename=f'{model_name}{bt_suffix}-train', 
+                 save_stats=save_stats, save_plot=save_plot)
     if ds_v is not None and df_v is not None:
       print('Backtesting Test')
       bt_env_kwargs = deepcopy(env_kwargs)
@@ -735,7 +737,8 @@ def train(
       bt_env_kwargs['kind'] = 'backtest'
       bt_env_kwargs['terminate_on_none'] = False
       bt_test_env = env_class(**bt_env_kwargs)
-      run_backtest(env=bt_test_env, model=model, filename=f'{model_name}{bt_suffix}-test', save_stats=save_stats)
+      run_backtest(env=bt_test_env, model=model, filename=f'{model_name}{bt_suffix}-test', 
+                   save_stats=save_stats, save_plot=save_plot)
     
   
 @hydra.main(version_base=None)
