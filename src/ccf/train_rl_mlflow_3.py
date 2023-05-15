@@ -709,7 +709,6 @@ def train(
     print('Loading model')
     if do_mlflow:
       print('MLflow')
-      model = model_class.load(model_name) 
       last_model, last_version, last_stage = load_model(model_name, model_version, model_stage)
       model = last_model.unwrap_python_model().model
     else:

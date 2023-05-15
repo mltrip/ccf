@@ -22,15 +22,16 @@ run_kwargs:
   env_path: ".env.benchmark"
   conf_dir: conf
   executable_path: "../src/ccf/train_rl_mlflow_3.py"
+  uuid_to_suffix: true
   train_config:
     save_stats: true
     save_plot: false
     do_backtest: true
-    do_train: true
-    do_mlflow: false
+    do_train: false
+    do_mlflow: true
     is_tune: false
     split_test: 0.5
-    bt_suffix: '-benchmark'
+    # bt_suffix: '-benchmark'
     learn_kwargs:
       total_timesteps: 100000
   train_configs: 
@@ -69,6 +70,10 @@ run_kwargs:
     # vl_std_g_scale_rew_nz_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_g-scale_rew_nz-std-last_30m
     # vl_std_g_scale_rew_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_g-scale_rew-mm-last_30m
     # vl_std_g_scale_rew_nz_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_g-scale_rew_nz-mm-last_30m
+    vlh_mm_g_1w_tune: train-rl-mlflow-ppo-binance-btc-tusd-20-h-v-l-min_max_all-last_1w-tune
+    vlh_std_g_1w_tune: train-rl-mlflow-ppo-binance-btc-tusd-20-h-v-l-std_all-last_1w-tune
+    vlh_std_f_1w_tune: train-rl-mlflow-ppo-binance-btc-tusd-20-h-v-l-std_f-last_1w-tune
+    vlh_std_s_1w_tune: train-rl-mlflow-ppo-binance-btc-tusd-20-h-v-l-std_s-last_1w-tune
   frames:
     flat_1: { start: "2023-05-05T09:30:00+00:00", stop: "2023-05-05T11:00:00+00:00", split: 0.333 }
     flat_2: { start: "2023-05-05T13:45:00+00:00", stop: "2023-05-05T15:15:00+00:00", split: 0.333 }

@@ -1,0 +1,12 @@
+class: PositionEnv
+price_column: tgt-last
+price_shift: -20
+size: 1.0
+scaler:
+  class: StandardScaler
+  kind: global
+scale_reward: true
+scale_zero_reward: false
+reward_scaler:
+  class: StandardScaler
+  kind: feature

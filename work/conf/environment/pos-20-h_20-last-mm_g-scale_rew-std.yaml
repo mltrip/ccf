@@ -1,0 +1,13 @@
+class: PositionEnv
+price_column: tgt-last
+price_shift: -20
+size: 1.0
+scaler:
+  class: MinMaxScaler
+  kind: global
+  feature_range: [-1, 1]
+scale_reward: true
+scale_zero_reward: true
+reward_scaler:
+  class: StandardScaler
+  kind: feature

@@ -82,7 +82,7 @@ def run_pbs(benchmark_path, executable_path, conf_path, config_path, env_path):
   
 def run(benchmark_name, n_runs, executable_path, train_config, train_configs, frames, 
         env_path, benchmarks_dir='benchmarks', conf_dir='conf', run_kind='local', 
-        reset_benchmark=False, reset_conf=False, delay=0.0):
+        reset_benchmark=False, reset_conf=False, delay=0.0, uuid_to_suffix=False):
   benchmark_path = Path(benchmarks_dir) / benchmark_name
   print(benchmark_path)
   if reset_benchmark and benchmark_path.exists():
@@ -103,7 +103,7 @@ def run(benchmark_name, n_runs, executable_path, train_config, train_configs, fr
       for run_i in range(n_runs):
         run_cnt += 1
         run_id = str(uuid.uuid4().hex)
-        print(f'\n{run_cnt}/{runs_total} {frame_name} {config_name} {run_i + 1}/{n_runs} {run_id}')
+        print(f'\n{run_cnt}/{runs_total} {run_i + 1}/{n_runs} {frame_name} {config_name} {run_id}')
         name_suffix = '-'.join([frame_name, config_name, run_id])
         config_path = (conf_path / config).with_suffix('.yaml')
         cfg = OmegaConf.load(config_path)
@@ -111,7 +111,10 @@ def run(benchmark_name, n_runs, executable_path, train_config, train_configs, fr
         new_cfg['create_dataset_kwargs']['start'] = frame['start']
         new_cfg['create_dataset_kwargs']['stop'] = frame['stop']
         new_cfg['create_dataset_kwargs']['split'] = frame['split']
-        new_cfg['model_name'] = new_cfg['model_name'] + f'-{name_suffix}'
+        if uuid_to_suffix:
+          new_cfg['bt_suffix'] = f'-{name_suffix}'
+        else:
+          new_cfg['model_name'] = new_cfg['model_name'] + f'-{name_suffix}'
         new_config_path = config_path.with_stem(config_path.stem + f'-{name_suffix}')
         OmegaConf.save(new_cfg, new_config_path)
         if run_kind == 'local':
@@ -129,7 +132,7 @@ def run(benchmark_name, n_runs, executable_path, train_config, train_configs, fr
 def plot(benchmark_name, benchmarks_dir='benchmarks', 
          reset_benchmark=False, reset_conf=False,
          metrics=None, update_results=True, results_name='results',
-         layout_kwargs=None):
+         order_func='mean', layout_kwargs=None):
   metrics = {} if metrics is None else metrics
   layout_kwargs = {} if layout_kwargs is None else layout_kwargs
   benchmark_path = Path(benchmarks_dir) / benchmark_name
@@ -139,34 +142,43 @@ def plot(benchmark_name, benchmarks_dir='benchmarks',
     print(f'Number of results: {len(results_paths)}')
     print('Loading results')
     results = {}
-    for p in results_paths:
+    for p in tqdm(results_paths):
       with open(p) as f:
         result = json.load(f)
       results[p.stem] = result
     print('Processing results')
     samples = []
-    for name, results in results.items():
+    for name, results in tqdm(results.items()):
+      tokens = name.split('-')
       for metric_name, metric in metrics.items():
-        tokens = name.split('-')
-        sample = {
-          'model': '-'.join(tokens[:-5]),
-          'frame': tokens[-5],
-          'train': tokens[-4],
-          'run': tokens[-3],
-          'suffix': tokens[-2],
-          'kind': tokens[-1]}
+        if 'benchmark' in tokens:
+          sample = {
+            'model': '-'.join(tokens[:-5]),
+            'frame': tokens[-5],
+            'name': tokens[-4],
+            'uuid': tokens[-3],
+            'suffix': tokens[-2],
+            'kind': tokens[-1]}
+        else:  # uuid to suffix
+          sample = {
+            'model': '-'.join(tokens[:-4]),
+            'frame': tokens[-4],
+            'name': tokens[-3],
+            'uuid': tokens[-2],
+            'suffix': None,
+            'kind': tokens[-1]}
         sample['metric'] = metric_name
         sample['value'] = results[metric]
         samples.append(sample)
     print('Writing results')
     df = pd.DataFrame(samples)
     df.to_csv(results_path)
-  elif results_path.exists():
+  else:
     print('Loading results')
     df = pd.read_csv(results_path)
   print(df)
-  print('Trains')
-  print(df['train'].value_counts())
+  print('Names')
+  print(df['name'].value_counts())
   print('Frames')
   print(df['frame'].value_counts())
   print('Metrics')
@@ -174,13 +186,13 @@ def plot(benchmark_name, benchmarks_dir='benchmarks',
   print('Plotting box plots')
   pbar = tqdm(metrics.items())
   for metric_name, metric in pbar:
-    pbar.set_description(f'{metric_name}')
     for kind in ['test', 'train']:
+      pbar.set_description(f'{metric_name} {kind}')
       df2 = df[(df['metric'] == metric_name) & (df['kind'] == kind)]
       fig = px.box(df2, 
-                   x='train',
+                   x='name',
                    y='value', 
-                   color="train",
+                   color="name",
                    facet_row='frame',
                    points='all',
                    title=f"Box plot of {kind} {metric_name}")
@@ -188,21 +200,40 @@ def plot(benchmark_name, benchmarks_dir='benchmarks',
       fig.update_layout(**layout_kwargs)
       fig_path = benchmark_path / f'{metric_name}-{kind}.html'
       fig.write_html(fig_path)
-      train_order = list(df2.groupby('train').agg({'value': 'median'}).sort_values(by='value').index)
+      # all frames
+      order = list(df2.groupby('name').agg({'value': order_func}).sort_values(by='value').index)
       fig_all = px.box(df2, 
-                   x='train',
+                   x='name',
                    y='value', 
-                   color="train",
+                   color="name",
                    points='all',
-                   category_orders={'train': train_order},
-                   title=f"Box plot of {kind} {metric_name} by all frames")
+                   category_orders={'name': order},
+                   title=f"Box plot of {kind} {metric_name} by all frames ordered by {order_func}")
       fig_all.update_layout(**layout_kwargs)
       fig_path = benchmark_path / f'{metric_name}-{kind}-all_frames.html'
       fig_all.write_html(fig_path)
+      # up/down/flat/vol frames
+      for frame_kind in ['up', 'down', 'flat', 'vol', 'vol_up', 'vol_down']:
+        pbar.set_description(f'{metric_name} {kind} {frame_kind}')
+        df3 = df2[df2['frame'].str.startswith(frame_kind)]
+        order = list(df3.groupby('name').agg({'value': order_func}).sort_values(by='value').index)
+        fig = px.box(df3, 
+                     x='name',
+                     y='value', 
+                     color="name",
+                     points='all',
+                     category_orders={'name': order},
+                     title=f"Box plot of {kind} {metric_name} by {frame_kind} frames ordered by {order_func}")
+        fig.update_layout(**layout_kwargs)
+        fig_path = benchmark_path / f'{metric_name}-{kind}-{frame_kind}_frames.html'
+        fig.write_html(fig_path)
     
 
-def main(benchmark_kwargs, run_kwargs, plot_kwargs,
+def main(benchmark_kwargs=None, run_kwargs=None, plot_kwargs=None,
          do_plot=False, do_run=False):
+  benchmark_kwargs = {} if benchmark_kwargs is None else benchmark_kwargs
+  run_kwargs = {} if run_kwargs is None else run_kwargs
+  plot_kwargs = {} if plot_kwargs is None else plot_kwargs
   if do_run:
     run(**benchmark_kwargs, **run_kwargs)
   if do_plot:
