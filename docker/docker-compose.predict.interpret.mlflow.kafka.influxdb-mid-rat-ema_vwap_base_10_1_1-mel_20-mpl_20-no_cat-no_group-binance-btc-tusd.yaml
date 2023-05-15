@@ -7,6 +7,10 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile
+    # logging:
+    #   driver: json-file
+    #   options:
+    #     max-size: 10m
     networks:
       - db
       - mlflow
@@ -17,6 +21,7 @@ services:
       - .env.secret.model
     environment:
       PYTHONPATH: /app/src
+      PYTHONUNBUFFERED: 1
       MLFLOW_TRACKING_URI: http://mlflow:5000
       MLFLOW_TRACKING_USERNAME: ccf
     volumes:

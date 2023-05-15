@@ -1,7 +1,7 @@
 defaults:
  - partitioner@agents.prediction.producers.p_1.partitioners.prediction: prediction
  - partitioner@agents.metric.producers.p_1.partitioners.metric: metric
- - partitioner@create_dataset_kwargs.agents.kafka.consumer.partitioners.feature: feature
+ - partitioner@create_dataset_kwargs.agents.feature.partitioner: feature
  - dataset@create_dataset_kwargs.dataset_kwargs: mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
  - _self_
  
@@ -20,25 +20,30 @@ interpret_attention: false
 interpret_importance: false
 create_dataset_kwargs:
   verbose: false
-  quant: 3.0e+9
-  watermark: 120.0e+9
+  quant: 3e+9
+  start: ~  # number of quants
+  stop: ~  # now
+  watermark: 90e9
   replace_nan: 1.0
   split: ~
+  new_only: true
+  merge_features: false
   dataset_kwargs: 
     predict_mode: true
   agents:
-    kafka: 
-      class: KafkaDataset
-      size: 1
-      verbose: false
-      topics: [ feature ]
-      executor:
-        class: ProcessPoolExecutor
-        max_workers: 1
-      feature_keys:
-        rat-ema-qv-vwap_20: [ binance-btc-tusd ]
+    feature:
+      class: KafkaDataset2
       consumer:
         bootstrap_servers: "kafka:9092"
+      poll:
+        timeout_ms: 1000
+        max_records: ~
+        update_offsets: true
+      topic: feature
+      key: binance-btc-tusd
+      filters:
+        feature: rat-ema-qv-vwap_20
+      resample: {}
 agents:
   prediction:
     class: Kafka

@@ -59,10 +59,11 @@ def predict(model_name, predict_kwargs, create_dataset_kwargs,
   executor = getattr(concurrent.futures, executor_class)(**executor)
   # Predict in infinite loop
   t_data = time.time()
-  for ds, _, df, _ in dataset:  # 2. Data retrieving
-    dt_data = time.time() - t_data
+  while True:   # 2. Data retrieving
     print(f'\nprediction at {datetime.utcnow()}')
-    if df is None:
+    ds, _, df, _ = dataset()
+    dt_data = time.time() - t_data
+    if ds is None:
       print('skipped')
       print(f'dt_data: {dt_data}')
       t_data = time.time()
@@ -326,12 +327,15 @@ def predict(model_name, predict_kwargs, create_dataset_kwargs,
                   future = executor.submit(producer.send, topic, key=key, value=message)
                   futures.append(future)
     for future in concurrent.futures.as_completed(futures):
-      result = future.result()
+      try:
+        result = future.result()
+      except Exception as e:
+        raise e
     dt_send = time.time() - t_send
     # 9. Statistics plotting
     dt = dt_data + dt_model + dt_pred + dt_prep + dt_send + dt_interpret
     wt = max(0, delay - dt)
-    print(f'dt_data: {dt_data:.3f}, dt_model: {dt_model:.3f}, dt_pred: {dt_pred:.3f}, dt_prep: {dt_prep:.3f}, dt_send: {dt_send:.3f}, dt_interpret: {dt_interpret:.3f}, dt: {dt:.3f}, wt: {wt:.3f}, msg_sent: {len(futures)}')
+    print(f'dt: {dt:.3f}, dt_data: {dt_data:.3f}, dt_model: {dt_model:.3f}, dt_pred: {dt_pred:.3f}, dt_prep: {dt_prep:.3f}, dt_send: {dt_send:.3f}, dt_interpret: {dt_interpret:.3f}, wt: {wt:.3f}, msg_sent: {len(futures)}')
     time.sleep(wt)
     t_data = time.time()
     
