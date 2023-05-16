@@ -6,7 +6,7 @@ n_envs: 1
 seed: ~
 verbose: 0
 do_train: true
-do_backtest: true
+do_backtest: false
 do_mlflow: true
 model_name: ppo-binance-btc-tusd-20-h_20-v-l-std_all-last_30m
 is_tune: false

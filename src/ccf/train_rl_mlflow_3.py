@@ -711,9 +711,11 @@ def train(
       print('MLflow')
       last_model, last_version, last_stage = load_model(model_name, model_version, model_stage)
       model = last_model.unwrap_python_model().model
+      version_suffix = f'-v{last_version}'
     else:
       print('Local')
       model = model_class.load(path=model_name)
+      version_suffix = f'-v{model_version}' if model_version is not None else ''
     print('Backtesting Train')
     bt_env_kwargs = deepcopy(env_kwargs)
     bt_env_kwargs['dataset'] = ds_t
@@ -722,7 +724,8 @@ def train(
     bt_env_kwargs['kind'] = 'backtest'
     bt_env_kwargs['terminate_on_none'] = False
     bt_train_env = env_class(**bt_env_kwargs)
-    run_backtest(env=bt_train_env, model=model, filename=f'{model_name}{bt_suffix}-train', 
+    run_backtest(env=bt_train_env, model=model,
+                 filename=f'{model_name}{version_suffix}{bt_suffix}-train', 
                  save_stats=save_stats, save_plot=save_plot)
     if ds_v is not None and df_v is not None:
       print('Backtesting Test')
@@ -736,7 +739,8 @@ def train(
       bt_env_kwargs['kind'] = 'backtest'
       bt_env_kwargs['terminate_on_none'] = False
       bt_test_env = env_class(**bt_env_kwargs)
-      run_backtest(env=bt_test_env, model=model, filename=f'{model_name}{bt_suffix}-test', 
+      run_backtest(env=bt_test_env, model=model, 
+                   filename=f'{model_name}{version_suffix}{bt_suffix}-test', 
                    save_stats=save_stats, save_plot=save_plot)
     
   
