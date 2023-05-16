@@ -6,6 +6,7 @@ import hashlib
 import requests
 from tqdm import tqdm
 import json
+from copy import deepcopy
 import yaml
 import time
 import hydra
@@ -18,6 +19,7 @@ import numpy as np
 import pandas as pd
 import uuid
 import plotly.express as px
+import plotly.graph_objects as go
 
 
 def run_local(benchmark_path, executable_path, conf_path, config_path, env_path): 
@@ -82,7 +84,7 @@ def run_pbs(benchmark_path, executable_path, conf_path, config_path, env_path):
   
 def run(benchmark_name, n_runs, executable_path, train_config, train_configs, frames, 
         env_path, benchmarks_dir='benchmarks', conf_dir='conf', run_kind='local', 
-        reset_benchmark=False, reset_conf=False, delay=0.0, uuid_to_suffix=False):
+        reset_benchmark=False, reset_conf=False, delay=0.0, uuid_to_suffix=True):
   benchmark_path = Path(benchmarks_dir) / benchmark_name
   print(benchmark_path)
   if reset_benchmark and benchmark_path.exists():
@@ -132,11 +134,13 @@ def run(benchmark_name, n_runs, executable_path, train_config, train_configs, fr
 def plot(benchmark_name, benchmarks_dir='benchmarks', 
          reset_benchmark=False, reset_conf=False,
          metrics=None, update_results=True, results_name='results',
-         order_func='mean', layout_kwargs=None):
+         order_func='mean', layout_kwargs=None, 
+         plot_metrics=True, plot_curves=True):
   metrics = {} if metrics is None else metrics
   layout_kwargs = {} if layout_kwargs is None else layout_kwargs
   benchmark_path = Path(benchmarks_dir) / benchmark_name
   results_path = benchmark_path / f'{results_name}.csv'
+  results_curves_path = benchmark_path / f'{results_name}_curves.csv'
   if update_results or not results_path.exists():
     results_paths = list(benchmark_path.glob('*.json'))
     print(f'Number of results: {len(results_paths)}')
@@ -148,86 +152,142 @@ def plot(benchmark_name, benchmarks_dir='benchmarks',
       results[p.stem] = result
     print('Processing results')
     samples = []
+    curves = []
     for name, results in tqdm(results.items()):
       tokens = name.split('-')
-      for metric_name, metric in metrics.items():
-        if 'benchmark' in tokens:
-          sample = {
-            'model': '-'.join(tokens[:-5]),
+      if 'benchmark' in tokens:
+        if tokens[-6].startswith('v'):
+          model = '-'.join(tokens[:-6])
+          version = tokens[-6][1:]
+        else:
+          model = '-'.join(tokens[:-5])
+          version = None
+        sample = {
+            'model': model,
+            'version': version,
             'frame': tokens[-5],
             'name': tokens[-4],
             'uuid': tokens[-3],
             'suffix': tokens[-2],
             'kind': tokens[-1]}
-        else:  # uuid to suffix
-          sample = {
-            'model': '-'.join(tokens[:-4]),
-            'frame': tokens[-4],
-            'name': tokens[-3],
-            'uuid': tokens[-2],
-            'suffix': None,
-            'kind': tokens[-1]}
-        sample['metric'] = metric_name
-        sample['value'] = results[metric]
-        samples.append(sample)
-    print('Writing results')
+      else:  # uuid to suffix
+        if tokens[-5].startswith('v'):
+          model = '-'.join(tokens[:-5])
+          version = tokens[-5][1:]
+        else:
+          model = '-'.join(tokens[:-4])
+          version = None
+        sample = {
+          'model': model,
+          'version': version,
+          'frame': tokens[-4],
+          'name': tokens[-3],
+          'uuid': tokens[-2],
+          'suffix': None,
+          'kind': tokens[-1]}
+      for metric_name, metric in metrics.items():
+        s = deepcopy(sample)
+        s['metric'] = metric_name
+        s['value'] = results[metric]
+        samples.append(s)
+      # Curves
+      cs = pd.DataFrame.from_records(data=list(results['_equity_curve'].values()), 
+                                     index=results['_equity_curve'].keys())
+      cs = cs.rename_axis('timestamp').reset_index().rename_axis('index')
+      for k, v in sample.items():
+        cs[k] = v
+      curves.append(cs)
+    print('Creating dataframes')
     df = pd.DataFrame(samples)
+    df_curves = pd.concat(curves)
+    print('Writing results')
     df.to_csv(results_path)
+    df_curves.to_csv(results_curves_path)
   else:
     print('Loading results')
     df = pd.read_csv(results_path)
-  print(df)
-  print('Names')
-  print(df['name'].value_counts())
-  print('Frames')
-  print(df['frame'].value_counts())
-  print('Metrics')
-  print(df['metric'].value_counts())
-  print('Plotting box plots')
-  pbar = tqdm(metrics.items())
-  for metric_name, metric in pbar:
-    for kind in ['test', 'train']:
-      pbar.set_description(f'{metric_name} {kind}')
-      df2 = df[(df['metric'] == metric_name) & (df['kind'] == kind)]
-      fig = px.box(df2, 
-                   x='name',
-                   y='value', 
-                   color="name",
-                   facet_row='frame',
-                   points='all',
-                   title=f"Box plot of {kind} {metric_name}")
-      # fig.update_yaxes(matches=None)
-      fig.update_layout(**layout_kwargs)
-      fig_path = benchmark_path / f'{metric_name}-{kind}.html'
-      fig.write_html(fig_path)
-      # all frames
-      order = list(df2.groupby('name').agg({'value': order_func}).sort_values(by='value').index)
-      fig_all = px.box(df2, 
-                   x='name',
-                   y='value', 
-                   color="name",
-                   points='all',
-                   category_orders={'name': order},
-                   title=f"Box plot of {kind} {metric_name} by all frames ordered by {order_func}")
-      fig_all.update_layout(**layout_kwargs)
-      fig_path = benchmark_path / f'{metric_name}-{kind}-all_frames.html'
-      fig_all.write_html(fig_path)
-      # up/down/flat/vol frames
-      for frame_kind in ['up', 'down', 'flat', 'vol', 'vol_up', 'vol_down']:
-        pbar.set_description(f'{metric_name} {kind} {frame_kind}')
-        df3 = df2[df2['frame'].str.startswith(frame_kind)]
-        order = list(df3.groupby('name').agg({'value': order_func}).sort_values(by='value').index)
-        fig = px.box(df3, 
+    df_curves = pd.read_csv(results_curves_path)
+  print('Plotting metrics')
+  if plot_metrics:
+    print(df)
+    print('Names')
+    print(df['name'].value_counts())
+    print('Frames')
+    print(df['frame'].value_counts())
+    print('Metrics')
+    print(df['metric'].value_counts())
+    pbar = tqdm(metrics.items())
+    for metric_name, metric in pbar:
+      for kind in ['test', 'train']:
+        pbar.set_description(f'{metric_name} {kind}')
+        df2 = df[(df['metric'] == metric_name) & (df['kind'] == kind)]
+        fig = px.box(df2, 
+                     x='name',
+                     y='value', 
+                     color="name",
+                     facet_row='frame',
+                     points='all',
+                     title=f"Box plot of {kind} {metric_name}")
+        # fig.update_yaxes(matches=None)
+        fig.update_layout(**layout_kwargs)
+        fig_path = benchmark_path / f'{metric_name}-{kind}.html'
+        fig.write_html(fig_path)
+        # all frames
+        order = list(df2.groupby('name').agg({'value': order_func}).sort_values(by='value').index)
+        fig_all = px.box(df2, 
                      x='name',
                      y='value', 
                      color="name",
                      points='all',
                      category_orders={'name': order},
-                     title=f"Box plot of {kind} {metric_name} by {frame_kind} frames ordered by {order_func}")
+                     title=f"Box plot of {kind} {metric_name} by all frames ordered by {order_func}")
+        fig_all.update_layout(**layout_kwargs)
+        fig_path = benchmark_path / f'{metric_name}-{kind}-all_frames.html'
+        fig_all.write_html(fig_path)
+        # up/down/flat/vol frames
+        for frame_kind in ['up', 'down', 'flat', 'vol', 'vol_up', 'vol_down']:
+          pbar.set_description(f'{metric_name} {kind} {frame_kind}')
+          df3 = df2[df2['frame'].str.startswith(frame_kind)]
+          order = list(df3.groupby('name').agg({'value': order_func}).sort_values(by='value').index)
+          fig = px.box(df3, 
+                       x='name',
+                       y='value', 
+                       color="name",
+                       points='all',
+                       category_orders={'name': order},
+                       title=f"Box plot of {kind} {metric_name} by {frame_kind} frames ordered by {order_func}")
+          fig.update_layout(**layout_kwargs)
+          fig_path = benchmark_path / f'{metric_name}-{kind}-{frame_kind}_frames.html'
+          fig.write_html(fig_path)
+  print('Plotting curves') 
+  if plot_curves:
+    print(df_curves)
+    pbar = tqdm(['test', 'train'])
+    for kind in pbar:
+      df2 = df_curves[df_curves['kind'] == kind]
+      # all frames
+      fig = go.Figure()
+      df3 = df2.groupby(['name', 'index', 'version'], dropna=False).agg({'Equity': 'mean'}).reset_index()
+      for (n, v), g in df3.groupby(['name', 'version'], dropna=False):
+        name = n if v is None or np.isnan(v) else f'{n}-v{v}'
+        fig.add_trace(go.Scatter(x=g['index'], y=g['Equity'], name=name))
+      fig.update_traces(mode='lines')
+      fig.update_layout(**layout_kwargs)
+      fig_path = benchmark_path / f'equity_{kind}-all_frames.html'
+      fig.write_html(fig_path)
+      # up/down/flat/vol frames
+      for frame_kind in ['up', 'down', 'flat', 'vol', 'vol_up', 'vol_down']:
+        fig = go.Figure()
+        df3 = df2[df2['frame'].str.startswith(frame_kind)]
+        df3 = df3.groupby(['name', 'index', 'version'], dropna=False).agg({'Equity': 'mean'}).reset_index()
+        for (n, v), g in df3.groupby(['name', 'version'], dropna=False):
+          name = n if v is None or np.isnan(v) else f'{n}-v{v}'
+          fig.add_trace(go.Scatter(x=g['index'], y=g['Equity'], name=name))
+        fig.update_traces(mode='lines')
         fig.update_layout(**layout_kwargs)
-        fig_path = benchmark_path / f'{metric_name}-{kind}-{frame_kind}_frames.html'
+        fig_path = benchmark_path / f'equity_{kind}-{frame_kind}_frames.html'
         fig.write_html(fig_path)
-    
+  
 
 def main(benchmark_kwargs=None, run_kwargs=None, plot_kwargs=None,
          do_plot=False, do_run=False):

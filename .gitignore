@@ -1,7 +1,10 @@
 work/monitor/
 work/outputs/
+work/multirun/
 work/tensorboard/
 work/benchmarks
+work/*.html
+work/*.zip
 *.db-journal
 *.db
 *.ckpt
