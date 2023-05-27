@@ -13,16 +13,15 @@ producer:
   api_version_auto_timeout_ms: 30000
   bootstrap_servers: "kafka:9092"
 agents:
-  rl-fast-ob_user-ppo-binance-btc-tusd-20-h_20-v-l-std_all-last_30m-qb_4em4-olcl_1.75_fc:
-    class: RLFastTrader
-    strategy: rl-fast-ob_user-ppo-binance-btc-tusd-20-h_20-v-l-std_all-last_30m-qb_4em4-olcl_1.75_fc
-    do_consume_rl: true
+  rl-fast-ob_user-ppo-binance-btc-tusd-20-h_20-v-l-std_all-last_30m-qb_4em4-olcl_1.75:
+    class: RLFastTraderKafka
+    strategy: rl-fast-ob_user-ppo-binance-btc-tusd-20-h_20-v-l-std_all-last_30m-qb_4em4-olcl_1.75
+    model_name_rl: ppo-binance-btc-tusd-20-h_20-v-l-std_all-last_30m
+    model_version_rl: ~
     key: binance-btc-tusd
-    model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
-    version: 4
     time_in_force: GTC  # GTC, FOK, IOC
     do_force_open: false
-    do_force_close: true
+    do_force_close: false
     open_type: limit  # market
     close_type: limit  # market
     open_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
@@ -43,6 +42,8 @@ agents:
     close_price_offset_len: 1800e9
     open_update_timeout: 3e9
     close_update_timeout: 30e9
+    # sltp_t: 3e-4
+    # sltp_r: 1.0
     precision: 8
     tick_size: 0.01
     stream: orderbook_user
@@ -52,21 +53,8 @@ agents:
     verbose: true
     do_log_account_status: false
     watermark: 1800e9
-    max_delay: 30e9
-    max_model_rl_delay: 1800e9
     ws_stream_ping_interval: 1800e9
-    do_check_order_placement_open: false
-    do_check_order_placement_close: false
     max_spread: 1e-4
     min_quantity: 1e-8
-    ema_length: 1800
-    ema_quant: 1e9
-    do_check_ema: false
-    # min_d_price: 3e-4
-    # sltp_t: 3e-4
-    # sltp_r: 1.0
     quantity: 4e-4
     is_base_quantity: true
-    kind_rl: 'auto_update'  # 'auto_update'
-    model_name_rl: ppo-binance-btc-tusd-20-h_20-v-l-std_all-last_30m
-    model_version_rl: ~

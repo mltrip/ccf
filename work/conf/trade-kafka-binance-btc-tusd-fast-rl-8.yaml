@@ -2,18 +2,20 @@ defaults:
   - partitioner@consumer_partitioner: prediction
   - partitioner@producer_partitioner: metric
   - _self_
-  
-n_clones: 1
+
+n_clones: ~
 executor:
   class: ProcessPoolExecutor
 consumer:
+  api_version_auto_timeout_ms: 30000
   bootstrap_servers: "kafka:9092"
 producer:
+  api_version_auto_timeout_ms: 30000
   bootstrap_servers: "kafka:9092"
 agents:
-  rl-fast-ob_user-ppo-binance-btc-tusd-20-h_20-v-a-last_30m-qb_4em4-olcl_1.5:
+  rl-fast-ob_user-ppo-binance-btc-tusd-20-h_20-v-l-mm_g-last_30m-qb_4em4-olcl_1.75:
     class: RLFastTrader
-    strategy: rl-fast-ob_user-ppo-binance-btc-tusd-20-h_20-v-a-last_30m-qb_4em4-olcl_1.5
+    strategy: rl-fast-ob_user-ppo-binance-btc-tusd-20-h_20-v-l-mm_g-last_30m-qb_4em4-olcl_1.75
     do_consume_rl: true
     key: binance-btc-tusd
     model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
@@ -27,8 +29,8 @@ agents:
     open_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
     close_buy_price: b_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
     close_sell_price: a_vwap  # m_vwap, m_p, b_p_0, a_p_0, b_vwap, a_vwap
-    open_price_offset: 1.5
-    close_price_offset: 1.5
+    open_price_offset: 1.75
+    close_price_offset: 1.75
     open_price_offset_kind: s_p-m_p
     close_price_offset_kind: s_p-m_p
     open_price_offset_agg: max
@@ -49,9 +51,6 @@ agents:
     is_test: false
     verbose: true
     do_log_account_status: false
-    horizon: 20
-    window_size: 20
-    prediction: value  # value, quantile_0.5
     watermark: 1800e9
     max_delay: 30e9
     max_model_rl_delay: 1800e9
@@ -69,5 +68,5 @@ agents:
     quantity: 4e-4
     is_base_quantity: true
     kind_rl: 'auto_update'  # 'auto_update'
-    model_name_rl: ppo-binance-btc-tusd-20-h_20-v-a-last_30m
+    model_name_rl: ppo-binance-btc-tusd-20-h_20-v-l-mm_g-last_30m
     model_version_rl: ~

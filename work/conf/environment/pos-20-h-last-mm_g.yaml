@@ -1,0 +1,8 @@
+class: PositionEnv
+price_column: tgt-last-20
+price_shift: -20
+size: 1.0
+scaler:
+  class: MinMaxScaler
+  kind: global
+  feature_range: [-1, 1]

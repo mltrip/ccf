@@ -1,0 +1,7 @@
+FROM python:3.9
+
+WORKDIR /app
+COPY src/ccf/requirements* src/ccf/
+RUN pip install --no-cache-dir -r src/ccf/requirements_trade_kafka.txt
+COPY src/ src/
+COPY work/conf work/conf

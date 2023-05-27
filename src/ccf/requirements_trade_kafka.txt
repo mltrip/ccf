@@ -1,0 +1,5 @@
+hydra-core==1.2.0
+kafka-python==2.0.2
+pandas==1.5.1
+psutil==5.9.4
+websocket-client==1.4.1
