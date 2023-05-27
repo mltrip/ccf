@@ -2,10 +2,10 @@ version: '3.3'
 
 services:
   trade-kafka-binance-btc-tusd-fast-rl-4:
-    image: ccf
+    image: ccf_trade_kafka
     build:
       context: ..
-      dockerfile: docker/Dockerfile
+      dockerfile: docker/Dockerfile.trade_kafka
     stop_signal: SIGTERM
     stop_grace_period: 15s
     logging:
@@ -17,7 +17,7 @@ services:
       - mlflow
     working_dir: /app/work
     entrypoint: [ python ]
-    command: [ ../src/ccf/trade.py, -cd, conf, -cn, trade-kafka-binance-btc-tusd-fast-rl-4 ]
+    command: [ ../src/ccf/trade_kafka.py, -cd, conf, -cn, trade-kafka-binance-btc-tusd-fast-rl-4 ]
     env_file:
       - .env.secret.trade.binance.mainnet
     environment:

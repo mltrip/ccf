@@ -1,32 +1,26 @@
 version: '3.3'
 
 services:
-  trade-kafka-binance-btc-tusd-fast-rl-11:
-    image: ccf_trade_kafka
+  predict.rl.ppo-binance-btc-tusd-20-h-v-l-min_max_all-last_1w-tune:
+    image: ccf
+    # container_name: predict_mlflow_kafka_influxdb_1d
     build:
       context: ..
-      dockerfile: docker/Dockerfile.trade_kafka
-    stop_signal: SIGTERM
-    stop_grace_period: 15s
-    # logging:
-    #   driver: json-file
-    #   options:
-    #     max-size: 10m
+      dockerfile: docker/Dockerfile
     networks:
       - db
       - mlflow
     working_dir: /app/work
     entrypoint: [ python ]
-    command: [ ../src/ccf/trade_kafka.py, -cd, conf, -cn, trade-kafka-binance-btc-tusd-fast-rl-11 ]
+    command: [ ../src/ccf/predict_rl.py, -cd, conf, -cn, predict-rl-kafka-train-rl-mlflow-ppo-binance-btc-tusd-20-h-v-l-min_max_all-last_1w-tune ]
     env_file:
-      - .env.secret.trade.binance.mainnet
+      - .env.secret.model
     environment:
       PYTHONPATH: /app/src
-      PYTHONUNBUFFERED: 1
       MLFLOW_TRACKING_URI: http://mlflow:5000
       MLFLOW_TRACKING_USERNAME: ccf
     volumes:
-    # - binance_btc_usdt:/app/work
+      # - binance_btc_usdt:/app/work
       - ../work:/app/work
     restart: always
       
