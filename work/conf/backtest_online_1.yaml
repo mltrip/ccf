@@ -1,0 +1,123 @@
+defaults:
+ - dataset@lob_dataset_kwargs.dataset_kwargs: mel_20-mpl_20-m_p
+ - dataset@ts_dataset_kwargs.dataset_kwargs: rl-mel_20-mpl_20-h-v-l-no_norm
+ - dataset@rl_dataset_kwargs.dataset_kwargs: rl-mel_20-mpl_20-action-no_norm
+ - dataset@trades_dataset_kwargs.dataset_kwargs: rl-mel_20-mpl_20-action-no_norm
+ - _self_
+
+
+layout_kwargs:
+  plot_bgcolor: "#212121"  # darkest grey
+  template: plotly_dark
+  showlegend: false
+curves_layout_kwargs:
+  plot_bgcolor: "#212121"  # darkest grey
+  template: plotly_dark
+  autosize: false
+  width: 800
+  height: 1200
+  legend: {x: 0, y: -1}
+update_trades: false
+plot_trades: false
+plot_trades_curves: false
+update_rl: false
+plot_rl: false
+plot_rl_curves: false
+update_ts: false
+plot_ts: false
+plot_ts_curves: false
+plot_all: false
+plot_all_curves: true
+start: "2023-05-16T00:00:00+00:00"
+stop: "2023-05-17T00:00:00+00:00"
+lob_dataset_kwargs:
+  quant: 3e+9
+  # start: -1800  # number of quants
+  # stop: ~  # now
+  replace_nan: ~
+  split: ~
+  merge_features: false
+  return_all_df: true
+  verbose: true
+  agents:
+    tusd:
+      class: InfluxDBDataset2
+      batch_size: 86400e+9
+      client:
+        timeout: 100000
+      topic: lob
+      key: binance-btc-tusd
+ts_dataset_kwargs:
+  quant: 3e+9
+  # start: -1800  # number of quants
+  # stop: ~  # now
+  replace_nan: ~
+  split: ~
+  merge_features: false
+  return_all_df: true
+  verbose: false
+  agents:
+    tusd:
+      class: InfluxDBDataset2
+      batch_size: 86400e+9
+      client:
+        timeout: 100000
+      topic: prediction
+      key: binance-btc-tusd
+      filters:
+        model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
+        # version: 4
+      # horizon: 20
+      # ratios:
+      #   value: last
+      pivot:
+        index: ['timestamp', 'exchange', 'base', 'quote', 'quant', 'feature', 'target', 'model', 'version']
+        columns: ['horizon']
+      # resample: {}
+rl_dataset_kwargs:
+  quant: 3e+9
+  # start: -1800  # number of quants
+  # stop: ~  # now
+  replace_nan: ~
+  split: ~
+  merge_features: false
+  return_all_df: true
+  verbose: true
+  agents:
+    tusd:
+      class: InfluxDBDataset2
+      batch_size: 86400e+9
+      client:
+        timeout: 100000
+      topic: prediction
+      key: binance-btc-tusd
+      filters:
+        model: "/ppo.*/"
+        # model: ppo-binance-btc-tusd-20-h-v-l-min_max_all-last_1w-tune
+        # model: ppo-binance-btc-tusd-20-h_20-v-l-std_all-last_30m   
+trades_dataset_kwargs:
+  quant: 3e+9
+  # start: -1800  # number of quants
+  # stop: ~  # now
+  replace_nan: ~
+  split: ~
+  merge_features: false
+  return_all_df: true
+  verbose: true
+  agents:
+    tusd:
+      class: InfluxDBDataset2
+      batch_size: 86400e+9
+      client:
+        timeout: 100000
+      topic: metric
+      key: binance-btc-tusd
+      filters:
+        model: ~    
+bt_kwargs:
+  cash: 100000.0
+  commission: 0.0
+  margin: 1.0
+  trade_on_close: false
+  hedging: false
+  exclusive_orders: false
