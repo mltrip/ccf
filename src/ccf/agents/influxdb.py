@@ -150,8 +150,12 @@ class InfluxDB(Agent):
           |> filter(fn:(r) => r._measurement == "{topic}")'''
     for k, v in key2values.items():
       if k != 'quant':
-        query += f'''
-            |> filter(fn:(r) => r.{k} == "{v}")'''
+        if isinstance(v, str) and v.startswith('/') and v.endswith('/'):
+          query += f'''
+              |> filter(fn:(r) => r.{k} =~ {v})'''
+        else:
+          query += f'''
+              |> filter(fn:(r) => r.{k} == "{v}")'''
       else:
         query += f'''
             |> filter(fn:(r) => r.{k} == "{v:.0e}" or r.{k} == "{int(v)}")'''
@@ -274,8 +278,8 @@ class InfluxDB(Agent):
                          verbose=False):
     subquery = InfluxDB.get_subquery('lob', 
                                      exchange=exchange, base=base, quote=quote)
-    return InfluxDB.get_dataframe(query_api, subquery, batch_size, bucket,
-                                  start, stop, verbose)
+    return InfluxDB.read_dataframe(query_api, subquery, batch_size, bucket,
+                                   start, stop, verbose)
   
   @staticmethod
   def get_lob_stream(query_api, bucket='ccf', 
