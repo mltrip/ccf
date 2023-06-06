@@ -6,17 +6,11 @@ defaults:
  - _self_
 
 
-layout_kwargs:
-  plot_bgcolor: "#212121"  # darkest grey
-  template: plotly_dark
-  showlegend: false
-curves_layout_kwargs:
-  plot_bgcolor: "#212121"  # darkest grey
-  template: plotly_dark
-  autosize: false
-  width: 800
-  height: 1200
-  legend: {x: 0, y: -1}
+start: "2023-05-16T00:00:00+00:00"
+stop: "2023-05-17T00:00:00+00:00"
+update_all: false
+plot_all: true
+plot_all_curves: true
 update_trades: false
 plot_trades: false
 plot_trades_curves: false
@@ -26,13 +20,30 @@ plot_rl_curves: false
 update_ts: false
 plot_ts: false
 plot_ts_curves: false
-plot_all: false
-plot_all_curves: true
-start: "2023-05-16T00:00:00+00:00"
-stop: "2023-05-17T00:00:00+00:00"
+plot_backtest_html: false
+strategy_kwargs:  
+  size: 400
+  unit_size: 1e-6  # μBTC
+bt_kwargs:
+  cash: 12
+  commission: 0.0
+  margin: 1.0
+  trade_on_close: false
+  hedging: false
+  exclusive_orders: false
+layout_kwargs:
+  plot_bgcolor: "#212121"  # darkest grey
+  template: plotly_dark
+  showlegend: false
+curves_layout_kwargs:
+  plot_bgcolor: "#212121"  # darkest grey
+  template: plotly_dark
+  autosize: false
+  width: 960
+  height: 540
+  legend: {x: 0, y: -2.0}
 lob_dataset_kwargs:
   quant: 3e+9
-  # start: -1800  # number of quants
   # stop: ~  # now
   replace_nan: ~
   split: ~
@@ -66,14 +77,9 @@ ts_dataset_kwargs:
       key: binance-btc-tusd
       filters:
         model: influxdb-mid-rat-ema_vwap_base_10_1_1-mel_20-mpl_20-no_cat-no_group
-        # version: 4
-      # horizon: 20
-      # ratios:
-      #   value: last
       pivot:
         index: ['timestamp', 'exchange', 'base', 'quote', 'quant', 'feature', 'target', 'model', 'version']
         columns: ['horizon']
-      # resample: {}
 rl_dataset_kwargs:
   quant: 3e+9
   # start: -1800  # number of quants
@@ -113,11 +119,5 @@ trades_dataset_kwargs:
       topic: metric
       key: binance-btc-tusd
       filters:
-        model: ~    
-bt_kwargs:
-  cash: 100000.0
-  commission: 0.0
-  margin: 1.0
-  trade_on_close: false
-  hedging: false
-  exclusive_orders: false
+        model: ~
+

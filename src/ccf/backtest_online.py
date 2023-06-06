@@ -40,94 +40,109 @@ colormap = {
 
 
 class Trades(Strategy):
-    def init(self):
-      self.size = 1.0
-      self.base_cumsum = self.I(lambda x: x, self.data.base_cumsum)
-      self.quote_cumsum = self.I(lambda x: x, self.data.quote_cumsum)
+  size = 1.0
+  unit_size = 1.0
 
-    def next(self):
-      open, high, low, close = self.data.Open, self.data.High, self.data.Low, self.data.Close
-      current_time = self.data.index[-1]
-      action = self.data.action[-1]
-      # print(current_time, action, close[-1], self.position)
-      if action == 'buy':
-        # assert not self.position.is_long
-        if not self.position.is_long:
-          self.buy(size=self.size)
-        else:
-          print(f'Warning: long buy {current_time}!')
-      elif action == 'sell':
-        # assert not self.position.is_short
-        if not self.position.is_short:
-          self.sell(size=self.size)
-        else:
-          print(f'Warning: short sell {current_time}!')  
+  def init(self):
+    self.base_cumsum = self.I(lambda x: x, self.data.base_cumsum)
+    self.quote_cumsum = self.I(lambda x: x, self.data.quote_cumsum)
+
+  def next(self):
+    open, high, low, close = self.data.Open, self.data.High, self.data.Low, self.data.Close
+    current_time = self.data.index[-1]
+    action = self.data.action[-1]
+    # print(current_time, action, close[-1], self.position)
+    if action == 'buy':
+      # assert not self.position.is_long
+      if not self.position.is_long:
+        self.buy(size=self.size)
+      else:
+        print(f'Warning: long buy {current_time}!')
+    elif action == 'sell':
+      # assert not self.position.is_short
+      if not self.position.is_short:
+        self.sell(size=self.size)
+      else:
+        print(f'Warning: short sell {current_time}!')  
           
           
 class RL(Strategy):
-    def init(self):
-      self.size = 1.0
+  size = 1.0
+  unit_size = 1.0
+  
+  def init(self):
+    pass
 
-    def next(self):
-      open, high, low, close = self.data.Open, self.data.High, self.data.Low, self.data.Close
-      current_time = self.data.index[-1]
-      action = self.data.action[-1]
-      if action == 1:  # buy
-        if not self.position.is_long:
-          self.buy(size=self.size)
-      elif action == 2:  # sell
-        if not self.position.is_short:
-          self.sell(size=self.size)
+  def next(self):
+    open, high, low, close = self.data.Open, self.data.High, self.data.Low, self.data.Close
+    current_time = self.data.index[-1]
+    action = self.data.action[-1]
+    if action == 1:  # buy
+      if not self.position.is_long:
+        self.buy(size=self.size)
+    elif action == 2:  # sell
+      if not self.position.is_short:
+        self.sell(size=self.size)
 
           
 class TS(Strategy):
-    horizon = 20
-    
-    def init(self):
-      self.size = 1.0
-      
-    def next(self):
-      current_time = self.data.index[-1]
-      open, high, low, close = self.data.Open, self.data.High, self.data.Low, self.data.Close
-      # Forecast
-      if self.horizon is not None:
-        last = self.data[f'last-{self.horizon}'][-1]
-        value = self.data[f'value-{self.horizon}'][-1]
-        forecast = value / last
-        if forecast > 1:
-          action = 'buy'
-        elif forecast < 1:
-          action = 'sell'
-        else:
-          action = 'hold'
+  size = 1.0
+  unit_size = 1.0
+  horizon = 20
+
+  def init(self):
+    pass
+
+  def next(self):
+    # Forecast
+    if self.horizon is not None:
+      last = self.data[f'last-{self.horizon}'][-1]
+      value = self.data[f'value-{self.horizon}'][-1]
+      forecast = value / last
+      if forecast > 1:
+        action = 'buy'
+      elif forecast < 1:
+        action = 'sell'
       else:
-        values, lasts = {}, {}
-        for c in self.data.df.columns:
-          if c.startswith('value'):
-            _, h = c.split('-')
-            values[h] = self.data[c][-1]
-          if c.startswith('last'):
-            _, h = c.split('-')
-            lasts[h] = self.data[c][-1]
-        forecasts = {}
-        for h, v in values.items():
-          l = lasts[h]
-          forecasts[h] = v / l
-        if all(x > 1 for x in forecasts.values()):
-          action = 'buy'
-        elif all(x < 1 for x in forecasts.values()):
-          action = 'sell'
-        else:
-          action = 'hold'
-      # Action
-      if action == 'buy':
-        if not self.position.is_long:
-          self.buy(size=self.size)
-      elif action == 'sell':
-        if not self.position.is_short:
-          self.sell(size=self.size)
-          
+        action = 'hold'
+    else:
+      values, lasts = {}, {}
+      for c in self.data.df.columns:
+        if c.startswith('value'):
+          _, h = c.split('-')
+          values[h] = self.data[c][-1]
+        if c.startswith('last'):
+          _, h = c.split('-')
+          lasts[h] = self.data[c][-1]
+      forecasts = {}
+      for h, v in values.items():
+        l = lasts[h]
+        forecasts[h] = v / l
+      if all(x > 1 for x in forecasts.values()):
+        action = 'buy'
+      elif all(x < 1 for x in forecasts.values()):
+        action = 'sell'
+      else:
+        action = 'hold'
+    # Action
+    if action == 'buy':
+      if not self.position.is_long:
+        self.buy(size=self.size)
+    elif action == 'sell':
+      if not self.position.is_short:
+        self.sell(size=self.size)
+
+        
+def init_backtest(bt_kwargs, strategy_kwargs):
+  unit_size = strategy_kwargs.get('unit_size', 1.0)
+  bt_kwargs['data']['Open'] *= unit_size
+  bt_kwargs['data']['High'] *= unit_size
+  bt_kwargs['data']['Low'] *= unit_size
+  bt_kwargs['data']['Close'] *= unit_size
+  bt = Backtest(**bt_kwargs)
+  return bt
     
+  
 def plot_bars(df, prefix, column, layout_kwargs):
   metrics = [x for x in df.columns if x not in [column]]
   for m in metrics:
@@ -146,51 +161,74 @@ def plot_bars(df, prefix, column, layout_kwargs):
     fig.write_html(f'{prefix}_{m}.html')
 
     
-def plot_curves(df, prefix, column, layout_kwargs, template='default', plot_html=False):
+def plot_curves(df, prefix, group_column=None, layout_kwargs=None, tags=None, 
+                plot_html=False, plot_png=True, y_column='Equity'):
+  tags = [] if tags is None else tags
+  layout_kwargs = {} if layout_kwargs is None else layout_kwargs
   fig = go.Figure()
-  for n, g in df.groupby(column):
+  groups = df.groupby(group_column) if group_column is not None else [('all', df)]
+  for n, g in groups:
     print(n)
     print(g)
-    scatter_kwargs = {'x': g.index, 'y': g['Equity'], 'name': n}
+    scatter_kwargs = {'x': g.index, 'y': g[y_column], 'name': n}
     scatter_kwargs['line_width'] = 1
-    if template == 'default':
-      pass
-    elif 'color_by_type' in template:
+    if 'total' in tags:
       if n.startswith('rl-'):
+        if 'skip_rl' in tags:
+          continue        
         if n.endswith('forward'):
+          if 'skip_rl_forward' in tags:
+            continue
           scatter_kwargs['line'] = {'dash': 'dot'}
+          if not 'split_rl_forward' in tags:
+            if '1w' in n:
+              scatter_kwargs['line_color'] = colormap['magenta']
+            elif '30m' in n:
+              scatter_kwargs['line_color'] = colormap['blue']
+            else:
+              scatter_kwargs['line_color'] = colormap['yellow']
+        else:  # backtest
+          if 'skip_rl_backtest' in tags:
+            continue
+          scatter_kwargs['line'] = {'dash': 'dash'}
+          if not 'split_rl_backtest' in tags:
+            if '1w' in n:
+              scatter_kwargs['line_color'] = colormap['magenta']
+            elif '30m' in n:
+              scatter_kwargs['line_color'] = colormap['blue']
+            else:
+              scatter_kwargs['line_color'] = colormap['yellow']
+      elif n.startswith('influxdb-'):
+        if 'skip_ts' in tags:
+          continue
+        if not 'split_ts' in tags:
+          scatter_kwargs['line_color'] = colormap['green']
+      elif n.startswith('ppo-'):
+        if 'skip_ppo' in tags:
+          continue
+        if not 'split_ppo' in tags:
           if '1w' in n:
             scatter_kwargs['line_color'] = colormap['magenta']
           elif '30m' in n:
             scatter_kwargs['line_color'] = colormap['blue']
           else:
             scatter_kwargs['line_color'] = colormap['yellow']
-        else:
-          continue
-          scatter_kwargs['line_color'] = colormap['lightgrey']
-      elif n.startswith('influxdb-'):
-        if 'skip_ts' in template:
-          continue
-        if not 'split_ts' in template:
-          scatter_kwargs['line_color'] = colormap['green']
-      elif n.startswith('ppo-'):
-        if '1w' in n:
-          scatter_kwargs['line_color'] = colormap['magenta']
-        elif '30m' in n:
-          scatter_kwargs['line_color'] = colormap['blue']
-        else:
-          scatter_kwargs['line_color'] = colormap['yellow']
     print(scatter_kwargs)
     scatter = go.Scatter(**scatter_kwargs)
     fig.add_trace(scatter)
   fig.update_traces(mode='lines')
   fig.update_layout(**layout_kwargs)
+  suffix = '-' + '-'.join(tags) if len(tags) > 0 else ''
   if plot_html:
-    fig.write_html(f'{prefix}_{template}.html')
-  fig.write_image(f'{prefix}_{template}.png')
+    fig.write_html(f'{prefix}{suffix}.html')
+  if plot_png:
+    fig.write_image(f'{prefix}{suffix}.png')
+    
   
-  
-def backtest_rl(rl_data_path, rl_curves_path, rl_dataset_kwargs, lob_df_t, unit_size=1.0):
+def backtest_rl(rl_data_path, rl_curves_path, rl_dataset_kwargs, lob_df_t,
+                plot_html=False, bt_kwargs=None, strategy_kwargs=None):
+  bt_kwargs = {} if bt_kwargs is None else bt_kwargs
+  strategy_kwargs = {} if strategy_kwargs is None else strategy_kwargs
   rl_dataset = Dataset(**rl_dataset_kwargs)
   rl_ds_t, rl_ds_v, rl_df_t, rl_df_v = rl_dataset()
   # Backtest
@@ -207,17 +245,15 @@ def backtest_rl(rl_data_path, rl_curves_path, rl_dataset_kwargs, lob_df_t, unit_
     print(bt_df)
     bt_df[['m_p', 'a_p_0', 'b_p_0']] = bt_df[['m_p', 'a_p_0', 'b_p_0']].interpolate('pad').interpolate('bfill')
     print(bt_df)
-    bt_df['Open'] = bt_df['High'] = bt_df['Low'] = bt_df['Close'] = bt_df['m_p']*unit_size
-    bt = Backtest(bt_df, RL,
-                  # commission=.002,
-                  cash=12,  # min ~ one unit
-                  # commission=1e-5, 
-                  margin=1.0, 
-                  exclusive_orders=False)
-    stats = bt.run()
+    bt_df['Open'] = bt_df['High'] = bt_df['Low'] = bt_df['Close'] = bt_df['m_p']
+    bt_kwargs['data'] = bt_df
+    bt_kwargs['strategy'] = RL
+    bt = init_backtest(bt_kwargs, strategy_kwargs)
+    stats = bt.run(**strategy_kwargs)
     print(stats)
     rl_model_stats[model] = stats
-    bt.plot(filename=f'backtest_rl_{model}.html')
+    if plot_html:
+      bt.plot(filename=f'backtest_rl_{model}.html')
   # Save
   rl_model_metrics = []
   rl_curves = []
@@ -240,7 +276,9 @@ def backtest_rl(rl_data_path, rl_curves_path, rl_dataset_kwargs, lob_df_t, unit_
   return rl_df, rl_df_curves
   
 
-def backtest_trades(trades_data_path, trades_curves_path, trades_dataset_kwargs, lob_df_t, unit_size=1.0):
+def backtest_trades(trades_data_path, trades_curves_path, trades_dataset_kwargs, lob_df_t, 
+                    plot_html=False, bt_kwargs=None, strategy_kwargs=None):
+  bt_kwargs = {} if bt_kwargs is None else bt_kwargs
   trades_dataset = Dataset(**trades_dataset_kwargs)
   trades_ds_t, trades_ds_v, trades_df_t, trades_df_v = trades_dataset()
   print(trades_df_t)
@@ -272,15 +310,11 @@ def backtest_trades(trades_data_path, trades_curves_path, trades_dataset_kwargs,
     # print(zeros['quote_delta'])
     print(bt_df.isna().sum())
     print(bt_df.count())
-    bt_df['Open'] = bt_df['High'] = bt_df['Low'] = bt_df['Close'] = bt_df['m_p']*unit_size
-    cash = 12
-    bt = Backtest(bt_df, Trades,
-                  # commission=.002,
-                  cash=cash,  # min ~ one unit
-                  # commission=1e-5, 
-                  margin=1.0, 
-                  exclusive_orders=False)
-    stats = bt.run()
+    bt_df['Open'] = bt_df['High'] = bt_df['Low'] = bt_df['Close'] = bt_df['m_p']
+    bt_kwargs['data'] = bt_df
+    bt_kwargs['strategy'] = Trades
+    bt = init_backtest(bt_kwargs, strategy_kwargs)
+    stats = bt.run(**strategy_kwargs)
     print(stats)
     # quote_balances 
     stats['last_quote_cumsum'] = bt_df.tail(1)['quote_cumsum'].item()
@@ -295,7 +329,8 @@ def backtest_trades(trades_data_path, trades_curves_path, trades_dataset_kwargs,
     stats['win_rate'] = win_rate
     stats['quote_cumsum'] = bt_df[['quote_cumsum']]
     trades_strategy_stats[strategy] = stats
-    bt.plot(filename=f'backtest_trades_{strategy}.html')
+    if plot_html:
+      bt.plot(filename=f'backtest_trades_{strategy}.html')
   # Save
   trades_strategy_metrics = []
   trades_curves = [] 
@@ -312,7 +347,7 @@ def backtest_trades(trades_data_path, trades_curves_path, trades_dataset_kwargs,
     # Forward curves
     forward_curve = stats['quote_cumsum']
     forward_curve = forward_curve.rename(columns={"quote_cumsum": "Equity"})
-    forward_curve['Equity'] += cash
+    forward_curve['Equity'] += bt_kwargs.get('cash', 0)
     forward_curve['agent'] = f'{strategy}_forward'
     trades_curves.append(forward_curve)
   print('Stats')
@@ -324,9 +359,19 @@ def backtest_trades(trades_data_path, trades_curves_path, trades_dataset_kwargs,
   return trades_df, trades_df_curves  
   
 
-def backtest_ts(ts_data_path, ts_curves_path, ts_dataset_kwargs, lob_df_t, unit_size=1.0):
+def backtest_ts(ts_data_path, ts_curves_path, ts_dataset_kwargs, lob_df_t,
+                plot_html=False, bt_kwargs=None, strategy_kwargs=None):
+  bt_kwargs = {} if bt_kwargs is None else bt_kwargs
+  strategy_kwargs = {} if strategy_kwargs is None else strategy_kwargs
   ts_dataset = Dataset(**ts_dataset_kwargs)
   ts_ds_t, ts_ds_v, ts_df_t, ts_df_v = ts_dataset()
+  # Shift predictions to the past
+  for c in ts_df_t.columns:
+    if 'last' in c or 'value' in c:
+      print(ts_df_t[c])
+      periods = int(c.split('-')[-1])  # metric-horizon (e.g value-15 or last-20)
+      ts_df_t[c] = ts_df_t[c].shift(periods=-periods)
+      print(ts_df_t[c])
   # Backtest
   ts_model_stats = {}
   for model, ts_df_t_model in ts_df_t.groupby(['model']):
@@ -339,18 +384,16 @@ def backtest_ts(ts_data_path, ts_curves_path, ts_dataset_kwargs, lob_df_t, unit_
     print(bt_df)
     bt_df[['m_p', 'a_p_0', 'b_p_0']] = bt_df[['m_p', 'a_p_0', 'b_p_0']].interpolate('pad').interpolate('bfill')
     print(bt_df)
-    bt_df['Open'] = bt_df['High'] = bt_df['Low'] = bt_df['Close'] = bt_df['m_p']*unit_size
-    bt = Backtest(bt_df, TS,
-                  # commission=.002,
-                  cash=12,  # min ~ one unit
-                  # commission=1e-5, 
-                  margin=1.0, 
-                  exclusive_orders=False)
+    bt_df['Open'] = bt_df['High'] = bt_df['Low'] = bt_df['Close'] = bt_df['m_p']
+    bt_kwargs['data'] = bt_df
+    bt_kwargs['strategy'] = TS
+    bt = init_backtest(bt_kwargs, strategy_kwargs)
     for horizon in [5, 10, 15, 20, None]:
-      stats = bt.run(horizon=horizon)
+      stats = bt.run(horizon=horizon, **strategy_kwargs)
       print(stats)
       ts_model_stats[f'{model}_{horizon}'] = stats
-      bt.plot(filename=f'backtest_ts_{model}_{horizon}.html')
+      if plot_html:
+        bt.plot(filename=f'backtest_ts_{model}_{horizon}.html')
   # Save
   ts_model_metrics = []
   ts_curves = []
@@ -358,8 +401,6 @@ def backtest_ts(ts_data_path, ts_curves_path, ts_dataset_kwargs, lob_df_t, unit_
     metrics = {k: v for k, v in stats.items() 
                if k not in ['_strategy', '_equity_curve', '_trades']}
     metrics['agent'] = model
-    # print(model)
-    # print(metrics)
     ts_model_metrics.append(metrics)
     # Back curves
     curve = stats['_equity_curve']
@@ -375,9 +416,8 @@ def backtest_ts(ts_data_path, ts_curves_path, ts_dataset_kwargs, lob_df_t, unit_
   
   
 def main(
-  hydra_config, 
   start, stop, 
-  bt_kwargs, lob_dataset_kwargs, 
+  bt_kwargs, strategy_kwargs, lob_dataset_kwargs, 
   ts_dataset_kwargs, rl_dataset_kwargs, trades_dataset_kwargs,
   layout_kwargs, curves_layout_kwargs,
   update_trades=False, plot_trades=False, plot_trades_curves=False, 
@@ -386,7 +426,8 @@ def main(
   rl_data_path='rl_data.csv', rl_curves_path='rl_curves.csv',
   update_ts=False, plot_ts=False, plot_ts_curves=False, 
   ts_data_path='ts_data.csv', ts_curves_path='ts_curves.csv',
-  plot_all=False, plot_all_curves=False
+  plot_all=False, plot_all_curves=False, update_all=False,
+  plot_backtest_html=False
 ):
   lob_dataset_kwargs.setdefault('start', start)
   lob_dataset_kwargs.setdefault('stop', stop)
@@ -397,12 +438,21 @@ def main(
   trades_dataset_kwargs.setdefault('start', start)
   trades_dataset_kwargs.setdefault('stop', stop)
   # LOB
-  if any([update_trades, update_rl, update_ts]):
+  if any([update_trades, update_rl, update_ts, update_all]):
     lob_dataset = Dataset(**lob_dataset_kwargs)
     lob_ds_t, lob_ds_v, lob_df_t, lob_df_v = lob_dataset()
     print(lob_df_t)
+    plot_curves(lob_df_t, prefix='m_p', group_column=None, 
+                layout_kwargs=curves_layout_kwargs, tags=None, 
+                plot_html=False, plot_png=True, y_column='m_p')
   # RL
-  if not update_rl:
+  if update_rl or update_all:
+    rl_df, rl_df_curves = backtest_rl(rl_data_path, rl_curves_path, 
+                                      rl_dataset_kwargs, lob_df_t,
+                                      plot_html=plot_backtest_html,
+                                      bt_kwargs=bt_kwargs, 
+                                      strategy_kwargs=strategy_kwargs)
+  else:
     if plot_rl or plot_all:
       rl_df = pd.read_csv(rl_data_path)
     if plot_rl_curves or plot_all_curves:
@@ -410,11 +460,13 @@ def main(
       if 'Unnamed: 0' in rl_df_curves:
         rl_df_curves = rl_df_curves.rename(columns={'Unnamed: 0': 'timestamp'})
       rl_df_curves = rl_df_curves.set_index('timestamp')
+  # TRADES
+  if update_trades or update_all:
+    trades_df, trades_df_curves = backtest_trades(trades_data_path, trades_curves_path, 
+                                                  trades_dataset_kwargs, lob_df_t, 
+                                                  plot_html=plot_backtest_html,
+                                                  bt_kwargs=bt_kwargs, strategy_kwargs=strategy_kwargs)
   else:
-    rl_df, rl_df_curves = backtest_rl(rl_data_path, rl_curves_path, 
-                                      rl_dataset_kwargs, lob_df_t, unit_size=4e-4)
-  # Trades
-  if not update_trades:
     if plot_trades or plot_all:
       trades_df = pd.read_csv(trades_data_path)
     if plot_trades_curves or plot_all_curves:
@@ -422,21 +474,21 @@ def main(
       if 'Unnamed: 0' in trades_df_curves:
         trades_df_curves = trades_df_curves.rename(columns={'Unnamed: 0': 'timestamp'})
       trades_df_curves = trades_df_curves.set_index('timestamp')
-  else:
-    trades_df, trades_df_curves = backtest_trades(trades_data_path, trades_curves_path, 
-                                                  trades_dataset_kwargs, lob_df_t, unit_size=4e-4)
   # TS
-  if not update_ts:
+  if update_ts or update_all:
+    ts_df, ts_df_curves = backtest_ts(ts_data_path, ts_curves_path, 
+                                      ts_dataset_kwargs, lob_df_t,
+                                      plot_html=plot_backtest_html,
+                                      bt_kwargs=bt_kwargs, strategy_kwargs=strategy_kwargs)
+  else:
     if plot_ts or plot_all:
-      trades_df = pd.read_csv(ts_data_path)
+      ts_df = pd.read_csv(ts_data_path)
     if plot_ts_curves or plot_all_curves:
       ts_df_curves = pd.read_csv(ts_curves_path)
       if 'Unnamed: 0' in ts_df_curves:
         ts_df_curves = ts_df_curves.rename(columns={'Unnamed: 0': 'timestamp'})
       ts_df_curves = ts_df_curves.set_index('timestamp')
-  else:
-    ts_df, ts_df_curves = backtest_ts(ts_data_path, ts_curves_path, 
-                                      ts_dataset_kwargs, lob_df_t, unit_size=4e-4)
+  # PLOT
   if plot_ts:
     plot_bars(ts_df, 'ts', 'agent', layout_kwargs)
   if plot_ts_curves:
@@ -454,17 +506,25 @@ def main(
     plot_bars(total_df, 'total', 'agent', layout_kwargs)
   if plot_all_curves:
     total_df_curves = pd.concat([trades_df_curves, rl_df_curves, ts_df_curves])
-    plot_curves(total_df_curves, 'total_curves', 'agent', curves_layout_kwargs, 'default')
-    plot_curves(total_df_curves, 'total_curves', 'agent', curves_layout_kwargs, 'color_by_type')
-    plot_curves(total_df_curves, 'total_curves', 'agent', curves_layout_kwargs, 'color_by_type_split_ts')
-    plot_curves(total_df_curves, 'total_curves', 'agent', curves_layout_kwargs, 'color_by_type_skip_ts')
+    plot_curves(total_df_curves, 'total_curves', 'agent', curves_layout_kwargs)
+    plot_curves(total_df_curves, 'total_curves', 'agent', curves_layout_kwargs, 
+                tags=['total', 'split_ts', 'split_rl', 'split_ppo', 'skip_rl_backtest'])
+    plot_curves(total_df_curves, 'total_curves', 'agent', curves_layout_kwargs, 
+                tags=['total', 'split_ts', 'skip_rl', 'skip_ppo'])
+    plot_curves(total_df_curves, 'total_curves', 'agent', curves_layout_kwargs, 
+                tags=['total', 'skip_ts', 'skip_ppo'])
+    plot_curves(total_df_curves, 'total_curves', 'agent', curves_layout_kwargs, 
+                tags=['total', 'split_ts', 'skip_rl_backtest'])
+    plot_curves(total_df_curves, 'total_curves', 'agent', curves_layout_kwargs, 
+                tags=['total', 'skip_ts', 'skip_rl_backtest'])
+    plot_curves(total_df_curves, 'total_curves', 'agent', curves_layout_kwargs, 
+                tags=['total', 'skip_ts', 'split_rl_forward', 'split_ppo', 'skip_rl_backtest'])
     
   
 @hydra.main(version_base=None)
 def app(cfg: DictConfig) -> None:
   print(OmegaConf.to_yaml(cfg))
-  hydra_cfg = HydraConfig.get()
-  main(hydra_config=hydra_cfg, **OmegaConf.to_object(cfg))
+  main(**OmegaConf.to_object(cfg))
 
   
 if __name__ == "__main__":
