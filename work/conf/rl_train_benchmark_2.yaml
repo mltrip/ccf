@@ -1,22 +1,24 @@
 do_run: true
 do_plot: true
 benchmark_kwargs:
-  benchmark_name: rl_train_benchmark_1
+  benchmark_name: rl_train_benchmark_2
   benchmarks_dir: benchmarks
   reset_benchmark: false
-  reset_conf: false
+  reset_conf: true
 plot_kwargs:
   update_results: true
   layout_kwargs:
     plot_bgcolor: rgb(30, 30, 30)  # grey
     template: plotly_dark
+  plot_metrics: true
   metrics:
     return: "Return [%]"
     win_rate: "Win Rate [%]"
     avg_trade: "Avg. Trade [%]"
     sqn: "SQN"
+  plot_curves: true
 run_kwargs:
-  n_runs: 1
+  n_runs: 10
   delay: 10
   run_kind: 'pbs'
   env_path: ".env.benchmark"
@@ -26,53 +28,48 @@ run_kwargs:
     save_stats: true
     save_plot: false
     do_backtest: true
-    do_train: false
-    do_mlflow: true
+    do_train: true
+    do_mlflow: false
     is_tune: false
     split_test: 0.5
-    model_version: ~
     learn_kwargs:
       total_timesteps: 100000
   train_configs:
-    # last_std: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-l-std_g-last_30m
-    # value_std: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-std_g-last_30m
-    # ratio_std: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-r-std_g-last_30m
-    # last_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-l-mm_g-last_30m
-    # value_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-mm_g-last_30m
-    # ratio_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-r-mm_g-last_30m
-    # value_last_std_g: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_g-last_30m
-    # value_last_std_f: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_f-last_30m
-    # value_last_std_s: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_s-last_30m
-    # value_last_mm_g: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-mm_g-last_30m
-    # value_last_mm_f: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-mm_f-last_30m
-    # value_last_mm_s: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-mm_s-last_30m
-    # value_ratio_std_f: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-r-std_f-last_30m
-    # last_ratio_std_f: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-l-r-std_f-last_30m
-    # value_last_ratio_std_f: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-last_30m
-    # value_last_ratio_mm_f: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-mm_f-last_30m
-    # vlr_std_f_scale_rew_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-scale_rew-std-last_30m
-    # vlr_std_f_scale_rew_nz_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-scale_rew_nz-std-last_30m
-    # vlr_std_f_scale_rew_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-scale_rew-mm-last_30m
-    # vlr_std_f_scale_rew_nz_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-scale_rew_nz-mm-last_30m
-    # vlr_std_f_pos: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-pos-last_30m
-    # vlr_std_f_rew: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-rew-last_30m
-    # vlr_std_f_pos_rew: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-pos-rew-last_30m
-    # vlr_mm_f_scale_rew_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-mm_f-scale_rew-std-last_30m
-    # vlr_mm_f_scale_rew_nz_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-mm_f-scale_rew_nz-std-last_30m
-    # vlr_mm_f_scale_rew_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-mm_f-scale_rew-mm-last_30m
-    # vlr_mm_f_scale_rew_nz_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-mm_f-scale_rew_nz-mm-last_30m
-    # vl_mm_g_scale_rew_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-mm_g-scale_rew-std-last_30m
-    # vl_mm_g_scale_rew_nz_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-mm_g-scale_rew_nz-std-last_30m
-    # vl_mm_g_scale_rew_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-mm_g-scale_rew-mm-last_30m
-    # vl_mm_g_scale_rew_nz_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-mm_g-scale_rew_nz-mm-last_30m
-    # vl_std_g_scale_rew_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_g-scale_rew-std-last_30m
-    # vl_std_g_scale_rew_nz_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_g-scale_rew_nz-std-last_30m
-    # vl_std_g_scale_rew_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_g-scale_rew-mm-last_30m
-    # vl_std_g_scale_rew_nz_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_g-scale_rew_nz-mm-last_30m
-    vlh_mm_g_1w_tune: train-rl-mlflow-ppo-binance-btc-tusd-20-h-v-l-min_max_all-last_1w-tune
-    vlh_std_g_1w_tune: train-rl-mlflow-ppo-binance-btc-tusd-20-h-v-l-std_all-last_1w-tune
-    vlh_std_f_1w_tune: train-rl-mlflow-ppo-binance-btc-tusd-20-h-v-l-std_f-last_1w-tune
-    vlh_std_s_1w_tune: train-rl-mlflow-ppo-binance-btc-tusd-20-h-v-l-std_s-last_1w-tune
+    last_std: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-l-std_g-last_30m
+    value_std: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-std_g-last_30m
+    ratio_std: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-r-std_g-last_30m
+    last_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-l-mm_g-last_30m
+    value_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-mm_g-last_30m
+    ratio_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-r-mm_g-last_30m
+    value_last_std_g: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_g-last_30m
+    value_last_std_f: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_f-last_30m
+    value_last_std_s: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_s-last_30m
+    value_last_mm_g: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-mm_g-last_30m
+    value_last_mm_f: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-mm_f-last_30m
+    value_last_mm_s: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-mm_s-last_30m
+    value_ratio_std_f: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-r-std_f-last_30m
+    last_ratio_std_f: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-l-r-std_f-last_30m
+    value_last_ratio_std_f: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-last_30m
+    value_last_ratio_mm_f: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-mm_f-last_30m
+    vlr_std_f_scale_rew_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-scale_rew-std-last_30m
+    vlr_std_f_scale_rew_nz_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-scale_rew_nz-std-last_30m
+    vlr_std_f_scale_rew_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-scale_rew-mm-last_30m
+    vlr_std_f_scale_rew_nz_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-scale_rew_nz-mm-last_30m
+    vlr_std_f_pos: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-pos-last_30m
+    vlr_std_f_rew: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-rew-last_30m
+    vlr_std_f_pos_rew: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-std_f-pos-rew-last_30m
+    vlr_mm_f_scale_rew_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-mm_f-scale_rew-std-last_30m
+    vlr_mm_f_scale_rew_nz_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-mm_f-scale_rew_nz-std-last_30m
+    vlr_mm_f_scale_rew_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-mm_f-scale_rew-mm-last_30m
+    vlr_mm_f_scale_rew_nz_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-r-mm_f-scale_rew_nz-mm-last_30m
+    vl_mm_g_scale_rew_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-mm_g-scale_rew-std-last_30m
+    vl_mm_g_scale_rew_nz_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-mm_g-scale_rew_nz-std-last_30m
+    vl_mm_g_scale_rew_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-mm_g-scale_rew-mm-last_30m
+    vl_mm_g_scale_rew_nz_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-mm_g-scale_rew_nz-mm-last_30m
+    vl_std_g_scale_rew_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_g-scale_rew-std-last_30m
+    vl_std_g_scale_rew_nz_sdt: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_g-scale_rew_nz-std-last_30m
+    vl_std_g_scale_rew_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_g-scale_rew-mm-last_30m
+    vl_std_g_scale_rew_nz_mm: train-rl-mlflow-ppo-binance-btc-tusd-20-h_20-v-l-std_g-scale_rew_nz-mm-last_30m
   frames:
     # flat_1: { start: "2023-05-05T09:30:00+00:00", stop: "2023-05-05T11:00:00+00:00", split: 0.333 }
     # flat_2: { start: "2023-05-05T13:45:00+00:00", stop: "2023-05-05T15:15:00+00:00", split: 0.333 }

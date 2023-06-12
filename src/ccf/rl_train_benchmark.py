@@ -262,6 +262,10 @@ def plot(benchmark_name, benchmarks_dir='benchmarks',
   print('Plotting curves') 
   if plot_curves:
     print(df_curves)
+    print('Names')
+    print(df_curves['name'].value_counts())
+    print('Frames')
+    print(df_curves['frame'].value_counts())
     pbar = tqdm(['test', 'train'])
     for kind in pbar:
       df2 = df_curves[df_curves['kind'] == kind]
@@ -269,7 +273,7 @@ def plot(benchmark_name, benchmarks_dir='benchmarks',
       fig = go.Figure()
       df3 = df2.groupby(['name', 'index', 'version'], dropna=False).agg({'Equity': 'mean'}).reset_index()
       for (n, v), g in df3.groupby(['name', 'version'], dropna=False):
-        name = n if v is None or np.isnan(v) else f'{n}-v{v}'
+        name = n if v is None or pd.isnull(v) else f'{n}-v{v}'
         fig.add_trace(go.Scatter(x=g['index'], y=g['Equity'], name=name))
       fig.update_traces(mode='lines')
       fig.update_layout(**layout_kwargs)
@@ -281,7 +285,7 @@ def plot(benchmark_name, benchmarks_dir='benchmarks',
         df3 = df2[df2['frame'].str.startswith(frame_kind)]
         df3 = df3.groupby(['name', 'index', 'version'], dropna=False).agg({'Equity': 'mean'}).reset_index()
         for (n, v), g in df3.groupby(['name', 'version'], dropna=False):
-          name = n if v is None or np.isnan(v) else f'{n}-v{v}'
+          name = n if v is None or pd.isnull(v) else f'{n}-v{v}'
           fig.add_trace(go.Scatter(x=g['index'], y=g['Equity'], name=name))
         fig.update_traces(mode='lines')
         fig.update_layout(**layout_kwargs)

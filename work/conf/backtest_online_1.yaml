@@ -6,22 +6,31 @@ defaults:
  - _self_
 
 
-start: "2023-05-16T00:00:00+00:00"
-stop: "2023-05-17T00:00:00+00:00"
+start: "2023-05-02T00:00:00+00:00"
+stop: "2023-05-30T00:00:00+00:00"
+benchmark_dir: backtest_online_3
 update_all: false
-plot_all: true
-plot_all_curves: true
+plot_all: false
+plot_all_curves: false
+update_lob: false
 update_trades: false
+update_trades_dataset: false
+update_trades_signature: false
+update_trades_backtest: false
 plot_trades: false
 plot_trades_curves: false
 update_rl: false
+update_rl_dataset: false
+update_rl_signature: true
 plot_rl: false
 plot_rl_curves: false
 update_ts: false
+update_ts_dataset: false
+update_ts_signature: false
 plot_ts: false
 plot_ts_curves: false
 plot_backtest_html: false
-strategy_kwargs:  
+strategy_kwargs:
   size: 400
   unit_size: 1e-6  # μBTC
 bt_kwargs:
@@ -31,25 +40,37 @@ bt_kwargs:
   trade_on_close: false
   hedging: false
   exclusive_orders: false
+trades_signature_kwargs:
+  window: 10T
+histogram_kwargs:
+  figsize: [8, 6]
+  bins: 600
+  cmap: hot
+  kinds: [ diff, relative, ratio, lograt ]
+  lines: ['mean', 'median', '0.25', '0.75', '0.05', '0.95']
+  plot_histogram: true
+  plot_html: true
 layout_kwargs:
   plot_bgcolor: "#212121"  # darkest grey
   template: plotly_dark
   showlegend: false
+signature_layout_kwargs:
+  plot_bgcolor: "#212121"  # darkest grey
+  template: plotly_dark
 curves_layout_kwargs:
   plot_bgcolor: "#212121"  # darkest grey
   template: plotly_dark
   autosize: false
-  width: 960
-  height: 540
+  width: 1920
+  height: 1080
   legend: {x: 0, y: -2.0}
 lob_dataset_kwargs:
   quant: 3e+9
-  # stop: ~  # now
   replace_nan: ~
   split: ~
   merge_features: false
   return_all_df: true
-  verbose: true
+  verbose: false
   agents:
     tusd:
       class: InfluxDBDataset2
@@ -66,7 +87,7 @@ ts_dataset_kwargs:
   split: ~
   merge_features: false
   return_all_df: true
-  verbose: false
+  verbose: true
   agents:
     tusd:
       class: InfluxDBDataset2
@@ -109,7 +130,7 @@ trades_dataset_kwargs:
   split: ~
   merge_features: false
   return_all_df: true
-  verbose: true
+  verbose: false
   agents:
     tusd:
       class: InfluxDBDataset2
