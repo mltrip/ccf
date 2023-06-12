@@ -1,20 +1,22 @@
 do_run: true
 do_plot: true
 benchmark_kwargs:
-  benchmark_name: rl_train_benchmark_1
+  benchmark_name: rl_train_benchmark_2
   benchmarks_dir: benchmarks
   reset_benchmark: false
-  reset_conf: false
+  reset_conf: true
 plot_kwargs:
   update_results: true
   layout_kwargs:
     plot_bgcolor: rgb(30, 30, 30)  # grey
     template: plotly_dark
+  plot_metrics: true
   metrics:
     return: "Return [%]"
     win_rate: "Win Rate [%]"
     avg_trade: "Avg. Trade [%]"
     sqn: "SQN"
+  plot_curves: true
 run_kwargs:
   n_runs: 1
   delay: 10

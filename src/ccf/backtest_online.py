@@ -8,6 +8,7 @@ import sys
 import threading
 import time
 import copy
+import os
 
 import hydra
 from hydra.core.hydra_config import HydraConfig
@@ -20,6 +21,9 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+from plotly_resampler import FigureResampler, FigureWidgetResampler
+import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from ccf.create_dataset import Dataset
 
@@ -165,7 +169,11 @@ def plot_curves(df, prefix, group_column=None, layout_kwargs=None, tags=None,
                 plot_html=False, plot_png=True, y_column='Equity'):
   tags = [] if tags is None else tags
   layout_kwargs = {} if layout_kwargs is None else layout_kwargs
-  fig = go.Figure()
+  print(len(df))
+  if len(df) < 100000:
+    fig = go.Figure()
+  else:  # Broken Pipe error
+    fig = FigureResampler(go.Figure())
   groups = df.groupby(group_column) if group_column is not None else [('all', df)]
   for n, g in groups:
     print(n)
@@ -182,22 +190,22 @@ def plot_curves(df, prefix, group_column=None, layout_kwargs=None, tags=None,
           scatter_kwargs['line'] = {'dash': 'dot'}
           if not 'split_rl_forward' in tags:
             if '1w' in n:
-              scatter_kwargs['line_color'] = colormap['magenta']
+              scatter_kwargs['line_color'] = colormap['white']
             elif '30m' in n:
-              scatter_kwargs['line_color'] = colormap['blue']
-            else:
               scatter_kwargs['line_color'] = colormap['yellow']
+            else:
+              scatter_kwargs['line_color'] = colormap['magenta']
         else:  # backtest
           if 'skip_rl_backtest' in tags:
             continue
           scatter_kwargs['line'] = {'dash': 'dash'}
           if not 'split_rl_backtest' in tags:
             if '1w' in n:
-              scatter_kwargs['line_color'] = colormap['magenta']
+              scatter_kwargs['line_color'] = colormap['white']
             elif '30m' in n:
-              scatter_kwargs['line_color'] = colormap['blue']
-            else:
               scatter_kwargs['line_color'] = colormap['yellow']
+            else:
+              scatter_kwargs['line_color'] = colormap['magenta']
       elif n.startswith('influxdb-'):
         if 'skip_ts' in tags:
           continue
@@ -207,12 +215,12 @@ def plot_curves(df, prefix, group_column=None, layout_kwargs=None, tags=None,
         if 'skip_ppo' in tags:
           continue
         if not 'split_ppo' in tags:
-          if '1w' in n:
-            scatter_kwargs['line_color'] = colormap['magenta']
-          elif '30m' in n:
-            scatter_kwargs['line_color'] = colormap['blue']
-          else:
-            scatter_kwargs['line_color'] = colormap['yellow']
+            if '1w' in n:
+              scatter_kwargs['line_color'] = colormap['white']
+            elif '30m' in n:
+              scatter_kwargs['line_color'] = colormap['yellow']
+            else:
+              scatter_kwargs['line_color'] = colormap['magenta']
     print(scatter_kwargs)
     scatter = go.Scatter(**scatter_kwargs)
     fig.add_trace(scatter)
@@ -275,14 +283,124 @@ def backtest_rl(rl_data_path, rl_curves_path, rl_dataset_kwargs, lob_df_t,
   rl_df_curves.to_csv(rl_curves_path)
   return rl_df, rl_df_curves
   
+  
+def plot_histogram_windows(windows, filename, x_col='index', y_col='m_p',
+                           figsize=(8,6), bins=100, cmap='viridis', kinds=None,
+                           lines=None, plot_histogram=True, plot_lines=True, 
+                           plot_html=True, plot_png=True, layout_kwargs=None):
+  layout_kwargs = {} if layout_kwargs is None else layout_kwargs
+  lines = ['mean'] if lines is None else lines
+  kinds = ['diff'] if kinds is None else kinds
+  if len(windows) == 0:
+    print('Warning! No windows')
+    return
+  for kind in kinds:
+    points = []
+    for w in windows:
+      if x_col == 'index':
+        xs = w.index.to_series().diff().dt.total_seconds().cumsum()
+      else:
+        xs = w[x_col].to_series().diff().dt.total_seconds().cumsum()
+      xs[0] = 0
+      y_center = len(w) // 2
+      if kind == 'diff':
+        ys = w[y_col] - w[y_col].iloc[y_center]
+      elif kind == 'relative':
+        ys = (w[y_col] - w[y_col].iloc[y_center]) / w[y_col].iloc[y_center]
+      elif kind == 'ratio':
+        ys = w[y_col] / w[y_col].iloc[y_center]
+      elif kind == 'lograt':
+        ys = np.log(w[y_col] / w[y_col].iloc[y_center])     
+      for x, y in zip(xs, ys):
+        points.append([x, y])
+    points = np.array(points)
+    H, xedges, yedges = np.histogram2d(points[:,0], points[:,1], bins=bins)
+    # Hist
+    if plot_histogram:
+      H_norm = H / H.sum(axis=1, keepdims=True)
+      plt.clf()
+      plt.figure(figsize=figsize)
+      X, Y = np.meshgrid(xedges, yedges)
+      plt.pcolormesh(X, Y, H_norm.T, cmap=plt.cm.get_cmap(cmap))
+      # plt.title(f'Points: {len(points)}')
+      plt.savefig(f'{filename}-histogram-{kind}.png')
+    # Lines
+    if plot_lines:
+      lines_ys = {x: [] for x in lines}
+      for ys in H:
+        vs = []
+        for yi, y in enumerate(ys):
+          vy0, vy1 = yedges[yi], yedges[yi+1]
+          vy = 0.5*(vy0 + vy1)
+          for _ in range(int(y)):
+            vs.append(vy)
+        for line in lines_ys.keys():
+          if line.isalpha():
+            lines_ys[line].append(getattr(np, line)(vs))
+          else:  # quantile
+            lines_ys[line].append(np.quantile(vs, float(line)))
+      fig = go.Figure()
+      # if len(df) < 100000:
+      # else:  # Broken Pipe error
+      #   fig = FigureResampler(go.Figure())
+      for line, ys in lines_ys.items():
+        y_center = len(ys) // 2
+        xs = np.arange(-y_center, y_center)
+        scatter_kwargs = {'x': xs, 'y': ys, 'name': line}
+        scatter = go.Scatter(**scatter_kwargs)
+        fig.add_trace(scatter)
+      fig.update_traces(mode='lines')
+      fig.update_layout(**layout_kwargs)
+      if plot_html:
+        fig.write_html(f'{filename}-lines-{kind}.html')
+      if plot_png:
+        fig.write_image(f'{filename}-lines-{kind}.png')  
+  
 
-def backtest_trades(trades_data_path, trades_curves_path, trades_dataset_kwargs, lob_df_t, 
+def backtest_signature(
+  actions_df, lob_df, prefix='-', window='T', g_col='strategy', a_col='action',
+  plot_strategy=True, layout_kwargs=None, histogram_kwargs=None):
+  histogram_kwargs = {} if histogram_kwargs is None else histogram_kwargs
+  histogram_kwargs['layout_kwargs'] = layout_kwargs
+  trades_strategy_stats = {}
+  buys_total, sells_total = [], []
+  lob_df = lob_df[~lob_df.index.duplicated(keep='first')]
+  for strategy, actions_df_strategy in actions_df.groupby(g_col):
+    print(strategy)
+    print(lob_df[['m_p', 'a_p_0', 'b_p_0']].index)
+    print(actions_df_strategy[[a_col]].index)
+    actions_df_strategy = actions_df_strategy[~actions_df_strategy.index.duplicated(keep='first')]
+    df = pd.concat([
+      lob_df[['m_p', 'a_p_0', 'b_p_0']],
+      actions_df_strategy[[a_col]]], 
+      axis=1)
+    df[['m_p', 'a_p_0', 'b_p_0']] = df[['m_p', 'a_p_0', 'b_p_0']].interpolate('time')
+    buys_before, buys_after, sells_before, sells_after = [], [], [], []
+    buys, sells = [], []
+    # df = df[3000000:]
+    for w in tqdm(df.rolling(window=window), total=len(df)):
+      center = len(w) // 2
+      action = w.iloc[center][a_col]
+      if action == 'buy' or action == 1:
+        buys.append(w)
+        buys_total.append(w)
+      elif action == 'sell' or action == 2:
+        sells.append(w)
+        sells_total.append(w)
+    print(f'buys {len(buys)}')
+    print(f'sells {len(sells)}')
+    if plot_strategy:
+      plot_histogram_windows(buys, f'signature{prefix}{strategy}-buy', **histogram_kwargs)
+      plot_histogram_windows(sells, f'signature{prefix}{strategy}-sell', **histogram_kwargs)
+  print(f'buys_total {len(buys_total)}')
+  print(f'sells_total {len(sells_total)}')
+  plot_histogram_windows(buys_total, f'signature{prefix}buy_total', **histogram_kwargs)
+  plot_histogram_windows(sells_total, f'signature{prefix}sell_total', **histogram_kwargs)
+
+    
+def backtest_trades(trades_data_path, trades_curves_path, trades_df_t, lob_df_t, 
                     plot_html=False, bt_kwargs=None, strategy_kwargs=None):
   bt_kwargs = {} if bt_kwargs is None else bt_kwargs
-  trades_dataset = Dataset(**trades_dataset_kwargs)
-  trades_ds_t, trades_ds_v, trades_df_t, trades_df_v = trades_dataset()
-  print(trades_df_t)
-  # print(trades_df_t.describe())
   # Backtest
   trades_strategy_stats = {}
   for strategy, trades_df_t_strategy in trades_df_t.groupby(['strategy']):
@@ -416,19 +534,34 @@ def backtest_ts(ts_data_path, ts_curves_path, ts_dataset_kwargs, lob_df_t,
   
   
 def main(
-  start, stop, 
+  start, stop, benchmark_dir,
   bt_kwargs, strategy_kwargs, lob_dataset_kwargs, 
   ts_dataset_kwargs, rl_dataset_kwargs, trades_dataset_kwargs,
-  layout_kwargs, curves_layout_kwargs,
-  update_trades=False, plot_trades=False, plot_trades_curves=False, 
-  trades_data_path='trades_data.csv', trades_curves_path='trades_curves.csv',
+  layout_kwargs, curves_layout_kwargs, signature_layout_kwargs=None, histogram_kwargs=None,
+  lob_dataset_path='lob.csv',
+  update_lob=False,
+  update_trades_dataset=False, update_trades_backtest=False, update_trades_signature=False,
+  update_trades=False, 
+  plot_trades=False,  plot_trades_curves=False, 
+  trades_dataset_path='trades.csv', trades_signature_path='trades_signature.csv',
+  trades_data_path='trades_data.csv', 
+  trades_curves_path='trades_curves.csv',
+  trades_signature_kwargs=None, rl_signature_kwargs=None, ts_signature_kwargs=None,
   update_rl=False, plot_rl=False, plot_rl_curves=False, 
   rl_data_path='rl_data.csv', rl_curves_path='rl_curves.csv',
+  update_rl_dataset=False, update_rl_backtest=False, update_rl_signature=False, 
+  rl_dataset_path='rl.csv', rl_signature_path='rl_signature.csv', 
+  update_ts_dataset=False, update_ts_backtest=False, update_ts_signature=False,
+  ts_dataset_path='ts.csv', ts_signature_path='ts_signature.csv', 
   update_ts=False, plot_ts=False, plot_ts_curves=False, 
   ts_data_path='ts_data.csv', ts_curves_path='ts_curves.csv',
   plot_all=False, plot_all_curves=False, update_all=False,
   plot_backtest_html=False
 ):
+  trades_signature_kwargs = {} if trades_signature_kwargs is None else trades_signature_kwargs
+  rl_signature_kwargs = {} if rl_signature_kwargs is None else rl_signature_kwargs
+  ts_signature_kwargs = {} if ts_signature_kwargs is None else ts_signature_kwargs
+  trades_signature_kwargs = {} if trades_signature_kwargs is None else trades_signature_kwargs
   lob_dataset_kwargs.setdefault('start', start)
   lob_dataset_kwargs.setdefault('stop', stop)
   ts_dataset_kwargs.setdefault('start', start)
@@ -437,16 +570,42 @@ def main(
   rl_dataset_kwargs.setdefault('stop', stop)
   trades_dataset_kwargs.setdefault('start', start)
   trades_dataset_kwargs.setdefault('stop', stop)
+  benchmark_path = Path(benchmark_dir)
+  benchmark_path.mkdir(parents=True, exist_ok=True)
+  os.chdir(benchmark_path)
   # LOB
-  if any([update_trades, update_rl, update_ts, update_all]):
+  lob_dataset_path = Path(lob_dataset_path)
+  if update_lob or update_all:
+    print(f'Reading lob from db')
     lob_dataset = Dataset(**lob_dataset_kwargs)
     lob_ds_t, lob_ds_v, lob_df_t, lob_df_v = lob_dataset()
-    print(lob_df_t)
     plot_curves(lob_df_t, prefix='m_p', group_column=None, 
                 layout_kwargs=curves_layout_kwargs, tags=None, 
                 plot_html=False, plot_png=True, y_column='m_p')
+    lob_df_t.to_csv(lob_dataset_path)
+  else:
+    print(f'Reading lob from {lob_dataset_path}')
+    lob_df_t = pd.read_csv(lob_dataset_path,
+                           index_col='timestamp', 
+                           parse_dates=['timestamp'])
+  print(lob_df_t)
   # RL
-  if update_rl or update_all:
+  rl_dataset_path = Path(rl_dataset_path)
+  rl_signature_path = Path(rl_signature_path)
+  if update_all or update_rl_dataset:
+    print(f'Reading rl from db')
+    rl_dataset = Dataset(**rl_dataset_kwargs)
+    rl_ds_t, rl_ds_v, rl_df_t, rl_df_v = rl_dataset()
+    rl_df_t.to_csv(rl_dataset_path)
+  elif rl_dataset_path.exists():
+    print(f'Reading rl from {rl_dataset_path}')
+    rl_df_t = pd.read_csv(rl_dataset_path,
+                          index_col='timestamp', 
+                          parse_dates=['timestamp'])
+  else:
+    rl_df_t = None
+  print(rl_df_t)
+  if update_rl_backtest or update_all:
     rl_df, rl_df_curves = backtest_rl(rl_data_path, rl_curves_path, 
                                       rl_dataset_kwargs, lob_df_t,
                                       plot_html=plot_backtest_html,
@@ -460,12 +619,37 @@ def main(
       if 'Unnamed: 0' in rl_df_curves:
         rl_df_curves = rl_df_curves.rename(columns={'Unnamed: 0': 'timestamp'})
       rl_df_curves = rl_df_curves.set_index('timestamp')
+  if update_rl_signature or update_all:
+    print(f'Reading rl signatures from {rl_signature_path}')
+    rl_signature_kwargs['histogram_kwargs'] = histogram_kwargs
+    rl_signature_kwargs['layout_kwargs'] = signature_layout_kwargs
+    rl_signature_kwargs['g_col'] = 'model'
+    rl_signature_kwargs['prefix'] = 'rl-'
+    rl_df_sign = backtest_signature(rl_df_t, lob_df_t, **rl_signature_kwargs)
+    # rl_df_sign.to_csv(trades_signature_path)
+  else:
+    print(f'Reading rl signatures from {rl_signature_path}')
+    # rl_df_sign = pd.read_csv(trades_signature_path)
   # TRADES
-  if update_trades or update_all:
-    trades_df, trades_df_curves = backtest_trades(trades_data_path, trades_curves_path, 
-                                                  trades_dataset_kwargs, lob_df_t, 
-                                                  plot_html=plot_backtest_html,
-                                                  bt_kwargs=bt_kwargs, strategy_kwargs=strategy_kwargs)
+  trades_dataset_path = Path(trades_dataset_path)
+  trades_signature_path = Path(trades_signature_path)
+  if update_all or update_trades_dataset:
+    print(f'Reading trades from db')
+    trades_dataset = Dataset(**trades_dataset_kwargs)
+    trades_ds_t, trades_ds_v, trades_df_t, trades_df_v = trades_dataset()
+    trades_df_t.to_csv(trades_dataset_path)
+  else:
+    print(f'Reading trades from {trades_dataset_path}')
+    trades_df_t = pd.read_csv(trades_dataset_path,
+                              index_col='timestamp', 
+                              parse_dates=['timestamp'])
+  print(trades_df_t)
+  if update_trades_backtest or update_all:
+    trades_df, trades_df_curves = backtest_trades(
+      trades_data_path, trades_curves_path, 
+      trades_df_t, lob_df_t, 
+      plot_html=plot_backtest_html,
+      bt_kwargs=bt_kwargs, strategy_kwargs=strategy_kwargs)
   else:
     if plot_trades or plot_all:
       trades_df = pd.read_csv(trades_data_path)
@@ -474,8 +658,29 @@ def main(
       if 'Unnamed: 0' in trades_df_curves:
         trades_df_curves = trades_df_curves.rename(columns={'Unnamed: 0': 'timestamp'})
       trades_df_curves = trades_df_curves.set_index('timestamp')
+  if update_trades_signature or update_all:
+    print(f'Reading trades signatures from {trades_signature_path}')
+    trades_signature_kwargs['histogram_kwargs'] = histogram_kwargs
+    trades_signature_kwargs['layout_kwargs'] = signature_layout_kwargs
+    trades_df_sign = backtest_signature(trades_df_t, lob_df_t, **trades_signature_kwargs)
+    # trades_df_sign.to_csv(trades_signature_path)
+  else:
+    print(f'Reading trades signatures from {trades_signature_path}')
+    # trades_df_sign = pd.read_csv(trades_signature_path)
   # TS
-  if update_ts or update_all:
+  ts_dataset_path = Path(ts_dataset_path)
+  ts_signature_path = Path(ts_signature_path)
+  if update_all or update_ts_dataset:
+    print(f'Reading ts from db')
+    ts_dataset = Dataset(**ts_dataset_kwargs)
+    ts_ds_t, ts_ds_v, ts_df_t, ts_df_v = ts_dataset()
+    ts_df_t.to_csv(ts_dataset_path)
+  else:
+    print(f'Reading ts from {ts_dataset_path}')
+    ts_df_t = pd.read_csv(ts_dataset_path,
+                          index_col='timestamp', 
+                          parse_dates=['timestamp'])
+  if update_ts_backtest or update_all:
     ts_df, ts_df_curves = backtest_ts(ts_data_path, ts_curves_path, 
                                       ts_dataset_kwargs, lob_df_t,
                                       plot_html=plot_backtest_html,
@@ -488,6 +693,27 @@ def main(
       if 'Unnamed: 0' in ts_df_curves:
         ts_df_curves = ts_df_curves.rename(columns={'Unnamed: 0': 'timestamp'})
       ts_df_curves = ts_df_curves.set_index('timestamp')
+  if update_ts_signature or update_all:
+    print(f'Reading ts signatures from {ts_dataset_path}')
+    ts_signature_kwargs['histogram_kwargs'] = histogram_kwargs
+    ts_signature_kwargs['layout_kwargs'] = signature_layout_kwargs
+    ts_signature_kwargs['g_col'] = 'model'
+    horizons = []
+    for c in ts_df_t.columns:
+      if 'last' in c or 'value' in c:
+        periods = int(c.split('-')[-1])  # metric-horizon (e.g value-15 or last-20)
+        ts_df_t[c] = ts_df_t[c].shift(periods=-periods)
+        horizons.append(periods)
+    for h in horizons:
+      ts_df_t[f'forecast-{h}'] = ts_df_t[f'value-{h}'] / ts_df_t[f'last-{h}'] - 1
+      ts_df_t[f'action-{h}'] = (ts_df_t[f'forecast-{h}'] < 0).astype(int) + 1  # 1 buy, 2 sell
+      ts_signature_kwargs['a_col'] = f'action-{h}'
+      ts_signature_kwargs['prefix'] = f'action-{h}-'
+      ts_df_sign = backtest_signature(ts_df_t, lob_df_t, **ts_signature_kwargs)
+    # ts_df_sign.to_csv(ts_signature_path)
+  else:
+    print(f'Reading ts signatures from {ts_dataset_path}')
+    # ts_df_sign = pd.read_csv(ts_signature_path)
   # PLOT
   if plot_ts:
     plot_bars(ts_df, 'ts', 'agent', layout_kwargs)
