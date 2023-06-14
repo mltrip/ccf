@@ -13,20 +13,19 @@ update_all: false
 plot_all: false
 plot_all_curves: false
 update_lob: false
-update_trades: false
 update_trades_dataset: false
-update_trades_signature: false
+update_rl_dataset: false
+update_ts_dataset: false
 update_trades_backtest: false
+update_rl_backtest: false
+update_ts_backtest: false
+update_trades_signature: true
+update_rl_signature: false
+update_ts_signature: false
 plot_trades: false
 plot_trades_curves: false
-update_rl: false
-update_rl_dataset: false
-update_rl_signature: true
 plot_rl: false
 plot_rl_curves: false
-update_ts: false
-update_ts_dataset: false
-update_ts_signature: false
 plot_ts: false
 plot_ts_curves: false
 plot_backtest_html: false
@@ -41,7 +40,17 @@ bt_kwargs:
   hedging: false
   exclusive_orders: false
 trades_signature_kwargs:
+  resample_kwargs: 
+    rule: 1S
   window: 10T
+rl_signature_kwargs:
+  window: 10T
+  resample_kwargs: 
+    rule: 1S
+ts_signature_kwargs:
+  window: 10T
+  resample_kwargs: 
+    rule: 1S
 histogram_kwargs:
   figsize: [8, 6]
   bins: 600
