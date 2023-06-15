@@ -166,7 +166,7 @@ def plot_bars(df, prefix, column, layout_kwargs):
 
     
 def plot_curves(df, prefix, group_column=None, layout_kwargs=None, tags=None, 
-                plot_html=False, plot_png=True, y_column='Equity'):
+                plot_html=False, plot_png=True, x_column='index', y_column='Equity'):
   tags = [] if tags is None else tags
   layout_kwargs = {} if layout_kwargs is None else layout_kwargs
   print(len(df))
@@ -178,7 +178,9 @@ def plot_curves(df, prefix, group_column=None, layout_kwargs=None, tags=None,
   for n, g in groups:
     print(n)
     print(g)
-    scatter_kwargs = {'x': g.index, 'y': g[y_column], 'name': n}
+    scatter_kwargs = {'x': g.index if x_column == 'index' else g[x_column], 
+                      'y': g[y_column], 
+                      'name': n if isinstance(n, str) else '-'.join(n)}
     scatter_kwargs['line_width'] = 1
     if 'total' in tags:
       if n.startswith('rl-'):
@@ -283,28 +285,32 @@ def backtest_rl(rl_data_path, rl_curves_path, rl_dataset_kwargs, lob_df_t,
   rl_df_curves.to_csv(rl_curves_path)
   return rl_df, rl_df_curves
   
-  
-def plot_histogram_windows(windows, filename, x_col='index', y_col='m_p',
-                           figsize=(8,6), bins=100, cmap='viridis', kinds=None,
-                           lines=None, plot_histogram=True, plot_lines=True, 
-                           plot_html=True, plot_png=True, layout_kwargs=None, 
-                           add_y_center_bin=True):
-  layout_kwargs = {} if layout_kwargs is None else layout_kwargs
+
+def calculate_signatures(windows, lines=None, kinds=None, 
+                         x_col='index', y_col='m_p',
+                         bins=100, 
+                         add_center_bin=True, center_tol=1e-12):
   lines = ['mean'] if lines is None else lines
   kinds = ['diff'] if kinds is None else kinds
   if len(windows) == 0:
     print('Warning! No windows')
-    return
+    return pd.DataFrame()
+  data = []
   for kind in kinds:
+    print(kind)
     points = []
     for w in windows:
+      if len(w) < 2:
+        continue
+      center_i = len(w) // 2
       if x_col == 'index':
         xs = w.index.to_series().diff().dt.total_seconds().cumsum()
       else:
         xs = w[x_col].to_series().diff().dt.total_seconds().cumsum()
       xs[0] = 0
-      y_center_i = len(w) // 2
-      y_center = w[y_col].iloc[y_center_i]
+      x_center = xs[center_i]
+      xs = [x - x_center for x in xs]
+      y_center = w[y_col].iloc[center_i]
       if kind == 'diff':
         ys = w[y_col] - y_center
       elif kind == 'ratio':
@@ -313,94 +319,70 @@ def plot_histogram_windows(windows, filename, x_col='index', y_col='m_p',
         ys = w[y_col] / y_center - 1.0
       elif kind == 'lograt':
         ys = np.log(w[y_col] / y_center)
-      # print(y_center_i, y_center)
-      # print(xs)
-      # print(ys)
       for x, y in zip(xs, ys):
         if np.isfinite(x) and np.isfinite(y):
           points.append([x, y])
     points = np.array(points)
-    try:
+    if add_center_bin:  # Add [y_center-y_tol, y_center, y_center+y_tol] bin to y
       min_x, max_x = min(points[:,0]), max(points[:,0])
+      x_center = 0
+      bins_x = np.concatenate([np.linspace(min_x, x_center - center_tol, bins // 2), 
+                               np.linspace(x_center + center_tol, max_x, bins // 2)], 
+                              axis=0)
       min_y, max_y = min(points[:,1]), max(points[:,1])
+      y_center = 1 if kind == 'ratio' else 0
+      bins_y = np.concatenate([np.linspace(min_y, y_center - center_tol, bins // 2), 
+                               np.linspace(y_center + center_tol, max_y, bins // 2)], 
+                              axis=0)
+    else:
       bins_x = bins
-      if add_y_center_bin:  # Add "0" bin to y
-        y_center = 1 if kind == 'ratio' else 0
-        y_tol = 1e-9
-        bins_y = np.concatenate([np.linspace(min_y, y_center - y_tol, bins//2), 
-                                 np.linspace(y_center + y_tol, max_y, bins//2)], 
-                                axis=0)
-      else:
-        bins_y = bins
+      bins_y = bins
+    try:
       H, xedges, yedges = np.histogram2d(points[:,0], points[:,1], 
                                          bins=[bins_x, bins_y])
-      # print(H.shape)
-      # print(xedges)
-      # print(yedges)
     except Exception as e:
       print(e)
-      return
-    # Hist
-    if plot_histogram:
-      H_norm = H / H.sum(axis=1, keepdims=True)
-      plt.clf()
-      plt.figure(figsize=figsize)
-      X, Y = np.meshgrid(xedges, yedges)
-      plt.pcolormesh(X, Y, H_norm.T, cmap=plt.cm.get_cmap(cmap))
-      plt.savefig(f'{filename}-histogram-{kind}.png')
+      continue
     # Lines
-    if plot_lines:
-      lines_ys = {x: [] for x in lines}
-      for ys in H:
-        vs = []
-        for yi, y in enumerate(ys):
-          vy0, vy1 = yedges[yi], yedges[yi+1]
-          vy = 0.5*(vy0 + vy1)
-          for _ in range(int(y)):
-            vs.append(vy)
-        for line in lines_ys.keys():
-          if line.isalpha():
-            lines_ys[line].append(getattr(np, line)(vs))
-          else:  # quantile
-            lines_ys[line].append(np.quantile(vs, float(line)))
-      fig = go.Figure()
-      # if len(df) < 100000:
-      # else:  # Broken Pipe error
-      #   fig = FigureResampler(go.Figure())
-      for line, ys in lines_ys.items():
-        y_center_i = len(ys) // 2
-        xs = np.arange(len(ys)) - y_center_i 
-        scatter_kwargs = {'x': xs, 'y': ys, 'name': line}
-        scatter = go.Scatter(**scatter_kwargs)
-        fig.add_trace(scatter)
-      fig.update_traces(mode='lines')
-      fig.update_layout(**layout_kwargs)
-      if plot_html:
-        fig.write_html(f'{filename}-lines-{kind}.html')
-      if plot_png:
-        fig.write_image(f'{filename}-lines-{kind}.png')  
+    for xi, nys in enumerate(H):
+      x0, x1 = xedges[xi], xedges[xi + 1]
+      x = 0.5*(x0 + x1)
+      ys = []
+      for yi, ny in enumerate(nys):
+        y0, y1 = yedges[yi], yedges[yi + 1]
+        y = 0.5*(y0 + y1)
+        for _ in range(int(ny)):
+          ys.append(y)
+      for line in lines:
+        if line.isalpha():
+          a = getattr(np, line)(ys)
+        else:  # quantile
+          a = np.quantile(ys, float(line))
+        d = {'kind': kind, 'line': line, 'y': a, 'x': x}
+        data.append(d)
+  df = pd.DataFrame(data)
+  return df
   
 
 def backtest_signature(
   actions_df, lob_df, prefix='-', window='T', g_col='strategy', a_col='action',
-  plot_strategy=True, layout_kwargs=None, histogram_kwargs=None, resample_kwargs=None):
-  histogram_kwargs = {} if histogram_kwargs is None else histogram_kwargs
-  histogram_kwargs['layout_kwargs'] = layout_kwargs
-  trades_strategy_stats = {}
+  resample_kwargs=None, calculate_kwargs=None, calculate_total=True, calculate_group=True):
+  calculate_kwargs = {} if calculate_kwargs is None else calculate_kwargs
+  dfs = []
   buys_total, sells_total = [], []
   lob_df = lob_df[~lob_df.index.duplicated(keep='first')]
-  for strategy, actions_df_strategy in actions_df.groupby(g_col):
-    print(strategy)
-    actions_df_strategy = actions_df_strategy[~actions_df_strategy.index.duplicated(keep='first')]
+  for group, actions_df_group in actions_df.groupby(g_col):
+    print(group)
+    actions_df_group = actions_df_group[~actions_df_group.index.duplicated(keep='first')]
     df = pd.concat([
       lob_df[['m_p', 'a_p_0', 'b_p_0']],
-      actions_df_strategy[[a_col]]], 
+      actions_df_group[[a_col]]], 
       axis=1)
     df[['m_p', 'a_p_0', 'b_p_0']] = df[['m_p', 'a_p_0', 'b_p_0']].interpolate('time')
     if resample_kwargs is not None:
       df = df.resample(**resample_kwargs).last()
     buys, sells = [], []
-    # df = df[2000000:]
+    # df = df[2400000:]
     for w in tqdm(df.rolling(window=window), total=len(df)):
       center = len(w) // 2
       action = w.iloc[center][a_col]
@@ -410,15 +392,30 @@ def backtest_signature(
       elif action == 'sell' or action == 2:
         sells.append(w)
         sells_total.append(w)
-    print(f'buys {len(buys)}')
-    print(f'sells {len(sells)}')
-    if plot_strategy:
-      plot_histogram_windows(buys, f'signature{prefix}{strategy}-buy', **histogram_kwargs)
-      plot_histogram_windows(sells, f'signature{prefix}{strategy}-sell', **histogram_kwargs)
-  print(f'buys_total {len(buys_total)}')
-  print(f'sells_total {len(sells_total)}')
-  plot_histogram_windows(buys_total, f'signature{prefix}buy_total', **histogram_kwargs)
-  plot_histogram_windows(sells_total, f'signature{prefix}sell_total', **histogram_kwargs)
+    if calculate_group:
+      print(f'buys {len(buys)}')
+      df_buys = calculate_signatures(buys, **calculate_kwargs)
+      df_buys['action'] = 'buy'
+      df_buys['agent'] = f'{prefix}{group}'
+      dfs.append(df_buys)
+      print(f'sells {len(sells)}')
+      df_sells = calculate_signatures(sells, **calculate_kwargs)
+      df_sells['action'] = 'sell'
+      df_sells['agent'] = f'{prefix}{group}'
+      dfs.append(df_sells)
+  if calculate_total:
+    print(f'buys_total {len(buys_total)}')
+    df_buys_total = calculate_signatures(buys_total, **calculate_kwargs)
+    df_buys_total['action'] = 'buy'
+    df_buys_total['agent'] = f'{prefix}total'
+    dfs.append(df_buys_total)
+    print(f'sells_total {len(sells_total)}')
+    df_sells_total = calculate_signatures(sells_total, **calculate_kwargs)
+    df_sells_total['action'] = 'sell'
+    df_sells_total['agent'] = f'{prefix}total'
+    dfs.append(df_sells_total)
+  df = pd.concat(dfs) if len(dfs) > 0 else pd.DataFrame()
+  return df
 
     
 def backtest_trades(trades_data_path, trades_curves_path, trades_df_t, lob_df_t, 
@@ -576,7 +573,11 @@ def main(
   plot_ts=False, plot_ts_curves=False, 
   ts_data_path='ts_data.csv', ts_curves_path='ts_curves.csv',
   plot_all=False, plot_all_curves=False, update_all=False,
-  plot_backtest_html=False
+  plot_backtest_html=False,
+  plot_trades_signatures=False,
+  plot_rl_signatures=False,
+  plot_ts_signatures=False,
+  plot_total_signatures=False
 ):
   trades_signature_kwargs = {} if trades_signature_kwargs is None else trades_signature_kwargs
   rl_signature_kwargs = {} if rl_signature_kwargs is None else rl_signature_kwargs
@@ -610,7 +611,6 @@ def main(
   print(lob_df_t)
   # RL
   rl_dataset_path = Path(rl_dataset_path)
-  rl_signature_path = Path(rl_signature_path)
   if update_all or update_rl_dataset:
     print(f'Reading rl from db')
     rl_dataset = Dataset(**rl_dataset_kwargs)
@@ -638,20 +638,16 @@ def main(
       if 'Unnamed: 0' in rl_df_curves:
         rl_df_curves = rl_df_curves.rename(columns={'Unnamed: 0': 'timestamp'})
       rl_df_curves = rl_df_curves.set_index('timestamp')
+  rl_signature_path = Path(rl_signature_path)
   if update_rl_signature or update_all:
     print(f'Calculating rl signatures')
-    rl_signature_kwargs['histogram_kwargs'] = histogram_kwargs
-    rl_signature_kwargs['layout_kwargs'] = signature_layout_kwargs
-    rl_signature_kwargs['g_col'] = 'model'
-    rl_signature_kwargs['prefix'] = '-rl-'
     rl_df_sign = backtest_signature(rl_df_t, lob_df_t, **rl_signature_kwargs)
-    # rl_df_sign.to_csv(trades_signature_path)
+    rl_df_sign.to_csv(rl_signature_path)
   else:
     print(f'Reading rl signatures from {rl_signature_path}')
-    # rl_df_sign = pd.read_csv(trades_signature_path)
+    rl_df_sign = pd.read_csv(rl_signature_path)
   # TRADES
   trades_dataset_path = Path(trades_dataset_path)
-  trades_signature_path = Path(trades_signature_path)
   if update_all or update_trades_dataset:
     print(f'Reading trades from db')
     trades_dataset = Dataset(**trades_dataset_kwargs)
@@ -677,19 +673,16 @@ def main(
       if 'Unnamed: 0' in trades_df_curves:
         trades_df_curves = trades_df_curves.rename(columns={'Unnamed: 0': 'timestamp'})
       trades_df_curves = trades_df_curves.set_index('timestamp')
+  trades_signature_path = Path(trades_signature_path)
   if update_trades_signature or update_all:
     print(f'Calculating trades signatures')
-    trades_signature_kwargs['histogram_kwargs'] = histogram_kwargs
-    trades_signature_kwargs['layout_kwargs'] = signature_layout_kwargs
-    trades_signature_kwargs['prefix'] = '-trades-'
     trades_df_sign = backtest_signature(trades_df_t, lob_df_t, **trades_signature_kwargs)
-    # trades_df_sign.to_csv(trades_signature_path)
+    trades_df_sign.to_csv(trades_signature_path)
   else:
     print(f'Reading trades signatures from {trades_signature_path}')
-    # trades_df_sign = pd.read_csv(trades_signature_path)
+    trades_df_sign = pd.read_csv(trades_signature_path)  
   # TS
   ts_dataset_path = Path(ts_dataset_path)
-  ts_signature_path = Path(ts_signature_path)
   if update_all or update_ts_dataset:
     print(f'Reading ts from db')
     ts_dataset = Dataset(**ts_dataset_kwargs)
@@ -713,27 +706,29 @@ def main(
       if 'Unnamed: 0' in ts_df_curves:
         ts_df_curves = ts_df_curves.rename(columns={'Unnamed: 0': 'timestamp'})
       ts_df_curves = ts_df_curves.set_index('timestamp')
+  ts_signature_path = Path(ts_signature_path)
   if update_ts_signature or update_all:
     print(f'Calculating ts signatures')
-    ts_signature_kwargs['histogram_kwargs'] = histogram_kwargs
-    ts_signature_kwargs['layout_kwargs'] = signature_layout_kwargs
-    ts_signature_kwargs['g_col'] = 'model'
     horizons = []
     for c in ts_df_t.columns:
       if 'last' in c or 'value' in c:
         periods = int(c.split('-')[-1])  # metric-horizon (e.g value-15 or last-20)
         ts_df_t[c] = ts_df_t[c].shift(periods=-periods)
         horizons.append(periods)
+    ts_df_sign_hs = []
     for h in horizons:
+      print(f'horizon: {h}')
       ts_df_t[f'forecast-{h}'] = ts_df_t[f'value-{h}'] / ts_df_t[f'last-{h}'] - 1
       ts_df_t[f'action-{h}'] = (ts_df_t[f'forecast-{h}'] < 0).astype(int) + 1  # 1 buy, 2 sell
       ts_signature_kwargs['a_col'] = f'action-{h}'
       ts_signature_kwargs['prefix'] = f'-ts-action-{h}-'
-      ts_df_sign = backtest_signature(ts_df_t, lob_df_t, **ts_signature_kwargs)
-    # ts_df_sign.to_csv(ts_signature_path)
+      ts_df_sign_h = backtest_signature(ts_df_t, lob_df_t, calculate_total=False, **ts_signature_kwargs)
+      ts_df_sign_hs.append(ts_df_sign_h)
+    ts_df_sign = pd.concat(ts_df_sign_hs)
+    ts_df_sign.to_csv(ts_signature_path)
   else:
-    print(f'Reading ts signatures from {ts_dataset_path}')
-    # ts_df_sign = pd.read_csv(ts_signature_path)
+    print(f'Reading ts signatures from {ts_signature_path}')
+    ts_df_sign = pd.read_csv(ts_signature_path)  
   # PLOT
   if plot_ts:
     plot_bars(ts_df, 'ts', 'agent', layout_kwargs)
@@ -765,7 +760,36 @@ def main(
                 tags=['total', 'skip_ts', 'skip_rl_backtest'])
     plot_curves(total_df_curves, 'total_curves', 'agent', curves_layout_kwargs, 
                 tags=['total', 'skip_ts', 'split_rl_forward', 'split_ppo', 'skip_rl_backtest'])
-    
+  if plot_rl_signatures:
+    for n, g in rl_df_sign.groupby(['action', 'kind', 'line']):
+      suffix = '-'.join(n)
+      plot_curves(g, f'signature-rl-{suffix}', 'agent', 
+                  x_column='x', y_column='y', 
+                  plot_html=True, plot_png=True,
+                  layout_kwargs=signature_layout_kwargs)
+  if plot_trades_signatures:
+    for n, g in trades_df_sign.groupby(['action', 'kind', 'line']):
+      suffix = '-'.join(n)
+      plot_curves(g, f'signature-trades-{suffix}', 'agent', 
+                  x_column='x', y_column='y', 
+                  plot_html=True, plot_png=True,
+                  layout_kwargs=signature_layout_kwargs) 
+  if plot_ts_signatures:
+    for n, g in ts_df_sign.groupby(['action', 'kind', 'line']):
+      suffix = '-'.join(n)
+      plot_curves(g, f'signature-ts-{suffix}', 'agent', 
+                  x_column='x', y_column='y', 
+                  plot_html=True, plot_png=True,
+                  layout_kwargs=signature_layout_kwargs) 
+  if plot_total_signatures:
+    total_sign_df = pd.concat([rl_df_sign, trades_df_sign, ts_df_sign])
+    for n, g in total_sign_df.groupby(['action', 'kind', 'line']):
+      suffix = '-'.join(n)
+      plot_curves(g, f'signature-total-{suffix}', 'agent', 
+                  x_column='x', y_column='y', 
+                  plot_html=True, plot_png=True,
+                  layout_kwargs=signature_layout_kwargs)
+  
   
 @hydra.main(version_base=None)
 def app(cfg: DictConfig) -> None:

@@ -20,8 +20,8 @@ update_trades_backtest: false
 update_rl_backtest: false
 update_ts_backtest: false
 update_trades_signature: true
-update_rl_signature: false
-update_ts_signature: false
+update_rl_signature: true
+update_ts_signature: true
 plot_trades: false
 plot_trades_curves: false
 plot_rl: false
@@ -29,6 +29,10 @@ plot_rl_curves: false
 plot_ts: false
 plot_ts_curves: false
 plot_backtest_html: false
+plot_trades_signatures: false
+plot_rl_signatures: false
+plot_ts_signatures: false
+plot_total_signatures: true
 strategy_kwargs:
   size: 400
   unit_size: 1e-6  # μBTC
@@ -40,17 +44,35 @@ bt_kwargs:
   hedging: false
   exclusive_orders: false
 trades_signature_kwargs:
+  prefix: "-trades-"
+  g_col: strategy
   resample_kwargs: 
     rule: 1S
   window: 10T
+  calculate_kwargs:
+    bins: 600
+    kinds: [ diff, relative, ratio, lograt ]
+    lines: ['mean', 'median']
 rl_signature_kwargs:
+  prefix: "-rl-"
+  g_col: model
   window: 10T
   resample_kwargs: 
     rule: 1S
+  calculate_kwargs:
+    bins: 600
+    kinds: [ diff, relative, ratio, lograt ]
+    lines: ['mean', 'median']
 ts_signature_kwargs:
+  prefix: "-ts-"
+  g_col: model
   window: 10T
   resample_kwargs: 
     rule: 1S
+  calculate_kwargs:
+    bins: 600
+    kinds: [ diff, relative, ratio, lograt ]
+    lines: ['mean', 'median']
 histogram_kwargs:
   figsize: [8, 6]
   bins: 600
@@ -66,6 +88,9 @@ layout_kwargs:
 signature_layout_kwargs:
   plot_bgcolor: "#212121"  # darkest grey
   template: plotly_dark
+  width: 800
+  height: 600
+  legend: {x: 0, y: -2.0}
 curves_layout_kwargs:
   plot_bgcolor: "#212121"  # darkest grey
   template: plotly_dark
