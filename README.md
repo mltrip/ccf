@@ -1,7 +1,9 @@
 # CCF
-Crypto Currency Forecasting App for [ML System Design Course on ODS.ai](https://ods.ai/tracks/ml-system-design-22).
+Crypto Currency Forecasting App for [ML System Design Course on ODS.ai](https://ods.ai/tracks/ml-system-design-22)
 
-Also read the article ["Yet another architecture of ML crypto trading system."](https://medium.com/@romanzes/yet-another-architecture-of-ml-crypto-trading-system-381544d32c30) on Medium.
+Also read the article ["Yet another architecture of ML crypto trading system."](https://medium.com/@romanzes/yet-another-architecture-of-ml-crypto-trading-system-381544d32c30) on Medium
+
+More visualizations and metrics are available in the [presentation](https://docs.google.com/presentation/d/1HI-84QSIph-YY7kKMD4bdUZ_YA4oXOgUfFcUXcie3Pg/edit?usp=sharing)
 
 ## Architecture
 ![architecture](docs/architecture.png)
